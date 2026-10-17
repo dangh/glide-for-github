@@ -62,19 +62,25 @@ Review GitHub pull requests with fast diffs and a file tree, next to Files chang
 features, in a tab next to Files changed.
 
 **Permission justifications:**
-- `storage`: saves the user's display settings (`chrome.storage.sync`) and, if the user adds one, their GitHub token
-  (`chrome.storage.local`, never synced).
+- `storage`: saves the user's display settings (`chrome.storage.sync`) and, if the user adds one, their GitHub token and
+  the username it belongs to (`chrome.storage.local`, never synced).
 - Host permission `https://github.com/*`: content scripts on pull request pages add the Glide tab and mount the
   viewer, and the extension makes same-origin requests with the user's own GitHub session to read the pull request's
-  diffs and threads and to apply suggestions, resolve threads and mark files viewed. It runs on no other site.
+  diffs and threads and to apply suggestions, resolve threads and mark files viewed. It also posts the draft text of
+  the comment box's Preview tab to github.com's `/preview`, and reads file contents to expand context from github.com,
+  which redirects to `raw.githubusercontent.com` (GitHub's file-content host; reached by redirect, not a separate host
+  permission). It runs on no other site.
 - Host permission `https://api.github.com/*`: sends the user's token to GitHub's API to post comments, replies,
   reviews, edits and reactions, and to resolve threads and mark files viewed. Nothing else is sent there.
 
 **Remote code:** No. All code ships in the package.
 
-**Data usage:** Collects no user data. The token is stored locally and sent only to api.github.com; settings sync
-through the user's Chrome account. No analytics, no third parties, no sale or transfer of data (check the
-"does not sell / does not use for unrelated purposes / does not use for creditworthiness" certifications).
+**Data usage:** tick **Authentication information** (the GitHub token the user may add, with the GitHub username it
+belongs to, stored in `chrome.storage.local`) and **Website content** (pull request files, diffs and comments read from
+github.com, and the draft text sent to its `/preview`). Leave the other types unticked. Everything stays on the device or
+goes only to GitHub at the user's direction; nothing goes to the developer or any third party, and there is no analytics.
+Settings sync through the user's Chrome account. Tick all three certifications (no sale or transfer to third parties
+outside the approved use cases, no use unrelated to the single purpose, no use for creditworthiness or lending).
 
 **Privacy policy URL:** https://github.com/dangh/glide-for-github/blob/main/store/PRIVACY.md
 
@@ -104,13 +110,13 @@ Actions). Without them the publish job is skipped with a notice, and the release
 | Secret | Where it comes from |
 |---|---|
 | `CWS_EXTENSION_ID` | The item's ID in the developer dashboard. This is the only new value: it exists once the first manual upload does. |
-| `CWS_CLIENT_ID` | Reuse the OAuth client "sift-ci-publish" (Desktop app) in Google Cloud project `sift-for-github-publish` (Chrome Web Store API enabled, consent screen in production), the one Sift for GitHub publishes with |
+| `CWS_CLIENT_ID` | An OAuth client (type Desktop app) in a Google Cloud project with the Chrome Web Store API enabled and the consent screen in production. An existing client for the same publisher account can be reused. |
 | `CWS_CLIENT_SECRET` | The same OAuth client |
-| `CWS_REFRESH_TOKEN` | The same refresh token Sift uses. It belongs to the publisher account, not to one extension, so it can update any item that account owns, Glide included. Generate a new one only if that token was revoked; see the [chrome-webstore-upload keys guide](https://github.com/fregante/chrome-webstore-upload-keys) |
+| `CWS_REFRESH_TOKEN` | A refresh token for the publisher account, generated for that client; see the [chrome-webstore-upload keys guide](https://github.com/fregante/chrome-webstore-upload-keys). It belongs to the account, not to one extension, so an existing token for the same publisher works for this item too. |
 
-Glide is published from the same publisher account as Sift, so nothing new is needed in Google Cloud: copy the same
-client ID, client secret and refresh token from Sift's repository secrets into Glide's, and add the new
-`CWS_EXTENSION_ID`. Treat all four as credentials: anyone holding them can publish a new version of the extension.
+If the same publisher account already publishes another extension from CI, reuse its client ID, client secret and refresh
+token, and add only the new `CWS_EXTENSION_ID`. Treat all four as credentials: anyone holding them can publish a new
+version of the extension.
 
 Each release: bump `version` in `manifest.json` (and `package.json`), commit, tag `vX.Y.Z` with the same number and
 push the tag. CI fails the build if the tag and the manifest version differ.

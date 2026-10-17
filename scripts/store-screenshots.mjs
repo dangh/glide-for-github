@@ -9,7 +9,7 @@
  * appears in any visible text.
  */
 import { chromium } from '@playwright/test';
-import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

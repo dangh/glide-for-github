@@ -52,6 +52,17 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
   });
 
   describe('injectTab', () => {
+    it('draws the Glide mark (a "G" arc with two streaks) in the tab, not the old diamond', () => {
+      const ds = [...injectTab(document, ref)!.querySelectorAll('svg path')].map((p) => p.getAttribute('d') ?? '');
+      expect(ds.some((d) => /A\d/.test(d))).toBe(true);
+      expect(ds.join(' ')).not.toContain('M8 1.5');
+      // Stroked on the paths themselves, so GitHub's octicon `fill: currentColor` cannot turn the G into a blob.
+      for (const p of injectTab(document, ref)!.querySelectorAll('svg path')) {
+        expect(p.getAttribute('fill')).toBe('none');
+        expect(p.getAttribute('stroke')).toBe('currentColor');
+      }
+    });
+
     it('inserts the Glide tab directly after Files changed', () => {
       const tab = injectTab(document, ref);
       const files = document.querySelector(filesTab)!;

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Renders the extension icons and store promo tiles with headless Chrome.
-# Usage: store/render.sh [path-to-chrome]. Screenshots are taken by hand (they need a
-# signed-in GitHub session); see store/README.md.
+# Usage: store/render.sh [path-to-chrome]. The 1280x800 screenshots are not made here: they need a
+# signed-in GitHub session, so scripts/store-screenshots.mjs takes them (see store/README.md).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 chrome=${1:-${CHROME:-google-chrome}}

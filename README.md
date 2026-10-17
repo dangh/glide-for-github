@@ -63,9 +63,11 @@ extension icon, then **Options**).
 
 ## Privacy
 
-- The extension only talks to GitHub: `github.com`, `api.github.com` and GitHub's image servers (for avatars and
-  images in comments). No third parties; it has no server of its own, no analytics and loads no remote code.
-- Your token is stored in `chrome.storage.local`, on this device only. It is sent only to `api.github.com`, only from
+- The extension only talks to GitHub: `github.com`, `api.github.com`, GitHub's image servers (for avatars and
+  images in comments) and `raw.githubusercontent.com` (GitHub's file-content host, reached by redirect from github.com,
+  used to expand unchanged context). The Preview tab of the comment box posts your draft text to github.com's `/preview`
+  so GitHub can render it. No third parties; it has no server of its own, no analytics and loads no remote code.
+- Your token is stored in `chrome.storage.local`, on this device only, with the GitHub username it belongs to. It is sent only to `api.github.com`, only from
   the extension's own pages, never to the github.com page, and the options page never displays it.
 - Display settings are stored in `chrome.storage.sync`, so Chrome can sync them between your signed-in browsers. They
   contain no tokens and no pull request data.
