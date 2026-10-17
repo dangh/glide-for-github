@@ -1,0 +1,10 @@
+/* Pierre viewer iframe; sizing is also set inline by host.ts. */
+iframe[data-pierre-viewer] {
+  display: block;
+  width: 100%;
+  border: 0;
+}
+
+a[data-pierre-tab] {
+  cursor: pointer;
+}

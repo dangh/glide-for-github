@@ -1,0 +1,139 @@
+import { pierreUrl, type PrRef } from '../shared/pr-url';
+
+/**
+ * The PR tab strip. The new React PR UI labels it "Pull request navigation"; the classic
+ * server-rendered UI labels it "Pull request tabs".
+ */
+const NAV_SELECTOR =
+  'nav[aria-label="Pull request navigation"], nav[aria-label="Pull request tabs"], [aria-label="Pull request tabs"]';
+const NAV_LABELS = ['[aria-label="Pull request navigation"]', '[aria-label="Pull request tabs"]'];
+
+/** GitHub marks the open tab with `aria-current="page"` plus `selected` (classic) or `selected__<hash>` (React). */
+const SELECTED_CLASS = /^selected(?:__|$)/;
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function isSelected(a: Element): boolean {
+  return a.getAttribute('aria-current') === 'page' || [...a.classList].some((c) => SELECTED_CLASS.test(c));
+}
+
+/** The "Files changed" tab, or null when the tab strip is not rendered. */
+export function findFilesTab(doc: Document): HTMLAnchorElement | null {
+  const byId = doc.querySelector<HTMLAnchorElement>('a#prs-files-anchor-tab');
+  if (byId) return byId;
+  const selector = NAV_LABELS.flatMap((nav) =>
+    ['a[href$="/files"]', 'a[href*="/changes"]'].map((link) => `${nav} ${link}:not([data-pierre-tab])`),
+  ).join(', ');
+  return doc.querySelector<HTMLAnchorElement>(selector);
+}
+
+/** The element holding the PR tabs. */
+export function findTabNav(doc: Document): HTMLElement | null {
+  return findFilesTab(doc)?.closest<HTMLElement>('nav') ?? doc.querySelector<HTMLElement>(NAV_SELECTOR);
+}
+
+function createTab(doc: Document, files: HTMLAnchorElement, ref: PrRef): HTMLAnchorElement {
+  const tab = doc.createElement('a');
+  tab.className = [...files.classList].filter((c) => !SELECTED_CLASS.test(c)).join(' ');
+  tab.setAttribute('href', pierreUrl(ref));
+  tab.setAttribute('data-pierre-tab', '');
+
+  // Reuse the sibling icon's classes (spacing, muted color, responsive display) with our own glyph.
+  const filesIcon = files.querySelector('svg');
+  const icon = doc.createElementNS(SVG_NS, 'svg');
+  icon.setAttribute('aria-hidden', 'true');
+  icon.setAttribute('viewBox', '0 0 16 16');
+  icon.setAttribute('width', '16');
+  icon.setAttribute('height', '16');
+  icon.setAttribute('fill', 'none');
+  icon.setAttribute('stroke', 'currentColor');
+  icon.setAttribute('stroke-width', '1.5');
+  icon.setAttribute('stroke-linejoin', 'round');
+  const iconClass = filesIcon?.getAttribute('class');
+  if (iconClass) icon.setAttribute('class', iconClass.replace(/octicon-[\w-]+/, 'octicon-pierre'));
+  const path = doc.createElementNS(SVG_NS, 'path');
+  path.setAttribute('d', 'M8 1.5 14.5 8 8 14.5 1.5 8Z');
+  icon.append(path);
+
+  tab.append(icon, 'Pierre');
+  return tab;
+}
+
+/**
+ * Inserts the Pierre tab directly after "Files changed". Idempotent: returns the existing tab
+ * (repositioning it if GitHub re-rendered the strip around it). Null if the strip is not rendered.
+ */
+export function injectTab(doc: Document, ref: PrRef): HTMLAnchorElement | null {
+  const files = findFilesTab(doc);
+  if (!files) return null;
+
+  let tab = doc.querySelector<HTMLAnchorElement>('a[data-pierre-tab]');
+  if (tab && tab.closest('nav') !== files.closest('nav')) {
+    tab.remove();
+    tab = null;
+  }
+  if (!tab) tab = createTab(doc, files, ref);
+  if (tab.getAttribute('href') !== pierreUrl(ref)) tab.setAttribute('href', pierreUrl(ref));
+  if (files.nextElementSibling !== tab) files.after(tab);
+  return tab;
+}
+
+/** Removes the Pierre tab (restoring GitHub's selected styling first). */
+export function removeTab(doc: Document): void {
+  setTabActive(doc, false);
+  doc.querySelectorAll('a[data-pierre-tab]').forEach((t) => t.remove());
+}
+
+/**
+ * Mirrors GitHub's selected-tab styling onto the Pierre tab while active, taking it off the other
+ * tabs; restores their exact original attributes when inactive. Idempotent.
+ */
+export function setTabActive(doc: Document, active: boolean): void {
+  const tab = doc.querySelector<HTMLAnchorElement>('a[data-pierre-tab]');
+  const scope: ParentNode = tab?.closest('nav') ?? doc;
+  const others = [...scope.querySelectorAll<HTMLAnchorElement>('a')].filter((a) => a !== tab);
+
+  if (active && tab) {
+    let selectedClasses: string[] = [];
+    for (const a of others) {
+      if (!isSelected(a)) continue;
+      const classes = [...a.classList].filter((c) => SELECTED_CLASS.test(c));
+      selectedClasses = selectedClasses.concat(classes);
+      a.setAttribute('data-pierre-class', a.getAttribute('class') ?? '');
+      if (a.hasAttribute('aria-current')) {
+        a.setAttribute('data-pierre-current', a.getAttribute('aria-current') ?? '');
+        a.setAttribute('aria-current', 'false');
+      }
+      a.classList.remove(...classes);
+      a.setAttribute('data-pierre-stripped', a.getAttribute('class') ?? '');
+    }
+    const stored = tab.getAttribute('data-pierre-selected');
+    if (selectedClasses.length === 0) selectedClasses = stored ? stored.split(' ') : ['selected'];
+    tab.setAttribute('data-pierre-selected', selectedClasses.join(' '));
+    tab.setAttribute('aria-current', 'page');
+    tab.classList.add(...selectedClasses);
+    return;
+  }
+
+  for (const a of others) {
+    if (!a.hasAttribute('data-pierre-class')) continue;
+    // Restore only tabs still in the state we left them. If GitHub navigated meanwhile it has
+    // already re-rendered them, and blindly restoring would select two tabs at once.
+    const savedCurrent = a.getAttribute('data-pierre-current');
+    const untouched =
+      a.getAttribute('class') === a.getAttribute('data-pierre-stripped') &&
+      (savedCurrent === null || a.getAttribute('aria-current') === 'false');
+    if (untouched) {
+      a.setAttribute('class', a.getAttribute('data-pierre-class') ?? '');
+      if (savedCurrent !== null) a.setAttribute('aria-current', savedCurrent);
+    }
+    a.removeAttribute('data-pierre-class');
+    a.removeAttribute('data-pierre-current');
+    a.removeAttribute('data-pierre-stripped');
+  }
+  if (tab && tab.hasAttribute('data-pierre-selected')) {
+    tab.classList.remove(...(tab.getAttribute('data-pierre-selected') ?? '').split(' '));
+    tab.removeAttribute('data-pierre-selected');
+    tab.removeAttribute('aria-current');
+  }
+}
