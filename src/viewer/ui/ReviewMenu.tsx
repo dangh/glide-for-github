@@ -73,7 +73,7 @@ function ReviewPanel({ close }: { close: () => void }) {
   const [event, setEvent] = useState<ReviewEvent>('COMMENT');
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [error, setError] = useState<{ message: string; retry: () => void } | null>(null);
+  const [error, setError] = useState<{ message: string; action: 'submit' | 'discard' } | null>(null);
   const submitted = useRef(false);
 
   const isAuthor = !!pr && !!pr.author && pr.author === pr.viewer.login;
@@ -102,30 +102,35 @@ function ReviewPanel({ close }: { close: () => void }) {
     };
   }, [save]);
 
+  const chooseEvent = (next: ReviewEvent) => {
+    setEvent(next);
+    setError(null);
+  };
+
   const onInput = () => {
     const el = ref.current;
     setHasText((el?.value.trim() ?? '') !== '');
+    setError(null); // an error belongs to the text and choice it was raised for
     clearTimeout(timer.current);
     timer.current = setTimeout(() => save(el), SAVE_DEBOUNCE_MS);
   };
 
-  const run = (fn: () => Promise<void>, onDone: () => void) => {
-    const attempt = () => {
-      setBusy(true);
-      setError(null);
-      fn()
-        .then(onDone)
-        .catch((err: unknown) => {
-          if (!isNoTokenError(err)) setError({ message: errorMessage(err), retry: attempt });
-        })
-        .finally(() => setBusy(false));
-    };
-    attempt();
+  /** Runs one action; Retry runs the same action again from the current state (never from values captured earlier). */
+  const run = (action: 'submit' | 'discard', fn: () => Promise<void>, onDone: () => void) => {
+    setBusy(true);
+    setError(null);
+    fn()
+      .then(onDone)
+      .catch((err: unknown) => {
+        if (!isNoTokenError(err)) setError({ message: errorMessage(err), action });
+      })
+      .finally(() => setBusy(false));
   };
 
   const submit = () => {
     const body = ref.current?.value.trim() ?? '';
     run(
+      'submit',
       () => submitReview(event, body),
       () => {
         submitted.current = true;
@@ -139,7 +144,7 @@ function ReviewPanel({ close }: { close: () => void }) {
 
   const discard = () => {
     setConfirming(false);
-    run(discardReview, () => usePr.getState().setNotice({ kind: 'info', message: 'Pending review discarded.' }));
+    run('discard', discardReview, () => usePr.getState().setNotice({ kind: 'info', message: 'Pending review discarded.' }));
   };
 
   const canSubmit = !busy && pr?.viewer.canReview !== false && (event !== 'COMMENT' || hasText || count > 0);
@@ -168,7 +173,7 @@ function ReviewPanel({ close }: { close: () => void }) {
           const disabled = o.event !== 'COMMENT' && isAuthor;
           return (
             <label key={o.event} className={`review-event${disabled ? ' review-event-disabled' : ''}`}>
-              <input type="radio" name="reviewEvent" value={o.event} checked={event === o.event} disabled={disabled} onChange={() => setEvent(o.event)} />
+              <input type="radio" name="reviewEvent" value={o.event} checked={event === o.event} disabled={disabled} onChange={() => chooseEvent(o.event)} />
               <span>
                 <span className="review-event-label">{o.label}</span>
                 <span className="review-event-desc">{disabled ? o.authorDescription : o.description}</span>
@@ -180,7 +185,7 @@ function ReviewPanel({ close }: { close: () => void }) {
       {error && (
         <div className="thread-error" role="alert">
           {error.message}{' '}
-          <button type="button" className="fh-link" onClick={error.retry}>
+          <button type="button" className="fh-link" onClick={error.action === 'submit' ? submit : discard}>
             Retry
           </button>
         </div>

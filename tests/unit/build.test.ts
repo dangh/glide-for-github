@@ -17,6 +17,7 @@ function walk(dir: string): string[] {
 interface Manifest {
   name?: string;
   description?: string;
+  minimum_chrome_version?: string;
   icons?: Record<string, string>;
   options_page?: string;
   content_scripts?: { js?: string[]; css?: string[] }[];
@@ -71,12 +72,22 @@ describe('build output', () => {
     expect(readFileSync(join(dist, 'manifest.json'), 'utf8')).not.toContain('%BRAND');
   });
 
+  it('requires Chrome 120, the esbuild target (MAIN-world content scripts need 111)', () => {
+    expect(manifest.minimum_chrome_version).toBe('120');
+    expect(readFileSync(join(root, 'build.mjs'), 'utf8')).toContain('chrome120');
+  });
+
   it('ships THIRD_PARTY_NOTICES.txt with the licenses of the bundled dependencies', () => {
     const notices = readFileSync(join(dist, 'THIRD_PARTY_NOTICES.txt'), 'utf8');
     expect(notices).toContain('@pierre/diffs');
     expect(notices).toContain('@pierre/trees');
     expect(notices).toContain('Apache License');
     expect(notices).toContain('react');
+    // MIT needs the copyright line and the permission notice, not just the identifier (lru_map ships no license file).
+    const lru = notices.slice(notices.indexOf('lru_map@0.4.1\nLicense: MIT'));
+    expect(lru).toContain('Copyright (c) 2010-2016 Rasmus Andersson');
+    expect(lru.slice(0, lru.indexOf('\n====', 400))).toContain('Permission is hereby granted, free of charge');
+    expect(notices).not.toContain('no license file shipped');
     // Production dependencies only: dev tooling is not in the package.
     expect(notices).not.toContain('vitest');
     expect(notices).not.toContain('esbuild');
@@ -114,10 +125,28 @@ describe('release workflow', () => {
     expect(workflow).not.toMatch(/pierre-for-github/);
   });
 
+  it('pins every action to a full commit SHA, and runs the publish job in the protected environment', () => {
+    const uses = [...workflow.matchAll(/^\s*(?:-\s+)?uses:\s*(\S+)(.*)$/gm)];
+    expect(uses.length).toBeGreaterThan(0);
+    for (const [, action, rest] of uses) {
+      expect(action, action).toMatch(/^[\w.-]+\/[\w.-]+@[0-9a-f]{40}$/);
+      expect(rest, action).toMatch(/#\s*v\d+\.\d+\.\d+/);
+    }
+    expect(workflow).toMatch(/^ {4}environment: chrome-web-store$/m);
+  });
+
+  it('installs the store CLI as an exact-version devDependency', () => {
+    const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { devDependencies: Record<string, string> };
+    expect(pkg.devDependencies['chrome-webstore-upload-cli']).toMatch(/^4\.\d+\.\d+$/);
+    const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8')) as { packages: Record<string, { version?: string }> };
+    expect(lock.packages['node_modules/chrome-webstore-upload-cli']?.version).toBe(pkg.devDependencies['chrome-webstore-upload-cli']);
+  });
+
   it('fails a v* tag that differs from the manifest version, and publishes through the pinned store CLI', () => {
     expect(workflow).toContain('require(\'./manifest.json\').version');
     expect(workflow).toContain('"v$version"');
-    expect(workflow).toContain('npx --yes chrome-webstore-upload-cli@4');
+    expect(workflow).toContain('npx --no-install chrome-webstore-upload ');
+    expect(workflow).not.toMatch(/npx --yes|chrome-webstore-upload-cli@/);
     for (const secret of ['CWS_EXTENSION_ID', 'CWS_CLIENT_ID', 'CWS_CLIENT_SECRET', 'CWS_REFRESH_TOKEN']) {
       expect(workflow).toContain(`secrets.${secret}`);
     }

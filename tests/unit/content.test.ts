@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { injectTab, setTabActive } from '../../src/content/tab';
+import { injectTab, removeTab, setTabActive } from '../../src/content/tab';
 import { mountViewer, setExtensionUrlResolver } from '../../src/content/host';
 import { createLifecycle } from '../../src/content/lifecycle';
 import { glideUrl, type PrRef } from '../../src/shared/pr-url';
@@ -466,3 +466,59 @@ function hiddenAncestor(el: Element): boolean {
   }
   return false;
 }
+
+describe('pages without a Glide tab are not scanned', () => {
+  const manyLinks = () => {
+    document.body.innerHTML = `<main>${Array.from({ length: 200 }, (_, i) => `<a href="/x/${i}">link ${i}</a>`).join('')}</main>`;
+  };
+  /** Counts the `querySelectorAll('a')` scans of every link on the page. */
+  const linkScans = () => {
+    let scans = 0;
+    for (const proto of [Document.prototype, Element.prototype]) {
+      const original = proto.querySelectorAll;
+      vi.spyOn(proto, 'querySelectorAll').mockImplementation(function (this: ParentNode, selectors: string) {
+        if (selectors === 'a') scans++;
+        return original.call(this, selectors);
+      } as typeof proto.querySelectorAll);
+    }
+    return () => scans;
+  };
+
+  it('removeTab returns early when there is no Glide tab', () => {
+    manyLinks();
+    const scans = linkScans();
+    removeTab(document);
+    removeTab(document);
+    expect(scans()).toBe(0);
+  });
+
+  it('a lifecycle sync on a non-PR page does not scan the links', () => {
+    manyLinks();
+    go('/dangh/pierre-sandbox/issues/1');
+    const lifecycle = createLifecycle();
+    const scans = linkScans();
+    lifecycle.sync();
+    lifecycle.sync();
+    expect(scans()).toBe(0);
+  });
+
+  it('still removes the tab and restores the tabs it had unselected when the Glide tab is there', () => {
+    document.body.innerHTML = fixture('pr-tabs-new.html');
+    const original = document.body.innerHTML;
+    injectTab(document, ref);
+    setTabActive(document, true);
+    removeTab(document);
+    expect(pierreTabs()).toHaveLength(0);
+    expect(document.body.innerHTML).toBe(original);
+  });
+
+  it('restores tabs left unselected even when GitHub re-rendered the Glide tab away', () => {
+    document.body.innerHTML = fixture('pr-tabs-new.html');
+    const original = document.body.innerHTML;
+    injectTab(document, ref);
+    setTabActive(document, true);
+    document.querySelector('[data-pierre-tab]')!.remove();
+    removeTab(document);
+    expect(document.body.innerHTML).toBe(original);
+  });
+});

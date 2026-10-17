@@ -154,7 +154,7 @@ function TokenDialog({ request, standalone }: DialogProps) {
           <p>
             {request
               ? reasonText(owner, request.reason, request.ref)
-              : `A token lets ${BRAND.short} post comments, replies, reviews and reactions, and is the fallback for resolving threads and marking files viewed when your GitHub session cannot. Applying suggestions uses your session. Tokens are per repository owner (a user or an organization).`}
+              : `A token lets ${BRAND.short} post comments, replies, reviews and reactions, and is tried first for resolving threads and marking files viewed, with your GitHub session as the fallback when GitHub refuses it. Applying suggestions uses your session. Tokens are per repository owner (a user or an organization).`}
           </p>
           <ul className="modal-links">
             <li>

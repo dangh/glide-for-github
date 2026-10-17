@@ -18,10 +18,12 @@
  * event, which remounts the viewer while the first viewer's first `diff_entries` requests are in flight, and the
  * second viewer asks for the same chunks again. Identical `page_data/diff_entries` requests (same path and query;
  * the query pins `range` to commit oids, so the answer cannot change) share one request while in flight and for
- * `ttlMs` after it succeeded. Failures are not shared.
+ * `ttlMs` after it succeeded. Failures are not shared. The bridge lives as long as the tab, so each entry is deleted
+ * when its window ends (`ttlMs` after success; `RPC_TIMEOUT_MS` after the request started, if it never settles, so a
+ * later identical request goes to the network instead of waiting on a lost one).
  */
 import { isGlideActive, parsePrUrl } from '../shared/pr-url';
-import type { BridgeMethods, RpcImpl } from '../shared/rpc';
+import { RPC_TIMEOUT_MS, type BridgeMethods, type RpcImpl } from '../shared/rpc';
 
 export const PREFETCH_TTL_MS = 10_000;
 
@@ -42,6 +44,8 @@ export interface RoutePrefetch {
   readonly impl: RpcImpl<BridgeMethods>;
   /** Issues the request now (once). */
   start(): void;
+  /** How many `diff_entries` requests are held (in flight or inside their window). */
+  diffEntryCount(): number;
 }
 
 const isEmptyQuery = (q: unknown) =>
@@ -71,7 +75,14 @@ export function createRoutePrefetch(
     };
   }
   /** In-flight and recent `diff_entries` requests by path + raw query. */
-  const diffs = new Map<string, { promise: Promise<GetResult>; settledAt?: number }>();
+  interface DiffEntry {
+    promise: Promise<GetResult>;
+    startedAt: number;
+    settledAt?: number;
+    timer?: ReturnType<typeof setTimeout>;
+  }
+  const diffs = new Map<string, DiffEntry>();
+  const usable = (e: DiffEntry) => (e.settledAt === undefined ? now() - e.startedAt <= RPC_TIMEOUT_MS : now() - e.settledAt <= ttlMs);
   const shareDiffs = (p: string, query: unknown, o: unknown): Promise<GetResult> | undefined => {
     const raw = (query as { raw?: unknown } | null | undefined)?.raw;
     if (!p.endsWith('/page_data/diff_entries') || typeof raw !== 'string' || !/(^|&)range=[0-9a-f.]+(&|$)/.test(raw) || o !== undefined) {
@@ -79,12 +90,25 @@ export function createRoutePrefetch(
     }
     const key = `${p}?${raw}`;
     const hit = diffs.get(key);
-    if (hit && (hit.settledAt === undefined || now() - hit.settledAt <= ttlMs)) return hit.promise;
-    const entry: { promise: Promise<GetResult>; settledAt?: number } = { promise: Promise.resolve(base.get(p, query as Parameters<BridgeMethods['get']>[1])) };
+    if (hit && usable(hit)) return hit.promise;
+    if (hit) clearTimeout(hit.timer);
+    const entry: DiffEntry = { promise: Promise.resolve(base.get(p, query as Parameters<BridgeMethods['get']>[1])), startedAt: now() };
     diffs.set(key, entry);
+    /** Deletes `entry` after `ms`, unless a newer entry has replaced it. */
+    const expireIn = (ms: number) => {
+      clearTimeout(entry.timer);
+      entry.timer = setTimeout(() => {
+        if (diffs.get(key) === entry) diffs.delete(key);
+      }, ms);
+    };
+    expireIn(RPC_TIMEOUT_MS);
     entry.promise.then(
-      () => (entry.settledAt = now()),
       () => {
+        entry.settledAt = now();
+        if (diffs.get(key) === entry) expireIn(ttlMs);
+      },
+      () => {
+        clearTimeout(entry.timer);
         if (diffs.get(key) === entry) diffs.delete(key);
       },
     );
@@ -104,6 +128,7 @@ export function createRoutePrefetch(
 
   return {
     impl,
+    diffEntryCount: () => diffs.size,
     start() {
       if (pending) return;
       const request = Promise.resolve(base.get(path, {}, { dataRouter: true }));

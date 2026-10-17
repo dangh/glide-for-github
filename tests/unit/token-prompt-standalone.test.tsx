@@ -72,6 +72,14 @@ describe('TokenPrompt, standalone', () => {
     expect(document.body.textContent).toMatch(/fine-grained/i);
   });
 
+  it('says the token is tried first and the session is the fallback for resolving threads and marking files viewed', () => {
+    const text = document.querySelector('[role="dialog"] p')!.textContent ?? '';
+    expect(text).toContain('tried first for resolving threads and marking files viewed');
+    expect(text).toContain('your GitHub session as the fallback');
+    expect(text).not.toMatch(/token[^.]*is the fallback/);
+    expect(text).toContain('Applying suggestions uses your session.');
+  });
+
   it('needs a valid owner before it can save', async () => {
     await type(secret(), TOKEN);
     expect(button('Save token').hasAttribute('disabled')).toBe(true);

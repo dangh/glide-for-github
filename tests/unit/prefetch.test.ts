@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createBridgeImpl } from '../../src/page/bridge';
 import { createRoutePrefetch, prefetchPath, startWhenHeadReady } from '../../src/page/prefetch';
+import { RPC_TIMEOUT_MS } from '../../src/shared/rpc';
 
 const ROUTE = '/react/react/pull/37778/changes';
 /** The viewer's first load (`loadPr(…, {initial: true})` → `fetchPrData(…, {prefetched: true})`). */
@@ -186,6 +187,76 @@ describe('diff_entries sharing during the page load (remounted viewer)', () => {
     void prefetch.impl.get(DIFFS, { raw: 'paths=a.ts&w=0' });
     void prefetch.impl.get(DIFFS, { raw: 'paths=a.ts&w=0' });
     expect(calls).toHaveLength(4);
+  });
+
+  describe('the diff cache does not grow for the life of the tab', () => {
+    const wait = async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    };
+
+    it('drops each answered entry once its ttl has passed', async () => {
+      vi.useFakeTimers();
+      try {
+        const { calls, prefetch, respond, tick } = setup();
+        const a = prefetch.impl.get(DIFFS, q('a.ts'));
+        void prefetch.impl.get(DIFFS, q('b.ts'));
+        expect(prefetch.diffEntryCount()).toBe(2);
+        respond(0, [{ path: 'a.ts' }]);
+        await a;
+        await wait();
+        vi.advanceTimersByTime(9_999);
+        expect(prefetch.diffEntryCount()).toBe(2); // a is still shared inside its window; b is in flight
+        vi.advanceTimersByTime(2);
+        tick(10_001);
+        expect(prefetch.diffEntryCount()).toBe(1); // a is gone, b is still in flight
+        void prefetch.impl.get(DIFFS, q('a.ts'));
+        expect(calls).toHaveLength(3);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('drops a request that never finishes after the rpc timeout, so a later identical request goes to the network', () => {
+      vi.useFakeTimers();
+      try {
+        const { calls, prefetch, tick } = setup();
+        void prefetch.impl.get(DIFFS, q('a.ts')); // never answered
+        void prefetch.impl.get(DIFFS, q('a.ts'));
+        expect(calls).toHaveLength(1);
+        vi.advanceTimersByTime(RPC_TIMEOUT_MS - 1);
+        tick(RPC_TIMEOUT_MS - 1);
+        expect(prefetch.diffEntryCount()).toBe(1);
+        vi.advanceTimersByTime(2);
+        tick(2);
+        expect(prefetch.diffEntryCount()).toBe(0);
+        void prefetch.impl.get(DIFFS, q('a.ts'));
+        expect(calls).toHaveLength(2);
+        expect(prefetch.diffEntryCount()).toBe(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('a request that settles after it was dropped does not remove or revive the newer entry', async () => {
+      vi.useFakeTimers();
+      try {
+        const { calls, prefetch, respond, tick } = setup();
+        const stale = prefetch.impl.get(DIFFS, q('a.ts'));
+        vi.advanceTimersByTime(RPC_TIMEOUT_MS + 1);
+        tick(RPC_TIMEOUT_MS + 1);
+        const fresh = prefetch.impl.get(DIFFS, q('a.ts'));
+        expect(calls).toHaveLength(2);
+        respond(0, { error: 'late' }, 500); // the stale one fails late
+        await expect(stale).rejects.toMatchObject({ status: 500 });
+        await wait();
+        expect(prefetch.diffEntryCount()).toBe(1);
+        expect(prefetch.impl.get(DIFFS, q('a.ts'))).toBe(fresh);
+        expect(calls).toHaveLength(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });
 

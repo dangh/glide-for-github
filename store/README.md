@@ -97,15 +97,26 @@ The first upload is manual (the store API can only update an item that exists). 
 4. **Privacy** tab: single purpose, the three permission justifications, remote code "No", data usage, and the privacy
    policy URL above.
 5. **Submit for review.**
-6. Copy the item's ID from the dashboard (the 32-letter ID in the item's URL) and set the four repository secrets
-   (next section). From the next tag on, CI uploads and publishes by itself.
+6. Copy the item's ID from the dashboard (the 32-letter ID in the item's URL) and set the four environment secrets
+   (next section; protect the environment first). From the next tag on, CI uploads and publishes by itself.
 7. Add the store link to the README's Install section. Also upload `promo/social-preview.png` in the GitHub repository's
    Settings > Social preview.
 
 ## Automatic publishing
 
-CI uploads and publishes every `v*` tag when all four repository secrets exist (Settings > Secrets and variables >
-Actions). Without them the publish job is skipped with a notice, and the release still gets the zip.
+CI uploads and publishes every `v*` tag when all four secrets exist. The publish job runs in the `chrome-web-store`
+GitHub environment, so the secrets belong there, not at repository level.
+
+**Before adding any secret**, create the environment and protect it: Settings > Environments > New environment, name
+`chrome-web-store`, turn on **Required reviewers** and add yourself (and any co-maintainer), and under **Deployment
+branches and tags** limit it to `v*` tags. Without reviewers, anyone who can push a tag can publish to the store with
+your credentials; with them, the job waits for an approval. Then add the four secrets as **environment secrets** of
+`chrome-web-store` (Environment secrets > Add environment secret). Without the secrets the publish job is skipped with
+a notice, and the release still gets the zip.
+
+The upload tool (`chrome-webstore-upload-cli`) is an exact-version devDependency in `package.json` and
+`package-lock.json`, and every action in the workflow is pinned to a commit SHA, so the job runs nothing that was not
+reviewed in the repository. Update them deliberately (Dependabot can propose both).
 
 | Secret | Where it comes from |
 |---|---|

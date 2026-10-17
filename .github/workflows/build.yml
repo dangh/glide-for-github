@@ -2,7 +2,8 @@ name: Build and release
 
 # Every push to main and every pull request: type-check, test, build the extension and upload the zip
 # as a build artifact. A tag like v0.1.0 (it must equal manifest.json's version): also create a GitHub
-# release with the zip, and upload and publish it to the Chrome Web Store when the store secrets are set.
+# release with the zip, and upload and publish it to the Chrome Web Store when the store secrets are set (as
+# secrets of the protected `chrome-web-store` environment; see store/README.md).
 # The e2e tests are not run here: they need a signed-in GitHub profile (see README.md).
 on:
   push:
@@ -17,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -34,7 +35,7 @@ jobs:
             exit 1
           fi
       - run: npm run zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: extension
           path: glide-for-github.zip
@@ -47,7 +48,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: extension
           path: dist
@@ -60,26 +61,47 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: release
     runs-on: ubuntu-latest
-    # Set these in Settings > Secrets and variables > Actions. See store/README.md.
-    env:
-      EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
-      CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
-      CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
-      REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+    # The Chrome Web Store credentials live in this environment (Settings > Environments), which should require
+    # reviewers: a tag alone cannot publish. See store/README.md.
+    environment: chrome-web-store
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Check for store credentials
+        id: store
+        env:
+          EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: |
+          if [ -n "$EXTENSION_ID" ] && [ -n "$CLIENT_ID" ] && [ -n "$CLIENT_SECRET" ] && [ -n "$REFRESH_TOKEN" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Chrome Web Store secrets not set; skipping store upload."
+          fi
+      # The credentials are only in the environment of the upload step below, never while installing packages.
+      - if: steps.store.outputs.configured == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - if: steps.store.outputs.configured == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - if: steps.store.outputs.configured == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: extension
           path: dist
-      - name: Skip without store credentials
-        if: env.EXTENSION_ID == '' || env.CLIENT_ID == '' || env.CLIENT_SECRET == '' || env.REFRESH_TOKEN == ''
-        run: echo "::notice::Chrome Web Store secrets not set; skipping store upload."
-      - uses: actions/setup-node@v4
-        if: env.EXTENSION_ID != '' && env.CLIENT_ID != '' && env.CLIENT_SECRET != '' && env.REFRESH_TOKEN != ''
-        with:
-          node-version: 22
+      # The upload CLI is a devDependency pinned in package.json and package-lock.json (not fetched at publish time).
+      - name: Install the pinned upload tool
+        if: steps.store.outputs.configured == 'true'
+        run: npm ci --ignore-scripts
       - name: Upload and publish to the Chrome Web Store
-        if: env.EXTENSION_ID != '' && env.CLIENT_ID != '' && env.CLIENT_SECRET != '' && env.REFRESH_TOKEN != ''
-        # With no command it uploads, then publishes. Reads EXTENSION_ID, CLIENT_ID,
-        # CLIENT_SECRET and REFRESH_TOKEN from the environment.
-        run: npx --yes chrome-webstore-upload-cli@4 --source dist/glide-for-github.zip
+        if: steps.store.outputs.configured == 'true'
+        env:
+          EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        # With no command it uploads, then publishes. Reads EXTENSION_ID, CLIENT_ID, CLIENT_SECRET and
+        # REFRESH_TOKEN from the environment. --no-install: never download anything here.
+        run: npx --no-install chrome-webstore-upload --source dist/glide-for-github.zip

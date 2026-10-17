@@ -192,6 +192,54 @@ describe('ReviewMenu', () => {
     expect(usePr.getState().pendingReview).toEqual({ nodeId: 'PRR_1', count: 1 });
   });
 
+  it('changing the choice or the summary clears a failed submit\'s error', async () => {
+    usePr.getState().setPr({ ...basePr, author: 'someone-else' });
+    usePr.getState().setPendingReview({ nodeId: 'PRR_1', count: 1 });
+    fetchMock.mockResolvedValue(json(200, { data: null, errors: [{ type: 'UNPROCESSABLE', message: 'Something went wrong' }] }));
+    await render(<ReviewMenu />);
+    await click(button(/^Review/)!);
+    const ta = () => document.querySelector<HTMLTextAreaElement>('.review-menu textarea')!;
+    await click(radio('APPROVE'));
+    await type(ta(), 'Looks good');
+    await click(button('Submit review')!);
+    await settle();
+    expect(gql().at(-1)!.variables.input).toMatchObject({ event: 'APPROVE', body: 'Looks good' });
+    expect(button('Retry')).toBeDefined();
+
+    // Changing the choice clears the stale error (and Retry with it).
+    await click(radio('REQUEST_CHANGES'));
+    expect(document.querySelector('.review-menu [role="alert"]')).toBeNull();
+
+    // Fail again, then edit the summary: also clears the error.
+    await click(button('Submit review')!);
+    await settle();
+    expect(button('Retry')).toBeDefined();
+    await type(ta(), 'Needs work');
+    expect(document.querySelector('.review-menu [role="alert"]')).toBeNull();
+  });
+
+  it('Retry itself re-reads the radio and textarea (a click on a stale Retry cannot send old values)', async () => {
+    usePr.getState().setPr({ ...basePr, author: 'someone-else' });
+    usePr.getState().setPendingReview({ nodeId: 'PRR_1', count: 1 });
+    let fail = true;
+    fetchMock.mockImplementation(async () =>
+      fail ? json(200, { data: null, errors: [{ type: 'UNPROCESSABLE', message: 'Something went wrong' }] }) : json(200, { data: { submitPullRequestReview: { pullRequestReview: { id: 'PRR_1' } } } }),
+    );
+    await render(<ReviewMenu />);
+    await click(button(/^Review/)!);
+    await click(radio('APPROVE'));
+    await type(document.querySelector<HTMLTextAreaElement>('.review-menu textarea')!, 'First');
+    await click(button('Submit review')!);
+    await settle();
+    fail = false;
+    // Edit without an input event (programmatic change): the error stays, so Retry is clickable.
+    document.querySelector<HTMLTextAreaElement>('.review-menu textarea')!.value = 'Second';
+    await click(button('Retry')!);
+    await settle();
+    await settle();
+    expect(gql().at(-1)!.variables.input).toMatchObject({ event: 'APPROVE', body: 'Second' });
+  });
+
   it('Discard pending review asks to confirm, then deletes the pending review', async () => {
     usePr.getState().setPendingReview({ nodeId: 'PRR_1', count: 3 });
     fetchMock.mockResolvedValue(json(200, { data: { deletePullRequestReview: { pullRequestReview: { id: 'PRR_1' } } } }));

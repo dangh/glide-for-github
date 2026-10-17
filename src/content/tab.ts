@@ -89,6 +89,10 @@ export function injectTab(doc: Document, ref: PrRef): HTMLAnchorElement | null {
 
 /** Removes the Glide tab (restoring GitHub's selected styling first). */
 export function removeTab(doc: Document): void {
+  const tab = doc.querySelector('a[data-pierre-tab]');
+  // This runs on every DOM change of every non-PR GitHub page: with no Glide tab (and no tab it left unselected)
+  // there is nothing to undo, so do not scan the page's links.
+  if (!tab && !doc.querySelector('[data-pierre-class]')) return;
   setTabActive(doc, false);
   doc.querySelectorAll('a[data-pierre-tab]').forEach((t) => t.remove());
 }
