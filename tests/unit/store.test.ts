@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { FileSummary, PrData } from '../../src/viewer/github/private';
 import type { ThreadModel } from '../../src/viewer/github/threads';
 import { commentCount, createPrStore, draftKey, isCollapsed, threadsByPath } from '../../src/viewer/state/store';
-import { decorationFor, visibleFiles } from '../../src/viewer/state/view';
+import { decorationFor, filesChangedUrl, visibleFiles } from '../../src/viewer/state/view';
 
 const file = (path: string, extra: Partial<FileSummary> = {}): FileSummary => ({
   path,
@@ -164,5 +164,11 @@ describe('view helpers', () => {
     expect(visibleFiles(order, topOf, 90, 300, 40)).toEqual({ ids: ['b'], current: 'b' }); // header edge
     expect(visibleFiles(order, topOf, 1900, 900)).toEqual({ ids: ['d', 'e'], current: 'd' });
     expect(visibleFiles([], topOf, 0, 100)).toEqual({ ids: [] });
+  });
+
+  it("filesChangedUrl links to the file in GitHub's Files changed, or the page", () => {
+    const r = { owner: 'o', repo: 'r', number: 7 };
+    expect(filesChangedUrl(r, 'abc123')).toBe('https://github.com/o/r/pull/7/changes#diff-abc123');
+    expect(filesChangedUrl(r)).toBe('https://github.com/o/r/pull/7/changes');
   });
 });

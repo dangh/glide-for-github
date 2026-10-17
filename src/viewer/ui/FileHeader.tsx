@@ -10,8 +10,10 @@ import { isNoTokenError, requireToken } from '../auth/requireToken';
 import type { FileSummary } from '../github/private';
 import { session } from '../state/session';
 import { commentCount, isCollapsed, threadsByPath, usePr, type FileLoadState } from '../state/store';
+import { filesChangedUrl, HEADER_HEIGHT } from '../state/view';
 
-export const HEADER_HEIGHT = 40;
+export { HEADER_HEIGHT };
+
 
 /** Octicon comment-16 path. */
 export function CommentIcon() {
@@ -52,6 +54,19 @@ function LoadNotice({ path, load, summary }: { path: string; load: FileLoadState
       return <span className="fh-note fh-muted">Loading…</span>;
     case 'too-large':
       if (load.loadingLines) return <span className="fh-note fh-muted">Loading diff…</span>;
+      if (load.tooBig) {
+        const ref = usePr.getState().pr?.ref;
+        return (
+          <span className="fh-note fh-muted" data-testid="too-big">
+            Diff is too big to render.{' '}
+            {ref && (
+              <a className="fh-link" href={filesChangedUrl(ref, summary.digest)} target="_blank" rel="noopener noreferrer">
+                Open on GitHub
+              </a>
+            )}
+          </span>
+        );
+      }
       return (
         <span className="fh-note" title={load.message}>
           {load.message ? 'Failed to load. ' : 'Large diff not rendered by default. '}

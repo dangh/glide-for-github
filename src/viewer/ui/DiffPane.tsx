@@ -3,20 +3,18 @@
  * one with `updateItem`, see state/items.ts).
  */
 import type { FileDiffLoadedFiles, FileDiffMetadata } from '@pierre/diffs';
-import { CodeView, type CodeViewHandle, type CodeViewReactOptions } from '@pierre/diffs/react';
+import { CodeView, type CodeViewHandle } from '@pierre/diffs/react';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
-import { DEFAULT_SETTINGS, toDiffOptions } from '../../shared/settings';
 import { fetchFullFile, type PrData, type Rpc } from '../github/private';
 import { ItemSync, noAnnotations, type AnnotationMeta, type AnnotationSource, type PierreItem } from '../state/items';
 import { rangeOids } from '../state/range';
 import { session } from '../state/session';
-import { effectiveThemeType, useSettings } from '../state/settings';
+import { useSettings } from '../state/settings';
 import { usePr } from '../state/store';
-import { FileHeader, HEADER_HEIGHT } from './FileHeader';
-import { visibleFiles } from '../state/view';
+import { createDiffOptionsBuilder, HEADER_HEIGHT, visibleFiles } from '../state/view';
+import { FileHeader } from './FileHeader';
 
 type Handle = CodeViewHandle<AnnotationMeta, undefined>;
-type Options = CodeViewReactOptions<AnnotationMeta, undefined>;
 
 /** Files around the viewport that the loader should fetch first (and whose collapsed lines load lazily). */
 const PRIORITY_AHEAD = 6;
@@ -61,15 +59,8 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations = noAnnotation
 
   const loadDiffFiles = useMemo(() => (pr ? createFileLoader(rpc, pr) : undefined), [rpc, pr]);
 
-  const options = useMemo<Options>(() => {
-    const base = toDiffOptions<AnnotationMeta>({ ...DEFAULT_SETTINGS, diff: diffSettings });
-    return {
-      ...base,
-      themeType: effectiveThemeType(diffSettings.themeType, colorMode),
-      itemMetrics: { diffHeaderHeight: HEADER_HEIGHT },
-      ...(loadDiffFiles ? { loadDiffFiles } : {}),
-    };
-  }, [diffSettings, colorMode, loadDiffFiles]);
+  const buildOptions = useMemo(createDiffOptionsBuilder, []);
+  const options = buildOptions(diffSettings, colorMode, loadDiffFiles);
 
   // Seeded once per PR; later changes go through `sync` → updateItem.
   const initialItems = useMemo<PierreItem[]>(() => (pr ? sync.seed(usePr.getState()) : []), [pr, sync]);
@@ -100,7 +91,8 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations = noAnnotation
         // The next few files below the viewport too, so scrolling down finds them loaded.
         const order = usePr.getState().order;
         const next = order.indexOf(current!) + ids.length;
-        session.loader?.prioritize([...ids, ...order.slice(next, next + PRIORITY_AHEAD)]);
+        session.viewport = [...ids, ...order.slice(next, next + PRIORITY_AHEAD)];
+        session.loader?.prioritize(session.viewport);
       }
       if (current && current !== lastCurrent.current && performance.now() >= quietUntil.current) {
         lastCurrent.current = current;
@@ -110,12 +102,11 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations = noAnnotation
   }, []);
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
-  // Loader restarts (range/whitespace) need the current viewport again.
-  const loadVersion = usePr((s) => s.range);
+  // The first viewport once items exist. (Loader restarts replay `session.viewport` themselves.)
   useEffect(() => {
     const t = setTimeout(onViewport, 0);
     return () => clearTimeout(t);
-  }, [loadVersion, initialItems, onViewport]);
+  }, [initialItems, onViewport]);
 
   const setHandle = useCallback((handle: Handle | null) => {
     handleRef.current = handle;

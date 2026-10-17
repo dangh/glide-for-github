@@ -1,5 +1,44 @@
 /** Pure view helpers (viewport math, tree decorations), kept out of the React components for unit tests. */
+import type { FileDiffContentsLoader } from '@pierre/diffs';
+import type { CodeViewReactOptions } from '@pierre/diffs/react';
+import { DEFAULT_SETTINGS, toDiffOptions, type DiffSettings } from '../../shared/settings';
+import type { PrRef } from '../../shared/pr-url';
+import type { AnnotationMeta } from './items';
+import { effectiveThemeType } from './settings';
 import { commentCount, threadsByPath, type PrState } from './store';
+
+/** Height of the per-file header row; CodeView reserves exactly this (`itemMetrics.diffHeaderHeight`). */
+export const HEADER_HEIGHT = 40;
+
+/** Constant so CodeView's shallow option comparison sees no change. */
+export const ITEM_METRICS = Object.freeze({ diffHeaderHeight: HEADER_HEIGHT });
+
+export type DiffViewOptions = CodeViewReactOptions<AnnotationMeta, undefined>;
+
+/**
+ * Memoized CodeView options: returns the previous object while the diff settings object, GitHub's color mode
+ * and the file loader are unchanged (by reference), so unrelated setting changes never call `setOptions`.
+ */
+export function createDiffOptionsBuilder() {
+  let last: { diff: DiffSettings; colorMode: string | undefined; loadDiffFiles?: FileDiffContentsLoader; options: DiffViewOptions } | undefined;
+  return (diff: DiffSettings, colorMode: string | undefined, loadDiffFiles?: FileDiffContentsLoader): DiffViewOptions => {
+    if (last && last.diff === diff && last.colorMode === colorMode && last.loadDiffFiles === loadDiffFiles) return last.options;
+    const options: DiffViewOptions = {
+      ...toDiffOptions<AnnotationMeta>({ ...DEFAULT_SETTINGS, diff }),
+      themeType: effectiveThemeType(diff.themeType, colorMode),
+      itemMetrics: ITEM_METRICS,
+      ...(loadDiffFiles ? { loadDiffFiles } : {}),
+    };
+    last = { diff, colorMode, ...(loadDiffFiles ? { loadDiffFiles } : {}), options };
+    return options;
+  };
+}
+
+/** GitHub's Files changed page for a PR, at one file's diff when its path digest is known. */
+export function filesChangedUrl(ref: Pick<PrRef, 'owner' | 'repo' | 'number'>, digest?: string): string {
+  const base = `https://github.com/${ref.owner}/${ref.repo}/pull/${ref.number}/changes`;
+  return digest ? `${base}#diff-${digest}` : base;
+}
 
 /**
  * Files intersecting the viewport, top first, and the current file (the one under the top edge), from the

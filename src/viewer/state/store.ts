@@ -45,7 +45,8 @@ export const draftKey = {
  * - `pending`: not requested yet (placeholder item); `loading`: request in flight.
  * - `loaded`: diff in `diffs` (`empty` when it has no lines: pure rename, mode change, or no change in the range).
  * - `needs-lines`: GitHub collapsed it (deleted files); lines load when it comes near the viewport.
- * - `too-large`: lines only on "Load diff" (`loadingLines` while that request runs).
+ * - `too-large`: lines only on "Load diff" (`loadingLines` while that request runs); `tooBig` once Load diff
+ *   found it too big to render in the viewer (link to GitHub instead).
  * - `binary`: no text diff. `error`: `message` says why; retry re-queues it.
  * `additions`/`deletions` are the counts for the requested range/whitespace (summaries hold the full PR's).
  */
@@ -55,6 +56,7 @@ export interface FileLoadState {
   deletions?: number;
   empty?: boolean;
   loadingLines?: boolean;
+  tooBig?: boolean;
   message?: string;
 }
 

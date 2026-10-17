@@ -91,10 +91,39 @@ test.describe('sandbox PR', () => {
     const big = viewer.locator.locator(`.fh[data-path="${TOO_LARGE}"]`);
     await expect(big.getByTestId('load-diff')).toBeVisible();
     expect((await viewer.item(TOO_LARGE))!.lines).toBe(0);
+    // GitHub returns no lines for this file (its own UI says "Diff is too big to render"), and the full files
+    // (~644 KB each, 1.29 M chars combined) are over the viewer's 1 M-char cap: Pierre says so and links to GitHub.
+    await big.getByTestId('load-diff').click();
+    await expect(big.getByTestId('too-big')).toContainText('Diff is too big to render', { timeout: 30_000 });
+    await expect(big.getByRole('link', { name: 'Open on GitHub' })).toHaveAttribute(
+      'href',
+      new RegExp(`^${prUrl(SANDBOX, '/changes')}#diff-[0-9a-f]{64}$`),
+    );
+    expect((await viewer.loads())[TOO_LARGE]).toMatchObject({ status: 'too-large', tooBig: true });
+  });
+
+  test('"Load diff" renders a too-large file when its full files fit', async ({ page }) => {
+    // Serve small versions of the file's raw contents (inside this browser only) so the fallback diff runs.
+    let headOid = '';
+    await page.route(
+      (url) => url.pathname.includes('/raw/') && url.pathname.endsWith(`/${TOO_LARGE}`),
+      (route) => {
+        const head = headOid !== '' && route.request().url().includes(`/raw/${headOid}/`);
+        const lines = Array.from({ length: 200 }, (_, i) => `export const v${i} = ${i};`);
+        if (!head) lines[100] = 'export const changed = true;';
+        return route.fulfill({ status: 200, contentType: 'text/plain', body: lines.join('\n') + '\n' });
+      },
+    );
+    const viewer = await openPierre(page, SANDBOX, 'hash');
+    headOid = await viewer.frame().evaluate(() => window.__pierre!.store.getState().pr!.headOid);
+    await viewer.allFetched();
+    await viewer.scrollToFile(TOO_LARGE);
+    const big = viewer.locator.locator(`.fh[data-path="${TOO_LARGE}"]`);
     await big.getByTestId('load-diff').click();
     await expect.poll(async () => (await viewer.loads())[TOO_LARGE]!.status, { timeout: 30_000 }).toBe('loaded');
     await viewer.scrollToFile(TOO_LARGE);
     await expect.poll(async () => (await viewer.item(TOO_LARGE))?.lines ?? 0, { timeout: 20_000 }).toBeGreaterThan(0);
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
   });
 
   test('Split/Unified toggle re-renders without reload and persists after reload', async ({ page }) => {

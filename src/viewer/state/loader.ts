@@ -45,9 +45,10 @@ export interface LoaderOptions {
   convert?: (summary: FileSummary, lines: GithubDiffLine[], ctx: { headOid: string; whitespace: boolean }) => FileDiffMetadata;
   /**
    * Fallback for "Load diff" when GitHub returns no lines (its own UI then says "Diff is too big to render"):
-   * build the diff from the full old/new files. Without it such files stay empty.
+   * build the diff from the full old/new files. Null means the files are too big to diff here (the file stays
+   * `too-large` with `tooBig`). Without it such files stay empty.
    */
-  fullFileDiff?: (summary: FileSummary) => Promise<FileDiffMetadata>;
+  fullFileDiff?: (summary: FileSummary) => Promise<FileDiffMetadata | null>;
   yieldToMain?: () => Promise<void>;
   /** Conversion budget per slice in ms before yielding (default 8). */
   sliceMs?: number;
@@ -258,7 +259,8 @@ export function createLoader(opts: LoaderOptions): Loader {
       if (full.lines.length === 0 && entry.tooLarge && opts.fullFileDiff) {
         const diff = await opts.fullFileDiff(next);
         if (cancelled) return;
-        opts.onResults([{ path, summary: next, load: { status: 'loaded', ...counts }, diff }]);
+        if (diff) opts.onResults([{ path, summary: next, load: { status: 'loaded', ...counts }, diff }]);
+        else opts.onResults([{ path, summary: next, load: { status: 'too-large', tooBig: true, ...counts } }]);
       } else if (full.lines.length === 0) {
         opts.onResults([
           { path, summary: next, load: { status: 'loaded', empty: true, ...counts, message: 'GitHub did not return this diff.' } },

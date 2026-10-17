@@ -127,6 +127,15 @@ describe('diff loader', () => {
     expect(results.get('generated/big.generated.ts')!.diff).toBeTruthy();
   });
 
+  it('"Load diff" over the size cap keeps the file too-large with tooBig', async () => {
+    const { loader, results } = await setup({ fullFileDiff: async () => null });
+    loader.start();
+    await loader.done;
+    await loader.loadLines('generated/big.generated.ts');
+    expect(results.get('generated/big.generated.ts')!.load).toMatchObject({ status: 'too-large', tooBig: true, additions: 3000 });
+    expect(results.get('generated/big.generated.ts')!.diff).toBeUndefined();
+  });
+
   it('marks a failed chunk as error and retry re-queues it', async () => {
     let failing = true;
     const { fake, loader, results } = await setup(

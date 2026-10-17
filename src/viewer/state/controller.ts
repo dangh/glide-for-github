@@ -27,20 +27,38 @@ async function fileAt(rpc: Rpc, pr: PrData, path: string, oid: string): Promise<
   }
 }
 
-/** A diff computed from the full old/new files (for diffs GitHub refuses to return). */
+/** Limits for diffing full files on the main thread ("Load diff" fallback): old + new text combined. */
+export const FULL_DIFF_MAX_CHARS = 1_000_000;
+export const FULL_DIFF_MAX_LINES = 20_000;
+
+function countLines(text: string | null): number {
+  if (!text) return 0;
+  let n = 1;
+  for (let i = text.indexOf('\n'); i !== -1; i = text.indexOf('\n', i + 1)) n++;
+  return n;
+}
+
+/**
+ * A diff computed from the full old/new files (for diffs GitHub refuses to return), or null when the files
+ * are over the caps (`FULL_DIFF_MAX_CHARS` / `FULL_DIFF_MAX_LINES` combined): jsdiff runs on the main thread
+ * and would freeze the viewer. The changed-line counts are checked first so huge files are not even fetched.
+ */
 export async function fullFileDiff(
   rpc: Rpc,
   pr: PrData,
   range: CommitRange,
   whitespace: boolean,
   summary: FileSummary,
-): Promise<FileDiffMetadata> {
+): Promise<FileDiffMetadata | null> {
+  if (summary.additions + summary.deletions > FULL_DIFF_MAX_LINES) return null;
   const { oldOid, newOid } = rangeOids(pr, range);
   const oldPath = summary.prevPath ?? summary.path;
   const [oldText, newText] = await Promise.all([
     summary.status === 'added' ? null : fileAt(rpc, pr, oldPath, oldOid),
     summary.status === 'deleted' ? null : fileAt(rpc, pr, summary.path, newOid),
   ]);
+  const chars = (oldText?.length ?? 0) + (newText?.length ?? 0);
+  if (chars > FULL_DIFF_MAX_CHARS || countLines(oldText) + countLines(newText) > FULL_DIFF_MAX_LINES) return null;
   return parseDiffFromFile(
     oldText === null ? null : { name: oldPath, contents: oldText, cacheKey: `${oldOid}:${oldPath}` },
     newText === null ? null : { name: summary.path, contents: newText, cacheKey: `${newOid}:${summary.path}` },
@@ -48,6 +66,10 @@ export async function fullFileDiff(
   );
 }
 
+/**
+ * Starts a loader for the store's PR and range. The last viewport priority (`session.viewport`) is replayed
+ * so a restart (range or whitespace change) still loads the visible files, and their collapsed lines, first.
+ */
 export function startLoader(rpc: Rpc, whitespace: boolean, store = usePr): Loader | undefined {
   const state = store.getState();
   const pr = state.pr;
@@ -76,6 +98,7 @@ export function startLoader(rpc: Rpc, whitespace: boolean, store = usePr): Loade
       `[pierre] ${pr.files.length} files: first diff ${first} ms, all ${Math.round(stats.doneAt - stats.startedAt)} ms, ${stats.requests} requests`,
     );
   });
+  if (session.viewport?.length) loader.prioritize(session.viewport);
   loader.start();
   return loader;
 }

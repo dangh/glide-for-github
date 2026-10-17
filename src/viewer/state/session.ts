@@ -11,6 +11,8 @@ export interface Session {
   /** Current diff loader (replaced when the range or whitespace changes). */
   loader?: Loader;
   codeView?: CodeViewHandle<AnnotationMeta, undefined> | null;
+  /** Last viewport priority (visible files + look-ahead, top first); replayed into every new loader. */
+  viewport?: string[];
   /** Scrolls the diff list to a file (tree selection). */
   scrollToFile?(path: string): void;
   /** Marks a file as the current one in the tree (diff scroll position). */

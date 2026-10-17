@@ -93,8 +93,16 @@ export class Viewer {
 
   /** Waits for the viewer to have the PR data and its first file header. */
   async ready(timeout = 60_000) {
-    await expect(this.locator.locator('.fh').first()).toBeVisible({ timeout });
-    await expect.poll(() => this.frame().evaluate(() => window.__pierre?.store.getState().pr !== null), { timeout }).toBe(true);
+    // The content script may remount the iframe once while GitHub hydrates: wait until the same viewer
+    // frame has the PR and stays attached.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await expect(this.locator.locator('.fh').first()).toBeVisible({ timeout });
+      await expect.poll(() => this.frame().evaluate(() => window.__pierre?.store.getState().pr !== null), { timeout }).toBe(true);
+      const frame = this.frame();
+      await this.page.waitForTimeout(500);
+      if (!frame.isDetached() && this.frame() === frame) return;
+    }
+    throw new Error('Pierre viewer frame did not settle');
   }
 
   order(): Promise<string[]> {
