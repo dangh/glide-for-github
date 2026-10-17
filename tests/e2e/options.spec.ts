@@ -111,9 +111,9 @@ test.describe('options page', () => {
     await page.close();
   });
 
-  test('groups the settings as Diff, Tree and Review and renders a live Pierre sample', async ({ extContext }) => {
+  test('groups the settings as Diff, Tree, Fonts and Review and renders a live Pierre sample', async ({ extContext }) => {
     const page = await openOptions(extContext);
-    await expect(page.locator('.settings-form legend')).toHaveText(['Diff', 'Tree', 'Review']);
+    await expect(page.locator('.settings-form legend')).toHaveText(['Diff', 'Tree', 'Fonts', 'Review']);
     const sample = page.getByTestId('sample-diff');
     const lines = () => page.evaluate(() => document.querySelector('[data-testid="sample-diff"] diffs-container')?.shadowRoot?.querySelectorAll('[data-line]').length ?? 0);
     const diffType = () =>
@@ -123,10 +123,12 @@ test.describe('options page', () => {
 
     const layout = field(page, 'Layout');
     const original = await layout.inputValue();
+    // 'default' is GitHub's layout: unified ('single').
+    const typeOf = (style: string) => (style === 'split' ? 'split' : 'single');
     try {
       const other = original === 'split' ? 'unified' : 'split';
       await layout.selectOption(other);
-      await expect.poll(diffType, { timeout: 15_000 }).toBe(other === 'unified' ? 'single' : 'split');
+      await expect.poll(diffType, { timeout: 15_000 }).toBe(typeOf(other));
       // A theme choice re-renders the sample too (no reload, same sample element).
       const dark = field(page, 'Dark theme');
       const originalDark = await dark.inputValue();
@@ -136,7 +138,7 @@ test.describe('options page', () => {
     } finally {
       await layout.selectOption(original);
     }
-    await expect.poll(diffType, { timeout: 15_000 }).toBe(original === 'unified' ? 'single' : 'split');
+    await expect.poll(diffType, { timeout: 15_000 }).toBe(typeOf(original));
     await page.close();
   });
 
@@ -147,7 +149,8 @@ test.describe('options page', () => {
     await viewer.scrollToFile(path);
     const original = await viewer.frame().evaluate(() => window.__pierre!.settings.getState().settings.diff.diffStyle);
     const other = original === 'split' ? 'unified' : 'split';
-    const typeOf = (style: string) => (style === 'unified' ? 'single' : 'split');
+    // 'default' is GitHub's layout: unified ('single').
+    const typeOf = (style: string) => (style === 'split' ? 'split' : 'single');
     await expect.poll(async () => (await viewer.item(path))?.diffType).toBe(typeOf(original));
 
     // The extension id from the options page's path-derived id must match the viewer frame's.

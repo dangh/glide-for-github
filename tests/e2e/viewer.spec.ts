@@ -14,12 +14,25 @@ const DELETED = 'src/obsolete.ts';
 /** Pierre's `data-diff-type` for the unified layout. */
 const UNIFIED = 'single';
 
-/** Resets settings the tests change, through the viewer's own settings store (persists to storage.sync). */
+/** Back to the defaults (GitHub's look): removes every stored display override; open viewers follow the change. */
 async function resetSettings(viewer: Viewer) {
-  await viewer.frame().evaluate(() =>
-    window.__pierre!.settings.getState().update({ diff: { diffStyle: 'split' }, tree: { initialExpansion: 'closed' }, review: { hideWhitespace: false } }),
-  );
+  await viewer.frame().evaluate(() => chrome.storage.sync.remove('pierre.settings'));
+  await expect
+    .poll(() => viewer.frame().evaluate(() => window.__pierre!.settings.getState().settings.diff.diffStyle))
+    .toBe('default');
 }
+
+/** Text of every rendered diff item (their shadow roots), joined. */
+const diffText = (viewer: Viewer) =>
+  viewer.frame().evaluate(() => [...document.querySelectorAll('diffs-container')].map((c) => c.shadowRoot?.textContent ?? '').join('\n'));
+
+/** The tree's git status lane: number of rows that have one, and the letters shown. */
+const gitLane = (viewer: Viewer) =>
+  viewer.frame().evaluate(() => {
+    const root = document.querySelector('file-tree-container')?.shadowRoot;
+    const lanes = [...(root?.querySelectorAll('[data-item-section="git"]') ?? [])];
+    return { rows: lanes.length, letters: lanes.map((l) => l.textContent?.trim() ?? '').filter((t) => /^[AMDR]$/.test(t)) };
+  });
 
 test.describe('sandbox PR', () => {
   test('Glide tab is visible right after Files changed', async ({ page }) => {
@@ -128,24 +141,128 @@ test.describe('sandbox PR', () => {
 
   test('Split/Unified toggle re-renders without reload and persists after reload', async ({ page }) => {
     const viewer = await openPierre(page, SANDBOX, 'hash');
+    await resetSettings(viewer);
     await viewer.allFetched();
     const path = 'config/settings.json';
     await viewer.scrollToFile(path);
-    await expect.poll(async () => (await viewer.item(path))?.diffType).toBe('split');
+    // The default layout is GitHub's: unified.
+    await expect.poll(async () => (await viewer.item(path))?.diffType).toBe(UNIFIED);
+    await expect(viewer.locator.getByRole('button', { name: 'Unified', exact: true })).toHaveAttribute('aria-pressed', 'true');
 
     await viewer.frame().evaluate(() => ((window as unknown as { __marker: number }).__marker = 42));
-    await viewer.locator.getByRole('button', { name: 'Unified', exact: true }).click();
-    await expect.poll(async () => (await viewer.item(path))?.diffType).toBe(UNIFIED);
+    await viewer.locator.getByRole('button', { name: 'Split', exact: true }).click();
+    await expect.poll(async () => (await viewer.item(path))?.diffType).toBe('split');
     // Same document: no reload happened.
     expect(await viewer.frame().evaluate(() => (window as unknown as { __marker?: number }).__marker)).toBe(42);
 
     await page.reload({ waitUntil: 'domcontentloaded' });
     const again = new Viewer(page);
     await again.ready();
-    await expect(again.locator.getByRole('button', { name: 'Unified', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(again.locator.getByRole('button', { name: 'Split', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await again.scrollToFile(path);
-    await expect.poll(async () => (await again.item(path))?.diffType).toBe(UNIFIED);
+    await expect.poll(async () => (await again.item(path))?.diffType).toBe('split');
     await resetSettings(again);
+  });
+
+  test("default look is GitHub's: no hunk rows, no A/M/D letters, GitHub colors, fonts and file boxes", async ({ page }) => {
+    const viewer = await openPierre(page, SANDBOX, 'hash');
+    await resetSettings(viewer);
+    await viewer.allFetched();
+    const path = 'config/settings.json';
+    await viewer.scrollToFile(path);
+    await expect.poll(async () => (await viewer.item(path))?.lines ?? 0).toBeGreaterThan(0);
+
+    // No "@@ -a,b +c,d @@" rows and no "N unmodified lines" rows...
+    expect(await diffText(viewer)).not.toMatch(/@@|unmodified lines|More unchanged context/);
+    // ...while an explicit choice still shows them (the check above is not vacuous).
+    await viewer.frame().evaluate(() => window.__pierre!.settings.getState().update({ diff: { hunkSeparators: 'metadata' } }));
+    await expect.poll(() => diffText(viewer), { timeout: 15_000 }).toMatch(/@@ -\d+/);
+    await viewer.frame().evaluate(() => window.__pierre!.settings.getState().update({ diff: { hunkSeparators: 'default' } }));
+    await expect.poll(() => diffText(viewer), { timeout: 15_000 }).not.toMatch(/@@/);
+
+    // No git status lane (letters) in the tree by default; the option turns it on.
+    expect(await gitLane(viewer)).toEqual({ rows: 0, letters: [] });
+    await viewer.frame().evaluate(() => window.__pierre!.settings.getState().update({ tree: { showGitStatus: true } }));
+    await expect.poll(async () => (await gitLane(viewer)).letters.length, { timeout: 15_000 }).toBeGreaterThan(0);
+    await viewer.frame().evaluate(() => window.__pierre!.settings.getState().update({ tree: { showGitStatus: false } }));
+    await expect.poll(async () => (await gitLane(viewer)).rows, { timeout: 15_000 }).toBe(0);
+
+    // GitHub's colors and fonts, octicon tree icons, the file box header without a status letter.
+    const look = await viewer.frame().evaluate(() => {
+      const root = [...document.querySelectorAll('diffs-container')].map((c) => c.shadowRoot!).find((r) => r.querySelector('[data-line][data-line-type="change-addition"]'));
+      const added = root?.querySelector('[data-line][data-line-type="change-addition"]');
+      // Any CSS color (lab(), hex with alpha) as 8-bit RGBA, through a canvas.
+      const ctx = document.createElement('canvas').getContext('2d')!;
+      const rgba = (css: string) => {
+        ctx.clearRect(0, 0, 1, 1);
+        ctx.fillStyle = css;
+        ctx.fillRect(0, 0, 1, 1);
+        return [...ctx.getImageData(0, 0, 1, 1).data];
+      };
+      const tree = document.querySelector('file-tree-container')!.shadowRoot!;
+      return {
+        added: added ? rgba(getComputedStyle(added).backgroundColor) : null,
+        // GitHub's addition line color, light and dark (src/shared/github-defaults.ts).
+        expected: [rgba('#dafbe1'), rgba('#2ea04326')],
+        codeFont: added ? getComputedStyle(added).fontFamily : null,
+        codeSize: added ? getComputedStyle(added).fontSize : null,
+        uiFont: getComputedStyle(document.querySelector('.pierre-toolbar')!).fontFamily,
+        fileIcons: [...tree.querySelectorAll('[data-item-type="file"] use')].map((u) => u.getAttribute('href')).slice(0, 3),
+        badge: getComputedStyle(document.querySelector('.fh-badge')!).display,
+        header: document.documentElement.dataset.fileHeader,
+      };
+    });
+    expect(look.added).not.toBeNull();
+    expect(look.codeFont).toContain('ui-monospace');
+    expect(look.codeSize).toBe('12px');
+    expect(look.uiFont).toContain('-apple-system');
+    expect(look.fileIcons.length).toBeGreaterThan(0);
+    for (const href of look.fileIcons) expect(href).toBe('#glide-octicon-file');
+    expect(look.badge).toBe('none');
+    expect(look.header).toBe('github');
+    // The line background is GitHub's color (light or dark, whichever scheme applies), not a mix into the background.
+    const close = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]!) <= 2);
+    expect(look.expected.some((e) => close(look.added!, e)), `${look.added} vs ${JSON.stringify(look.expected)}`).toBe(true);
+    await resetSettings(viewer);
+  });
+
+  test('the tree can sit on the right of the diffs', async ({ page }) => {
+    const viewer = await openPierre(page, SANDBOX, 'hash');
+    await resetSettings(viewer);
+    const sides = () =>
+      viewer.frame().evaluate(() => ({
+        tree: document.querySelector('.pierre-tree-pane')!.getBoundingClientRect().x,
+        main: document.querySelector('.pierre-main')!.getBoundingClientRect().x,
+      }));
+    expect((await sides()).tree).toBeLessThan((await sides()).main);
+    await viewer.locator.getByTestId('display-menu').click();
+    await viewer.locator.locator('label.field', { hasText: 'Tree position' }).locator('select').selectOption('right');
+    await expect.poll(async () => { const s = await sides(); return s.tree > s.main; }).toBe(true);
+    await page.keyboard.press('Escape');
+    // The tree still works there: selecting a file scrolls its diff into view.
+    const path = 'src/util/math.ts';
+    await viewer.locator.locator('file-tree-container').getByPlaceholder('Search…').fill('math');
+    await viewer.locator.locator(`file-tree-container [data-item-path="${path}"]`).click();
+    await expect.poll(async () => (await viewer.item(path))?.top ?? Infinity, { timeout: 10_000 }).toBeLessThan(80);
+    await resetSettings(viewer);
+    await expect.poll(async () => { const s = await sides(); return s.tree < s.main; }).toBe(true);
+  });
+
+  test('clicking the GitHub page around the viewer closes the Display menu', async ({ page }) => {
+    const viewer = await openPierre(page, SANDBOX, 'hash');
+    const panel = viewer.locator.locator('.display-menu .popover-panel');
+    await viewer.locator.getByTestId('display-menu').click();
+    await expect(panel).toBeVisible();
+    // Focus inside the menu (a select, a text field) keeps it open.
+    await viewer.locator.locator('label.field', { hasText: 'Code font' }).first().locator('input').click();
+    await expect(panel).toBeVisible();
+    // A click on GitHub's page (outside the iframe): the PR title (plain text, no link).
+    const title = page.locator('h1:visible').first();
+    const box = (await title.boundingBox())!;
+    const frameBox = (await page.locator('iframe[data-pierre-viewer]').boundingBox())!;
+    expect(box.y + box.height).toBeLessThan(frameBox.y);
+    await page.mouse.click(box.x + 4, box.y + box.height / 2);
+    await expect(panel).toBeHidden();
   });
 
   test('Hide whitespace refetches with w=1; the commit picker narrows the range', async ({ page }) => {
