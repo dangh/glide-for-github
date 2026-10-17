@@ -256,8 +256,8 @@ const MAX_THREAD_PAGES = 100;
 const prPath = (ref: PrRef) => `/${ref.owner}/${ref.repo}/pull/${ref.number}`;
 const badPayload = (what: string) => new BridgeError({ status: 0, code: 'bad_payload', message: `Unexpected ${what} payload` });
 
-async function fetchRoute(rpc: Rpc, ref: PrRef): Promise<ChangesRoute> {
-  const { data } = await rpc.call('get', `${prPath(ref)}/changes`, {}, { dataRouter: true });
+async function fetchRoute(rpc: Rpc, ref: PrRef, prefetched = false): Promise<ChangesRoute> {
+  const { data } = await rpc.call('get', `${prPath(ref)}/changes`, {}, prefetched ? { dataRouter: true, prefetched: true } : { dataRouter: true });
   const route = (data as { payload?: { pullRequestsChangesRoute?: ChangesRoute } } | null)?.payload?.pullRequestsChangesRoute;
   if (!route || !Array.isArray(route.diffSummaries) || !route.user) throw badPayload('route');
   return route;
@@ -378,8 +378,8 @@ const rangeOf = (opts: DiffOptions) => opts.range || opts.headOid;
 // ---------------------------------------------------------------------------------------------------------
 // Reading
 
-/** A commit id as the head check compares it (only for equality with `PrData.headOid`). */
-const HEAD_ID = /^\w{1,64}$/;
+/** A commit id as GitHub sends it: 40 (SHA-1) or 64 (SHA-256) lowercase hex digits. Anything else falls back to the route. */
+const HEAD_ID = /^[0-9a-f]{40}([0-9a-f]{24})?$/;
 
 /**
  * The PR's current head commit: the freshness poll's request (Task 11, Task 12). `GET page_data/header` (the PR
@@ -424,10 +424,11 @@ export async function fetchHeadOid(rpc: Rpc, ref: PrRef): Promise<string> {
  *   summaries do not carry the old path, so for other renamed files it stays undefined until
  *   `applyDiffEntry` (no extra request here).
  * - `threadMarkers` ← `markers.threads` and `diffSummaries[].markersMap` (for `fetchThreads`).
- * One request: the route JSON.
+ * One request: the route JSON. `opts.prefetched` (the viewer's first load only) lets the bridge answer from the
+ * route it prefetched during page load; every other read (reloads, refreshes) goes to GitHub.
  */
-export async function fetchPrData(rpc: Rpc, ref: PrRef): Promise<PrData> {
-  const route = await fetchRoute(rpc, ref);
+export async function fetchPrData(rpc: Rpc, ref: PrRef, opts: { prefetched?: boolean } = {}): Promise<PrData> {
+  const route = await fetchRoute(rpc, ref, opts.prefetched === true);
   const embedded = new Map((route.diffContents ?? []).map((e) => [e.path, e]));
 
   const files = route.diffSummaries.map((s): FileSummary => {

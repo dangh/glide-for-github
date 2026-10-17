@@ -5,9 +5,12 @@
  *
  * The bridge now starts at document_start and, on a `#pierre` PR URL, issues that request as soon as the page's
  * `<head>` is in (the request needs GitHub's meta tags), in parallel with GitHub's own page load. The viewer's
- * identical request (`get(<that path>, {}, {dataRouter: true})`) is answered from it while it is fresh:
- * - in flight, or settled less than `ttlMs` ago (default 10 s), so every viewer boot of this page load, including a
- *   remounted iframe, shares it; later reads (the freshness poll, reloads) go to the network as before;
+ * first load (`get(<that path>, {}, {dataRouter: true, prefetched: true})`, which only the viewer's initial
+ * `loadPr` sends) is answered from it while it is fresh:
+ * - in flight, or settled less than `ttlMs` ago (default 10 s), so each viewer boot of this page load, including a
+ *   remounted iframe, shares it. Every other read of the route (thread refreshes after a comment, reloads, "Try
+ *   again") omits `prefetched` and goes to GitHub, so nothing after a write (bridge or api.github.com) can be
+ *   answered with the pre-write route;
  * - a failed prefetch is never served (the caller makes its own request, with its own error handling);
  * - any write through the bridge drops it, so nothing after a write can see the older route.
  */
@@ -62,9 +65,12 @@ export function createRoutePrefetch(
     };
   }
   impl.get = (p, query, o) => {
-    const served = p === path && isEmptyQuery(query) && (o as { dataRouter?: unknown } | undefined)?.dataRouter === true;
-    if (served && fresh()) return pending!.catch(() => base.get(p, query, o));
-    return base.get(p, query, o);
+    const opts = o as { dataRouter?: unknown; prefetched?: unknown } | undefined;
+    const served = p === path && isEmptyQuery(query) && opts?.dataRouter === true && opts.prefetched === true;
+    // The network request never carries `prefetched` (it only selects this cache).
+    const forward = opts?.prefetched !== undefined ? { dataRouter: opts.dataRouter === true } : o;
+    if (served && fresh()) return pending!.catch(() => base.get(p, query, forward));
+    return base.get(p, query, forward);
   };
 
   return {

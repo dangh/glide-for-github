@@ -18,6 +18,12 @@ import { FatalError } from '../../src/viewer/ui/Notice';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+/** Commit ids as GitHub sends them (40 hex digits); `fetchHeadOid` rejects anything else. */
+const HEAD1 = '1'.repeat(40);
+const HEAD2 = '2'.repeat(40);
+const HEAD3 = '3'.repeat(40);
+const ABC = 'abc0'.repeat(10);
+
 const file = (path: string): FileSummary => ({
   path,
   digest: `d-${path}`,
@@ -33,7 +39,7 @@ const pr: PrData = {
   ref: { owner: 'o', repo: 'r', number: 7, page: 'changes' },
   author: 'me',
   baseOid: 'base',
-  headOid: 'head1',
+  headOid: HEAD1,
   commits: [],
   files: [file('a.ts')],
   viewer: { login: 'me', canApplySuggestion: false, canReview: true },
@@ -82,15 +88,34 @@ const flush = async () => {
 };
 
 describe('fetchHeadOid', () => {
+  it('accepts SHA-1 and SHA-256 commit ids from the header', async () => {
+    for (const sha of ['0123456789abcdef0123456789abcdef01234567', 'f'.repeat(64)]) {
+      const { rpc } = fakeRpc(() => sha);
+      await expect(fetchHeadOid(rpc, pr.ref)).resolves.toBe(sha);
+    }
+  });
+
   it('reads the head from page_data/header (one small request, no route JSON, no diff loading)', async () => {
-    const { rpc, calls } = fakeRpc(() => 'abc');
-    await expect(fetchHeadOid(rpc, pr.ref)).resolves.toBe('abc');
+    const { rpc, calls } = fakeRpc(() => ABC);
+    await expect(fetchHeadOid(rpc, pr.ref)).resolves.toBe(ABC);
     expect(calls).toHaveLength(1);
     expect(String(calls[0]![1])).toMatch(/\/pull\/7\/page_data\/header$/);
   });
 
-  it('falls back to the route JSON when the header has no head sha or fails', async () => {
-    for (const answer of [{ data: { pullRequest: {} }, link: null }, { data: null, link: null }, new Error('boom')]) {
+  it('falls back to the route JSON when the header has no well-formed head sha or fails', async () => {
+    const malformed = (headSha: unknown) => ({ data: { pullRequest: { headSha }, mergeStatusButtonData: { headSha } }, link: null });
+    for (const answer of [
+      { data: { pullRequest: {} }, link: null },
+      { data: null, link: null },
+      new Error('boom'),
+      // Not a commit id: must not reach the head comparison (it would show a false "PR updated" banner).
+      malformed('head1'),
+      malformed(''),
+      malformed('ABCDEF'.repeat(7).slice(0, 40)),
+      malformed('a'.repeat(39)),
+      malformed('a'.repeat(41)),
+      malformed(12345),
+    ]) {
       const calls: unknown[][] = [];
       const rpc = {
         call: vi.fn(async (...args: unknown[]) => {
@@ -109,10 +134,10 @@ describe('fetchHeadOid', () => {
 });
 
 describe('freshness polling', () => {
-  let head = 'head1';
+  let head = HEAD1;
   beforeEach(() => {
     vi.useFakeTimers();
-    head = 'head1';
+    head = HEAD1;
     usePr.setState({ headMoved: false, drafts: new Map() });
     usePr.getState().setPr(pr);
   });
@@ -133,7 +158,7 @@ describe('freshness polling', () => {
     const shownPr = usePr.getState().pr;
     await f.check();
     expect(usePr.getState().headMoved).toBe(false);
-    head = 'head2';
+    head = HEAD2;
     await f.check();
     expect(usePr.getState().headMoved).toBe(true);
     expect(usePr.getState().pr).toBe(shownPr); // no auto reload: the PR data is untouched
@@ -143,14 +168,14 @@ describe('freshness polling', () => {
   it('keeps drafts when the head moves', async () => {
     const { f } = make();
     usePr.getState().setDraft(draftKey.reviewSummary, { body: 'typing', updatedAt: 1 });
-    head = 'head2';
+    head = HEAD2;
     await f.check();
     expect(usePr.getState().drafts.get(draftKey.reviewSummary)?.body).toBe('typing');
   });
 
   it('does not ask again once the head is known to have moved', async () => {
     const { f, calls } = make();
-    head = 'head2';
+    head = HEAD2;
     await f.check();
     await f.check();
     expect(calls).toHaveLength(1);
@@ -294,8 +319,8 @@ describe('freshness polling', () => {
     } as unknown as Rpc;
     const f = createFreshness({ rpc: () => rpc, doc: fakeDoc().doc });
     const pending = f.check();
-    usePr.getState().setPr({ ...pr, headOid: 'head2' }); // reloaded meanwhile
-    release('head2');
+    usePr.getState().setPr({ ...pr, headOid: HEAD2 }); // reloaded meanwhile
+    release(HEAD2);
     await pending;
     expect(usePr.getState().headMoved).toBe(false);
 
@@ -310,7 +335,7 @@ describe('freshness polling', () => {
     expect(() => noteWrite()).not.toThrow();
     const { rpc, calls } = fakeRpc(() => head);
     const stop = startFreshness({ rpc: () => rpc, doc: fakeDoc().doc });
-    head = 'head3';
+    head = HEAD3;
     noteWrite();
     await vi.advanceTimersByTimeAsync(3000);
     expect(calls).toHaveLength(1);
@@ -325,17 +350,22 @@ describe('freshness polling', () => {
   describe('which writes trigger a check', () => {
     let routeCalls = 0;
     let headChecks = 0;
+    let routeOpts: unknown[] = [];
     const installRpc = () => {
       routeCalls = 0;
+      routeOpts = [];
       headChecks = 0;
       return {
-        call: vi.fn(async (method: string, path: string) => {
+        call: vi.fn(async (method: string, path: string, _query?: unknown, opts?: unknown) => {
           if (method === 'applySuggestions') return {};
           if (method === 'get' && String(path).endsWith('/page_data/header')) {
             headChecks++;
             return header(head);
           }
-          if (method === 'get' && String(path).endsWith('/changes')) routeCalls++;
+          if (method === 'get' && String(path).endsWith('/changes')) {
+            routeCalls++;
+            routeOpts.push(opts);
+          }
           return route(head);
         }),
       } as unknown as Rpc;
@@ -356,6 +386,8 @@ describe('freshness polling', () => {
       usePr.getState().addToBatch(ref);
       await commitSuggestions([ref], 'm');
       expect(routeCalls).toBeGreaterThan(0); // the commit's own PR reload
+      // A reload after a write never takes the route prefetched during page load.
+      expect(routeOpts.every((o) => (o as { prefetched?: boolean } | undefined)?.prefetched !== true)).toBe(true);
       expect(headChecks).toBe(0);
       await vi.advanceTimersByTimeAsync(2999);
       expect(headChecks).toBe(0);
@@ -422,7 +454,7 @@ describe('draft persistence (survives a page reload)', () => {
     const stop = initDraftPersistence(store);
     store.getState().setPr(pr);
     store.getState().setDraft(draftKey.reviewSummary, { body: 'typed', updatedAt: 1 });
-    store.getState().setPr({ ...pr, headOid: 'head2' });
+    store.getState().setPr({ ...pr, headOid: HEAD2 });
     expect(store.getState().drafts.get(draftKey.reviewSummary)?.body).toBe('typed');
     stop();
   });

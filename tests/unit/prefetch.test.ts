@@ -5,6 +5,8 @@ import { createBridgeImpl } from '../../src/page/bridge';
 import { createRoutePrefetch, prefetchPath, startWhenHeadReady } from '../../src/page/prefetch';
 
 const ROUTE = '/react/react/pull/37778/changes';
+/** The viewer's first load (`loadPr(…, {initial: true})` → `fetchPrData(…, {prefetched: true})`). */
+const FIRST = { dataRouter: true, prefetched: true };
 
 function deferred<T>() {
   let resolve!: (v: T) => void;
@@ -15,10 +17,10 @@ function deferred<T>() {
 
 /** A bridge over a fake fetch whose responses the test releases one by one. */
 function setup() {
-  const calls: { url: string; method: string }[] = [];
+  const calls: { url: string; method: string; headers: Record<string, string> }[] = [];
   const responses: ReturnType<typeof deferred<Response>>[] = [];
   const fetch = vi.fn((url: string | URL | Request, init?: RequestInit) => {
-    calls.push({ url: String(url), method: init?.method ?? 'GET' });
+    calls.push({ url: String(url), method: init?.method ?? 'GET', headers: (init?.headers ?? {}) as Record<string, string> });
     const d = deferred<Response>();
     responses.push(d);
     return d.promise;
@@ -54,7 +56,7 @@ describe('createRoutePrefetch', () => {
     prefetch.start();
     expect(calls).toHaveLength(1);
     expect(calls[0]!.url).toBe(`https://github.com${ROUTE}`);
-    const viewer = prefetch.impl.get(ROUTE, {}, { dataRouter: true });
+    const viewer = prefetch.impl.get(ROUTE, {}, FIRST);
     respond(0, { payload: { ok: 1 } });
     await expect(viewer).resolves.toEqual({ data: { payload: { ok: 1 } }, link: null });
     expect(calls).toHaveLength(1);
@@ -66,11 +68,11 @@ describe('createRoutePrefetch', () => {
     respond(0, { n: 1 });
     await flush();
     tick(5_000);
-    await expect(prefetch.impl.get(ROUTE, {}, { dataRouter: true })).resolves.toMatchObject({ data: { n: 1 } });
-    await expect(prefetch.impl.get(ROUTE, undefined, { dataRouter: true })).resolves.toMatchObject({ data: { n: 1 } });
+    await expect(prefetch.impl.get(ROUTE, {}, FIRST)).resolves.toMatchObject({ data: { n: 1 } });
+    await expect(prefetch.impl.get(ROUTE, undefined, FIRST)).resolves.toMatchObject({ data: { n: 1 } });
     expect(calls).toHaveLength(1);
     tick(5_001);
-    const later = prefetch.impl.get(ROUTE, {}, { dataRouter: true });
+    const later = prefetch.impl.get(ROUTE, {}, FIRST);
     expect(calls).toHaveLength(2);
     respond(1, { n: 2 });
     await expect(later).resolves.toMatchObject({ data: { n: 2 } });
@@ -81,17 +83,33 @@ describe('createRoutePrefetch', () => {
     prefetch.start();
     respond(0, { n: 1 });
     await flush();
-    void prefetch.impl.get(ROUTE, { w: '1' }, { dataRouter: true });
+    void prefetch.impl.get(ROUTE, { w: '1' }, FIRST);
     void prefetch.impl.get(ROUTE, {}, {});
-    void prefetch.impl.get('/react/react/pull/1/changes', {}, { dataRouter: true });
+    void prefetch.impl.get('/react/react/pull/1/changes', {}, FIRST);
     void prefetch.impl.get(`/react/react/pull/37778/page_data/diff_entries`, { paths: 'a' });
     expect(calls).toHaveLength(5);
+  });
+
+  it('serves only the first load: a later route read (thread refresh after a token write) goes to GitHub while fresh', async () => {
+    const { calls, prefetch, respond } = setup();
+    prefetch.start();
+    respond(0, { n: 1 });
+    await flush();
+    // e.g. a comment posted through api.github.com, then scheduleRefresh → refreshThreads → fetchRoute
+    const refresh = prefetch.impl.get(ROUTE, {}, { dataRouter: true });
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.headers['X-GitHub-App-Type']).toBe('dataRouter');
+    respond(1, { n: 2 });
+    await expect(refresh).resolves.toMatchObject({ data: { n: 2 } });
+    // The flag only selects the cache: a request that is not served goes out as a plain dataRouter request.
+    void prefetch.impl.get(ROUTE, { w: '1' }, FIRST);
+    expect(calls[2]!.headers['X-GitHub-App-Type']).toBe('dataRouter');
   });
 
   it('never serves a failed prefetch: a waiting viewer makes its own request', async () => {
     const { calls, prefetch, respond } = setup();
     prefetch.start();
-    const viewer = prefetch.impl.get(ROUTE, {}, { dataRouter: true });
+    const viewer = prefetch.impl.get(ROUTE, {}, FIRST);
     respond(0, { error: 'boom' }, 500);
     await flush();
     await flush();
@@ -99,7 +117,7 @@ describe('createRoutePrefetch', () => {
     respond(1, { n: 2 });
     await expect(viewer).resolves.toMatchObject({ data: { n: 2 } });
     // And later requests skip it too.
-    void prefetch.impl.get(ROUTE, {}, { dataRouter: true });
+    void prefetch.impl.get(ROUTE, {}, FIRST);
     expect(calls).toHaveLength(3);
   });
 
@@ -110,7 +128,7 @@ describe('createRoutePrefetch', () => {
     await flush();
     void Promise.resolve(prefetch.impl.markViewed('react', 'react', 37778, 'a.ts')).catch(() => undefined);
     expect(calls[1]!.method).toBe('POST');
-    void prefetch.impl.get(ROUTE, {}, { dataRouter: true });
+    void prefetch.impl.get(ROUTE, {}, FIRST);
     expect(calls).toHaveLength(3);
     expect(calls[2]!.url).toBe(`https://github.com${ROUTE}`);
   });
@@ -121,7 +139,7 @@ describe('createRoutePrefetch', () => {
     respond(0, { n: 1 });
     await flush();
     void Promise.resolve(prefetch.impl.getText(`https://github.com/react/react/raw/${'a'.repeat(40)}/a.ts`)).catch(() => undefined);
-    void prefetch.impl.get(ROUTE, {}, { dataRouter: true });
+    void prefetch.impl.get(ROUTE, {}, FIRST);
     expect(calls).toHaveLength(2);
   });
 

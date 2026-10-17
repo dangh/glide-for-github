@@ -93,7 +93,8 @@ export type BridgeMethods = {
   get(
     path: string,
     query?: BridgeQuery,
-    opts?: { dataRouter?: boolean },
+    /** `prefetched`: the caller may be answered from the bridge's route prefetch (first viewer boot only, see src/page/prefetch.ts). */
+    opts?: { dataRouter?: boolean; prefetched?: boolean },
   ): { data: Json; link: string | null };
   getText(url: string): string;
   preview(text: string, context: PreviewContext): string /* html */;

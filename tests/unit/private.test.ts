@@ -50,6 +50,17 @@ describe('fetchPrData', () => {
     expect(rpc.calls[0]).toEqual({ method: 'get', args: [`${base}/changes`, {}, { dataRouter: true }] });
   });
 
+  it('asks for the prefetched route only when told to (the viewer\'s first load); thread reads never do', async () => {
+    const first = fakeRpc();
+    await fetchPrData(first, ref, { prefetched: true });
+    expect(first.calls[0]).toEqual({ method: 'get', args: [`${base}/changes`, {}, { dataRouter: true, prefetched: true }] });
+    const threads = fakeRpc();
+    await fetchThreads(threads, ref).catch(() => undefined);
+    const routeReads = threads.calls.filter((c) => String(c.args[0]).endsWith('/changes'));
+    expect(routeReads.length).toBeGreaterThan(0);
+    for (const c of routeReads) expect(c.args[2]).toEqual({ dataRouter: true });
+  });
+
   it('builds file summaries in GitHub order with statuses, counts and digests', async () => {
     const pr = await fetchPrData(fakeRpc(), ref);
     expect(pr.files.map((f) => f.path)).toEqual(allPaths);

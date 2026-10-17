@@ -74,7 +74,8 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
   useEffect(() => {
     let cancelled = false;
     // Threads render inline (annotations) and feed the comment counts; their failure is not fatal.
-    loadPr(rpc, prRef, () => !cancelled)
+    // Only the first load may use the route prefetched during page load; "Try again" reads it fresh.
+    loadPr(rpc, prRef, () => !cancelled, { initial: attempt === 0 })
       .catch((err: unknown) => {
         if (!cancelled) usePr.getState().setFatal(err instanceof Error ? err.message : String(err));
       });

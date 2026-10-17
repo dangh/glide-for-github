@@ -14,10 +14,16 @@ import { usePr } from './store';
  * Fetches the PR and puts it in the store (diffs reload, viewed state and pending review come fresh from GitHub;
  * `headMoved` resets; drafts and the suggestion batch stay). `isCurrent` lets a caller drop a result that arrives
  * after it moved on. Resolves once the PR data is set, with `threads`: settles when the threads are in (then the
- * batch is pruned of refs that no longer apply). Thread failures are not fatal.
+ * batch is pruned of refs that no longer apply). Thread failures are not fatal. `initial`: the viewer's first load,
+ * which may use the route the bridge prefetched during page load (never a reload).
  */
-export async function loadPr(rpc: Rpc, ref: PrRef, isCurrent: () => boolean = () => true): Promise<{ threads: Promise<void> }> {
-  const data = await fetchPrData(rpc, ref);
+export async function loadPr(
+  rpc: Rpc,
+  ref: PrRef,
+  isCurrent: () => boolean = () => true,
+  opts: { initial?: boolean } = {},
+): Promise<{ threads: Promise<void> }> {
+  const data = await fetchPrData(rpc, ref, { prefetched: opts.initial === true });
   if (!isCurrent()) return { threads: Promise.resolve() };
   resetReviewCaches();
   usePr.getState().setPr(data);
