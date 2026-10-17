@@ -60,12 +60,26 @@ describe('build output', () => {
   it("takes the product name and description from BRAND (one place to rename)", () => {
     expect(manifest.name).toBe(BRAND.name);
     expect(manifest.description).toBe(BRAND.description);
+    expect(BRAND.description.length).toBeLessThanOrEqual(132); // Chrome Web Store limit for the manifest description
+    expect(BRAND.name).toBe('Glide for GitHub');
+    expect(BRAND.description).toContain('Pierre');
     for (const page of ['options.html', 'viewer.html']) {
       const html = readFileSync(join(dist, page), 'utf8');
       expect(html, page).toContain(`<title>${BRAND.name}`);
       expect(html, page).not.toContain('%BRAND');
     }
     expect(readFileSync(join(dist, 'manifest.json'), 'utf8')).not.toContain('%BRAND');
+  });
+
+  it('ships THIRD_PARTY_NOTICES.txt with the licenses of the bundled dependencies', () => {
+    const notices = readFileSync(join(dist, 'THIRD_PARTY_NOTICES.txt'), 'utf8');
+    expect(notices).toContain('@pierre/diffs');
+    expect(notices).toContain('@pierre/trees');
+    expect(notices).toContain('Apache License');
+    expect(notices).toContain('react');
+    // Production dependencies only: dev tooling is not in the package.
+    expect(notices).not.toContain('vitest');
+    expect(notices).not.toContain('esbuild');
   });
 
   it('emits the Pierre worker as a self-contained dist/pierre-worker.js', () => {
@@ -88,6 +102,24 @@ describe('build output', () => {
     const remote = /importScripts\(\s*["']http|import\(\s*["']http/;
     for (const f of js) {
       expect(readFileSync(f, 'utf8'), f).not.toMatch(remote);
+    }
+  });
+});
+
+describe('release workflow', () => {
+  const workflow = readFileSync(join(root, '.github/workflows/build.yml'), 'utf8');
+
+  it('uploads the zip that `npm run zip` writes', () => {
+    expect(workflow).toContain(`${BRAND.slug}.zip`);
+    expect(workflow).not.toMatch(/pierre-for-github/);
+  });
+
+  it('fails a v* tag that differs from the manifest version, and publishes through the pinned store CLI', () => {
+    expect(workflow).toContain('require(\'./manifest.json\').version');
+    expect(workflow).toContain('"v$version"');
+    expect(workflow).toContain('npx --yes chrome-webstore-upload-cli@4');
+    for (const secret of ['CWS_EXTENSION_ID', 'CWS_CLIENT_ID', 'CWS_CLIENT_SECRET', 'CWS_REFRESH_TOKEN']) {
+      expect(workflow).toContain(`secrets.${secret}`);
     }
   });
 });
