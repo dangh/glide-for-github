@@ -24,8 +24,11 @@ review features: comments, suggestions, resolving threads, viewed files and revi
 - Reading needs no token. Posting comments, replies, reviews, edits and reactions needs one (next section). Applying
   suggestions, resolving threads and marking files viewed use your signed-in GitHub session, so they work without a
   token.
-- Display options (layout, themes, line wrapping, tree density, and more) are on the options page and in the viewer's
-  Display menu, with a live preview on the options page. Changes apply to open pull requests without a reload.
+- Display options (layout, themes, line wrapping, hunk rows, tree icons and position, fonts, and more) are on the
+  options page and in the viewer's Display menu, with a live preview on the options page. Every option starts at
+  "Default (GitHub)", which looks like GitHub's own Files changed page (unified, GitHub's colors, fonts and file boxes,
+  no `@@` rows, no status letters in the tree); Pierre's other styles are one choice away. Changes apply to open pull
+  requests without a reload.
 
 ## Install
 
