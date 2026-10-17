@@ -1,7 +1,7 @@
 /** The extension's options page: tokens, display settings (shared with the viewer's Display menu) and a live sample. */
 import { useEffect } from 'react';
 import { BRAND } from '../shared/brand';
-import { resolveDiffChoice } from '../shared/github-defaults';
+import { resolveDiffChoice, resolveFonts } from '../shared/github-defaults';
 import { initSettings, useSettings } from '../viewer/state/settings';
 import { DisplaySettingsForm } from '../viewer/ui/DisplaySettingsForm';
 import { DisplayStyle } from '../viewer/ui/DisplayStyle';
@@ -35,7 +35,7 @@ export function OptionsPage() {
             <DisplaySettingsForm settings={settings} update={update} />
             <div className="options-sample">
               <h3>Preview</h3>
-              <SampleDiff diff={settings.diff} />
+              <SampleDiff diff={settings.diff} lineHeight={resolveFonts(settings.fonts).codeLineHeight} />
             </div>
           </div>
         )}

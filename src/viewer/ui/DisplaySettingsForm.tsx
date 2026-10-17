@@ -98,9 +98,20 @@ function NumberField({ label, value, min, onChange }: { label: string; value: nu
   );
 }
 
+/**
+ * Font text the stored-settings validation accepts (isFontText) and that CSS itself accepts as a custom property
+ * value (`CSS.supports`, where available): unbalanced `)` / `]` or `!important` would pass the first check but make
+ * the variable invalid at use, silently falling back to Pierre's font.
+ */
+export function fontTextValid(v: string): boolean {
+  if (!isFontText(v)) return false;
+  if (v.trim() === '' || typeof CSS === 'undefined' || typeof CSS.supports !== 'function') return true;
+  return CSS.supports('--x', v);
+}
+
 /** Free font text (goes into a CSS custom property); empty = the GitHub default shown as placeholder. */
 function FontTextField({ label, value, placeholder, onChange }: { label: string; value: string; placeholder: string; onChange(v: string): void }) {
-  const [draft, change] = useDebounced(value, onChange, isFontText);
+  const [draft, change] = useDebounced(value, onChange, fontTextValid);
   return (
     <label className="field field-text">
       <span>{label}</span>
@@ -110,7 +121,7 @@ function FontTextField({ label, value, placeholder, onChange }: { label: string;
         placeholder={placeholder}
         title={placeholder}
         spellCheck={false}
-        aria-invalid={!isFontText(draft) || undefined}
+        aria-invalid={!fontTextValid(draft) || undefined}
         onChange={(e) => change(e.target.value)}
       />
     </label>

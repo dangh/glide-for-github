@@ -106,6 +106,28 @@ describe('DisplaySettingsForm', () => {
     expect(update).toHaveBeenCalledWith({ fonts: { codeFontFamily: '"Fira Code", monospace' } });
   });
 
+  it('marks font text CSS rejects (CSS.supports) invalid and never commits it', async () => {
+    const supports = vi.fn((_p: string, v: string) => !/[)\]]|!important/.test(v));
+    vi.stubGlobal('CSS', { supports });
+    try {
+      await mount();
+      const code = field('Code font') as HTMLInputElement;
+      for (const bad of ['Menlo)', 'Menlo]', 'Menlo !important']) {
+        await type(code, bad);
+        expect(code.getAttribute('aria-invalid'), bad).toBe('true');
+      }
+      await act(async () => void vi.advanceTimersByTime(INPUT_DEBOUNCE_MS * 3));
+      expect(update).not.toHaveBeenCalled();
+      expect(supports).toHaveBeenCalledWith('--x', 'Menlo)');
+      await type(code, 'Menlo, monospace');
+      expect(code.getAttribute('aria-invalid')).toBeNull();
+      await act(async () => void vi.advanceTimersByTime(INPUT_DEBOUNCE_MS + 1));
+      expect(update).toHaveBeenCalledWith({ fonts: { codeFontFamily: 'Menlo, monospace' } });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('never commits unsafe font text or an out-of-range size; an empty size means default', async () => {
     await mount();
     await type(field('Code font') as HTMLInputElement, 'Menlo; } body {');

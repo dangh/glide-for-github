@@ -174,6 +174,24 @@ test.describe('options page', () => {
     }
   });
 
+  test('font text that CSS rejects is marked invalid and never saved', async ({ extContext }) => {
+    const page = await openOptions(extContext);
+    const input = field(page, 'Code font');
+    const stored = () =>
+      page.evaluate(async () => ((await chrome.storage.sync.get('pierre.settings'))['pierre.settings'] as { fonts?: { codeFontFamily?: string } } | undefined)?.fonts?.codeFontFamily ?? null);
+    const before = await stored();
+    for (const bad of ['Menlo)', 'Menlo]', 'Menlo !important', 'Menlo; color: red']) {
+      await input.fill(bad);
+      await expect(input, bad).toHaveAttribute('aria-invalid', 'true');
+    }
+    await page.waitForTimeout(1200);
+    expect(await stored()).toBe(before);
+    await input.fill(before ?? '');
+    await expect(input).not.toHaveAttribute('aria-invalid', 'true');
+    await page.waitForTimeout(1200);
+    await page.close();
+  });
+
   test('a numeric edit typed right before the page closes is still saved', async ({ extContext }) => {
     const page = await openOptions(extContext);
     const input = field(page, 'Lines per expand');

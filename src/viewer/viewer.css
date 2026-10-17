@@ -265,11 +265,7 @@ button {
   min-height: 0;
 }
 
-/* Tree on the right (layout.treePosition): mirror the panes and the divider. */
-.pierre-body[data-tree-position='right'] {
-  flex-direction: row-reverse;
-}
-
+/* Tree on the right (layout.treePosition; App renders it after the diffs): the divider moves to its left. */
 .pierre-body[data-tree-position='right'] .pierre-tree-pane {
   border-right: 0;
   border-left: 1px solid var(--pierre-border);

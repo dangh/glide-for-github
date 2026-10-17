@@ -1,6 +1,9 @@
 import { createFileTreeIconResolver } from '@pierre/trees';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  GITHUB_CHANGE_CSS,
   GITHUB_COLORS,
   GITHUB_DIFF,
   GITHUB_FONTS,
@@ -51,14 +54,14 @@ describe("the GitHub mapping of 'default'", () => {
     expect(effectiveThemeType('light', 'dark')).toBe('light');
   });
 
-  it("uses GitHub's diffBlob colors (light from the brief, dark from Primer)", () => {
+  it("uses GitHub's diffBlob colors from Primer primitives 11.10.0 (light and dark)", () => {
     expect(GITHUB_COLORS).toEqual({
       additionLine: { light: '#dafbe1', dark: '#2ea04326' },
       additionWord: { light: '#aceebb', dark: '#2ea04366' },
-      additionNum: { light: '#ccffd8', dark: '#3fb9504d' },
+      additionNum: { light: '#aceebb', dark: '#3fb9504d' },
       deletionLine: { light: '#ffebe9', dark: '#f851491a' },
       deletionWord: { light: '#ffcecb', dark: '#f8514966' },
-      deletionNum: { light: '#ffd7d5', dark: '#f851494d' },
+      deletionNum: { light: '#ffcecb', dark: '#f851494d' },
     });
   });
 });
@@ -69,7 +72,16 @@ describe('fonts', () => {
     expect(GITHUB_FONTS.ui).toBe('-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"');
     expect(GITHUB_FONTS.codeSize).toBe(12);
     expect(GITHUB_FONTS.features).toBe('normal');
-    expect(resolveFonts(DEFAULT_SETTINGS.fonts)).toEqual({ code: GITHUB_FONTS.code, ui: GITHUB_FONTS.ui, codeSize: 12, features: 'normal' });
+    expect(resolveFonts(DEFAULT_SETTINGS.fonts)).toEqual({ code: GITHUB_FONTS.code, ui: GITHUB_FONTS.ui, codeSize: 12, codeLineHeight: 20, features: 'normal' });
+  });
+
+  it("scales the code line height with the size (GitHub's 20 px at 12 px), so large sizes do not overlap", () => {
+    const at = (codeFontSize: number) => resolveFonts({ ...DEFAULT_SETTINGS.fonts, codeFontSize }).codeLineHeight;
+    expect(at(12)).toBe(20);
+    expect(at(24)).toBe(40);
+    expect(at(8)).toBe(13);
+    expect(at(32)).toBe(53);
+    for (let size = 8; size <= 32; size++) expect(at(size), String(size)).toBeGreaterThanOrEqual(Math.ceil(size * 1.5));
   });
 
   it("treats empty, blank and 'default' text as the GitHub stack, and trims custom text", () => {
@@ -82,6 +94,7 @@ describe('fonts', () => {
       code: '"Fira Code"',
       ui: 'Inter',
       codeSize: 14,
+      codeLineHeight: 23,
       features: '"liga" 0',
     });
   });
@@ -95,6 +108,7 @@ describe('toStyleVars', () => {
       '--pierre-mono': GITHUB_FONTS.code,
       '--diffs-font-family': GITHUB_FONTS.code,
       '--diffs-font-size': '12px',
+      '--diffs-line-height': '20px',
       '--diffs-font-features': 'normal',
       '--diffs-header-font-family': GITHUB_FONTS.ui,
       '--trees-font-family-override': GITHUB_FONTS.ui,
@@ -107,6 +121,7 @@ describe('toStyleVars', () => {
     expect(vars['--diffs-font-family']).toBe('"Fira Code", monospace');
     expect(vars['--pierre-mono']).toBe('"Fira Code", monospace');
     expect(vars['--diffs-font-size']).toBe('15px');
+    expect(vars['--diffs-line-height']).toBe('25px');
     expect(vars['--diffs-font-features']).toBe('"calt" 0');
     expect(vars['--pierre-font']).toBe('Inter');
     expect(vars['--trees-font-family-override']).toBe('Inter');
@@ -118,10 +133,10 @@ describe('toStyleVars', () => {
     expect(vars).toMatchObject({
       '--diffs-bg-addition-override': 'light-dark(#dafbe1, #2ea04326)',
       '--diffs-bg-addition-emphasis-override': 'light-dark(#aceebb, #2ea04366)',
-      '--diffs-bg-addition-number-override': 'light-dark(#ccffd8, #3fb9504d)',
+      '--diffs-bg-addition-number-override': 'light-dark(#aceebb, #3fb9504d)',
       '--diffs-bg-deletion-override': 'light-dark(#ffebe9, #f851491a)',
       '--diffs-bg-deletion-emphasis-override': 'light-dark(#ffcecb, #f8514966)',
-      '--diffs-bg-deletion-number-override': 'light-dark(#ffd7d5, #f851494d)',
+      '--diffs-bg-deletion-number-override': 'light-dark(#ffcecb, #f851494d)',
     });
     const theme = toStyleVars({ ...DEFAULT_SETTINGS, diff: { ...DEFAULT_SETTINGS.diff, changeColors: 'theme' } });
     expect(Object.keys(theme).filter((k) => k.startsWith('--diffs-bg-'))).toEqual([]);
@@ -141,8 +156,10 @@ describe('GitHub tree icons', () => {
     }
   });
 
-  it('draws folders with the octicon folder (filled; open when expanded)', () => {
-    expect(resolveIcon('file-tree-icon-chevron').name).toBe('glide-octicon-folder');
+  it("draws folders like GitHub: chevron + octicon folder in one 32x16 icon (open: chevron-down + open folder)", () => {
+    expect(resolveIcon('file-tree-icon-chevron')).toMatchObject({ name: 'glide-octicon-folder', width: 32, height: 16, viewBox: '0 0 32 16' });
+    // Both rows get a 32 px icon cell; file icons sit right-aligned, under their sibling folders' icons.
+    expect(GITHUB_TREE_CSS).toMatch(/\[data-item-section="icon"\][^}]*width:\s*32px/);
     const sprite = GITHUB_TREE_ICONS.spriteSheet!;
     expect(sprite).toContain('id="glide-octicon-file"');
     expect(sprite).toContain('id="glide-octicon-folder"');
@@ -152,5 +169,50 @@ describe('GitHub tree icons', () => {
     expect(GITHUB_TREE_CSS).toContain('--glide-folder-open');
     // The tree rotates closed folders' chevrons; a folder icon must stay upright.
     expect(GITHUB_TREE_CSS).toMatch(/transform:\s*none/);
+  });
+});
+
+/** All JS of an installed @pierre package's dist (its own files, not nested node_modules). */
+function pierreDist(pkg: 'diffs' | 'trees'): string {
+  const root = join(__dirname, '../../node_modules/@pierre', pkg, 'dist');
+  const out: string[] = [];
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) {
+        if (e.name !== 'node_modules') walk(join(dir, e.name));
+      } else if (e.name.endsWith('.js')) out.push(readFileSync(join(dir, e.name), 'utf8'));
+    }
+  };
+  walk(root);
+  return out.join('\n');
+}
+
+/** Attribute names, attribute values and non-Glide custom properties a CSS string refers to. */
+function cssNames(css: string): string[] {
+  const names = new Set<string>();
+  for (const m of css.matchAll(/\[([a-z-]+)(?:[\^]?=["']?([\w-]+))?/g)) {
+    names.add(m[1]!);
+    if (m[2]) names.add(m[2]);
+  }
+  for (const m of css.matchAll(/--[\w-]+/g)) if (!m[0].startsWith('--glide-')) names.add(m[0]);
+  return [...names];
+}
+
+describe('names our fixed Pierre CSS relies on (guards drift on @pierre upgrades)', () => {
+  const diffs = pierreDist('diffs');
+  const trees = pierreDist('trees');
+
+  it('the diff unsafeCSS and the style variables exist in @pierre/diffs', () => {
+    const names = [...cssNames(GITHUB_CHANGE_CSS), 'change-addition', 'change-deletion', 'data-diff-span'];
+    for (const v of Object.keys(toStyleVars(DEFAULT_SETTINGS))) if (v.startsWith('--diffs-')) names.push(v);
+    expect(names).toEqual(expect.arrayContaining(['--mix-light', '--mix-dark', 'data-line-type', 'data-background', '--diffs-line-height']));
+    for (const name of names) expect(diffs.includes(name), name).toBe(true);
+  });
+
+  it('the tree unsafeCSS, icon slots and style variables exist in @pierre/trees', () => {
+    const names = [...cssNames(GITHUB_TREE_CSS), ...Object.keys(GITHUB_TREE_ICONS.remap ?? {})];
+    for (const v of Object.keys(toStyleVars(DEFAULT_SETTINGS))) if (v.startsWith('--trees-')) names.push(v);
+    expect(names).toEqual(expect.arrayContaining(['data-item-section', 'data-item-type', 'data-icon-name', 'aria-expanded', 'file-tree-icon-chevron']));
+    for (const name of names) expect(trees.includes(name), name).toBe(true);
   });
 });

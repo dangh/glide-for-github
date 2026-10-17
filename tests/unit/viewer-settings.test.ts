@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, SETTINGS_STORAGE_KEY, setSettingsStorage, type DisplaySettings, type SettingsStorage } from '../../src/shared/settings';
 import { initSettings, reconcileSettings, useSettings } from '../../src/viewer/state/settings';
-import { createDiffOptionsBuilder, ITEM_METRICS } from '../../src/viewer/state/view';
+import { createDiffOptionsBuilder, ITEM_METRICS, itemMetricsFor } from '../../src/viewer/state/view';
 
 /** In-memory sync area that, like chrome.storage, echoes every write back to subscribers (async). */
 function echoingStorage(): SettingsStorage & { writes: number } {
@@ -72,6 +72,20 @@ describe('viewer settings identity', () => {
 
     stop();
     unsubscribe();
+  });
+
+  it("diff options carry the code line height in itemMetrics (CodeView's row estimate), reused while unchanged", () => {
+    const build = createDiffOptionsBuilder();
+    const diff = DEFAULT_SETTINGS.diff;
+    const base = build(diff, undefined);
+    expect(base.itemMetrics).toBe(ITEM_METRICS);
+    expect(ITEM_METRICS).toMatchObject({ lineHeight: 20, diffHeaderHeight: 40 });
+    const big = build(diff, undefined, undefined, undefined, 40);
+    expect(big).not.toBe(base);
+    expect(big.itemMetrics).toMatchObject({ lineHeight: 40, diffHeaderHeight: 40 });
+    expect(build(diff, undefined, undefined, undefined, 40)).toBe(big);
+    expect(itemMetricsFor(40)).toBe(big.itemMetrics);
+    expect(itemMetricsFor(20)).toBe(ITEM_METRICS);
   });
 
   it('reconcileSettings keeps section identity when values are equal', () => {

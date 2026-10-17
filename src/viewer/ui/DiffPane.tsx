@@ -5,6 +5,7 @@
 import type { DiffLineAnnotation, FileDiffLoadedFiles, FileDiffMetadata, LineAnnotation, SelectedLineRange } from '@pierre/diffs';
 import { CodeView, type CodeViewHandle } from '@pierre/diffs/react';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { resolveFonts } from '../../shared/github-defaults';
 import { fetchFullFile, type PrData, type Rpc } from '../github/private';
 import { createAnnotationSource } from '../state/annotations';
 import { targetFromRange } from '../state/compose';
@@ -89,6 +90,7 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
   const pr = usePr((s) => s.pr);
   const diffSettings = useSettings((s) => s.settings.diff);
   const colorMode = useSettings((s) => s.colorMode);
+  const lineHeight = useSettings((s) => resolveFonts(s.settings.fonts).codeLineHeight);
   const handleRef = useRef<Handle | null>(null);
   const defaultSource = useMemo(createAnnotationSource, []);
   const source = annotations ?? defaultSource;
@@ -97,7 +99,7 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
   const loadDiffFiles = useMemo(() => (pr ? createFileLoader(rpc, pr) : undefined), [rpc, pr]);
 
   const buildOptions = useMemo(createDiffOptionsBuilder, []);
-  const options = buildOptions(diffSettings, colorMode, loadDiffFiles, INTERACTIONS);
+  const options = buildOptions(diffSettings, colorMode, loadDiffFiles, INTERACTIONS, lineHeight);
 
   // Seeded once per PR; later changes go through `sync` → updateItem.
   const initialItems = useMemo<PierreItem[]>(() => (pr ? sync.seed(usePr.getState()) : []), [pr, sync]);

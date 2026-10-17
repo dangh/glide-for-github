@@ -12,31 +12,67 @@ import { commentCount, threadsByPath, type PrState } from './store';
 /** Height of the per-file header row; CodeView reserves exactly this (`itemMetrics.diffHeaderHeight`). */
 export const HEADER_HEIGHT = 40;
 
-/** Constant so CodeView's shallow option comparison sees no change. */
-export const ITEM_METRICS = Object.freeze({ diffHeaderHeight: HEADER_HEIGHT });
+/** Pierre's default code row height (`--diffs-line-height`), GitHub's 20 px at the default 12 px font. */
+export const DEFAULT_LINE_HEIGHT = 20;
+
+const metricsByLineHeight = new Map<number, Readonly<{ diffHeaderHeight: number; lineHeight: number }>>();
+
+/**
+ * CodeView `itemMetrics` for a code row height. CodeView estimates rows it does not measure (overflow 'scroll'
+ * without annotations) at `lineHeight`, so it must match `--diffs-line-height` (github-defaults.ts toStyleVars).
+ * One frozen object per height, so CodeView's option comparison sees no change while the height stays.
+ */
+export function itemMetricsFor(lineHeight: number) {
+  let m = metricsByLineHeight.get(lineHeight);
+  if (!m) metricsByLineHeight.set(lineHeight, (m = Object.freeze({ diffHeaderHeight: HEADER_HEIGHT, lineHeight })));
+  return m;
+}
+
+/** Metrics at the default code font size. */
+export const ITEM_METRICS = itemMetricsFor(DEFAULT_LINE_HEIGHT);
 
 export type DiffViewOptions = CodeViewReactOptions<AnnotationMeta, undefined>;
 
 /**
- * Memoized CodeView options: returns the previous object while the diff settings object, GitHub's color mode
- * and the file loader are unchanged (by reference), so unrelated setting changes never call `setOptions`.
+ * Memoized CodeView options: returns the previous object while the diff settings object, GitHub's color mode,
+ * the file loader and the code line height are unchanged, so unrelated setting changes never call `setOptions`.
  */
 export function createDiffOptionsBuilder() {
   let last:
-    | { diff: DiffSettings; colorMode: string | undefined; loadDiffFiles?: FileDiffContentsLoader; interactions?: DiffViewOptions; options: DiffViewOptions }
+    | {
+        diff: DiffSettings;
+        colorMode: string | undefined;
+        loadDiffFiles?: FileDiffContentsLoader;
+        interactions?: DiffViewOptions;
+        lineHeight: number;
+        options: DiffViewOptions;
+      }
     | undefined;
-  /** `interactions`: gutter "+" / line selection wiring (Task 9); pass a stable object. */
-  return (diff: DiffSettings, colorMode: string | undefined, loadDiffFiles?: FileDiffContentsLoader, interactions?: DiffViewOptions): DiffViewOptions => {
-    if (last && last.diff === diff && last.colorMode === colorMode && last.loadDiffFiles === loadDiffFiles && last.interactions === interactions)
+  /** `interactions`: gutter "+" / line selection wiring (Task 9); pass a stable object. `lineHeight`: code row px. */
+  return (
+    diff: DiffSettings,
+    colorMode: string | undefined,
+    loadDiffFiles?: FileDiffContentsLoader,
+    interactions?: DiffViewOptions,
+    lineHeight: number = DEFAULT_LINE_HEIGHT,
+  ): DiffViewOptions => {
+    if (
+      last &&
+      last.diff === diff &&
+      last.colorMode === colorMode &&
+      last.loadDiffFiles === loadDiffFiles &&
+      last.interactions === interactions &&
+      last.lineHeight === lineHeight
+    )
       return last.options;
     const options: DiffViewOptions = {
       ...toDiffOptions<AnnotationMeta>({ ...DEFAULT_SETTINGS, diff }),
       themeType: effectiveThemeType(diff.themeType, colorMode),
-      itemMetrics: ITEM_METRICS,
+      itemMetrics: itemMetricsFor(lineHeight),
       ...(loadDiffFiles ? { loadDiffFiles } : {}),
       ...interactions,
     };
-    last = { diff, colorMode, ...(loadDiffFiles ? { loadDiffFiles } : {}), ...(interactions ? { interactions } : {}), options };
+    last = { diff, colorMode, ...(loadDiffFiles ? { loadDiffFiles } : {}), ...(interactions ? { interactions } : {}), lineHeight, options };
     return options;
   };
 }

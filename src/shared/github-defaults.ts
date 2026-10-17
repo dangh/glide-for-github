@@ -11,7 +11,10 @@
  * diff.lineDiffType          'default'    'word'                              GitHub highlights changed words
  * diff.diffIndicators        'default'    'classic'                           +/- signs in the line gutter
  * diff.hunkSeparators        'default'    'simple'                            no "@@ -a,b +c,d @@" rows (user request);
- *                                                                             a plain separator with the expand affordance
+ *                                                                             a plain divider between hunks. NOTE: Pierre's
+ *                                                                             'simple' has NO expand buttons (only the
+ *                                                                             line-info* types do), so unchanged context
+ *                                                                             cannot be expanded in this mode
  * diff.themeLight/Dark       'default'    'github-light-default' /            GitHub's Primer syntax colors (Shiki's
  *                                         'github-dark-default'               bundled GitHub themes)
  * diff.themeType             'default'    'system' (follows GitHub's mode)    GitHub's default theme setting syncs with the OS
@@ -85,20 +88,24 @@ export function resolveDiff(d: DiffSettings): ResolvedDiffSettings {
 }
 
 /**
- * GitHub's diff line colors (Primer `diffBlob` tokens). Light: the values the user asked for (#dafbe1 / #aceebb /
- * #ccffd8 and #ffebe9 / #ffcecb / #ffd7d5). Dark: Primer primitives 11.10.0, functional/themes/dark.css
- * (https://unpkg.com/@primer/primitives@11.10.0/dist/css/functional/themes/dark.css):
+ * GitHub's diff line colors: Primer primitives 11.10.0 `diffBlob` tokens.
+ * Light, functional/themes/light.css (https://unpkg.com/@primer/primitives@11.10.0/dist/css/functional/themes/light.css):
+ * `--diffBlob-additionLine-bgColor` = bgColor-success-muted #dafbe1, `--diffBlob-additionWord-bgColor` #aceebb,
+ * `--diffBlob-additionNum-bgColor` #aceebb, `--diffBlob-deletionLine-bgColor` = bgColor-danger-muted #ffebe9,
+ * `--diffBlob-deletionWord-bgColor` #ffcecb, `--diffBlob-deletionNum-bgColor` #ffcecb.
+ * Dark, functional/themes/dark.css (https://unpkg.com/@primer/primitives@11.10.0/dist/css/functional/themes/dark.css):
  * `--diffBlob-additionLine-bgColor` = bgColor-success-muted #2ea04326, `--diffBlob-additionWord-bgColor` #2ea04366,
  * `--diffBlob-additionNum-bgColor` #3fb9504d, `--diffBlob-deletionLine-bgColor` = bgColor-danger-muted #f851491a,
  * `--diffBlob-deletionWord-bgColor` #f8514966, `--diffBlob-deletionNum-bgColor` #f851494d.
+ * (The older GitHub gutter colors #ccffd8 / #ffd7d5 predate these tokens.)
  */
 export const GITHUB_COLORS = Object.freeze({
   additionLine: { light: '#dafbe1', dark: '#2ea04326' },
   additionWord: { light: '#aceebb', dark: '#2ea04366' },
-  additionNum: { light: '#ccffd8', dark: '#3fb9504d' },
+  additionNum: { light: '#aceebb', dark: '#3fb9504d' },
   deletionLine: { light: '#ffebe9', dark: '#f851491a' },
   deletionWord: { light: '#ffcecb', dark: '#f8514966' },
-  deletionNum: { light: '#ffd7d5', dark: '#f851494d' },
+  deletionNum: { light: '#ffcecb', dark: '#f851494d' },
 });
 
 /** Pierre's override variables, each fed one GitHub color as a `light-dark()` pair. */
@@ -132,8 +139,13 @@ export interface ResolvedFonts {
   code: string;
   ui: string;
   codeSize: number;
+  /** Code row height in px: GitHub's 20 px at 12 px, scaled with the size (Pierre's rows are a fixed line height). */
+  codeLineHeight: number;
   features: string;
 }
+
+/** Row height for a code font size: GitHub's 20/12 ratio, rounded to whole px (CodeView's row estimate is in px). */
+export const codeLineHeight = (size: number): number => Math.round((size * 20) / 12);
 
 const text = (value: string, fallback: string) => {
   const v = value.trim();
@@ -142,10 +154,12 @@ const text = (value: string, fallback: string) => {
 
 /** Effective fonts: blank or 'default' text and a 'default' size become GitHub's. */
 export function resolveFonts(f: FontSettings): ResolvedFonts {
+  const codeSize = f.codeFontSize === DEFAULT ? GITHUB_FONTS.codeSize : f.codeFontSize;
   return {
     code: text(f.codeFontFamily, GITHUB_FONTS.code),
     ui: text(f.uiFontFamily, GITHUB_FONTS.ui),
-    codeSize: f.codeFontSize === DEFAULT ? GITHUB_FONTS.codeSize : f.codeFontSize,
+    codeSize,
+    codeLineHeight: codeLineHeight(codeSize),
     features: text(f.codeFontFeatures, GITHUB_FONTS.features),
   };
 }
@@ -165,6 +179,8 @@ export function toStyleVars(s: DisplaySettings): Readonly<Record<string, string>
     '--pierre-mono': f.code,
     '--diffs-font-family': f.code,
     '--diffs-font-size': `${f.codeSize}px`,
+    // Must match the CodeView `itemMetrics.lineHeight` (state/view.ts), which estimates unmeasured rows.
+    '--diffs-line-height': `${f.codeLineHeight}px`,
     '--diffs-font-features': f.features,
     '--diffs-header-font-family': f.ui,
     '--trees-font-family-override': f.ui,

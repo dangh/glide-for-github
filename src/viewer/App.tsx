@@ -113,9 +113,11 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
         <DisplayStyle />
         <Toolbar />
         <BatchBar />
+        {/* DOM order follows the visual order (tree first or last), so keyboard focus order matches the screen. */}
         <div className="pierre-body" data-tree-position={treePosition}>
-          <TreePane />
+          {treePosition === 'left' && <TreePane />}
           <main className="pierre-main">{pr && settingsLoaded ? <DiffPane rpc={rpc} /> : <div className="pierre-loading">Loading pull request…</div>}</main>
+          {treePosition === 'right' && <TreePane />}
         </div>
         <Notice />
         <CommitDialogHost />

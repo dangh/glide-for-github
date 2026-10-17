@@ -226,6 +226,45 @@ test.describe('sandbox PR', () => {
     await resetSettings(viewer);
   });
 
+  test('a 24 px code font gets taller rows: no overlapping rows or files', async ({ page }) => {
+    const viewer = await openPierre(page, SANDBOX, 'hash');
+    await resetSettings(viewer);
+    await viewer.allFetched();
+    // 'scroll' is the path where CodeView estimates rows from itemMetrics instead of measuring them.
+    await viewer.frame().evaluate(() => window.__pierre!.settings.getState().update({ fonts: { codeFontSize: 24 }, diff: { overflow: 'scroll' } }));
+    const path = 'src/util/math.ts';
+    await viewer.scrollToFile(path);
+    await expect.poll(async () => (await viewer.item(path))?.lines ?? 0, { timeout: 15_000 }).toBeGreaterThan(3);
+    await page.waitForTimeout(500);
+    const layout = await viewer.frame().evaluate(() => {
+      const items = [...document.querySelectorAll('diffs-container')].map((c) => ({ c, r: c.getBoundingClientRect() })).sort((a, b) => a.r.top - b.r.top);
+      const problems: string[] = [];
+      for (let i = 1; i < items.length; i++) {
+        if (items[i]!.r.top < items[i - 1]!.r.bottom - 0.5) problems.push(`file ${i} overlaps the one above`);
+      }
+      let rows = 0;
+      let fontSize = '';
+      for (const { c } of items) {
+        for (const column of c.shadowRoot!.querySelectorAll('code')) {
+          const lines = [...column.querySelectorAll<HTMLElement>('[data-line]')].map((l) => l.getBoundingClientRect());
+          for (let i = 0; i < lines.length; i++) {
+            rows++;
+            if (lines[i]!.height < 24) problems.push(`row ${i} is ${lines[i]!.height}px tall`);
+            if (i > 0 && lines[i]!.top < lines[i - 1]!.bottom - 0.5) problems.push(`row ${i} overlaps the row above`);
+          }
+        }
+        const line = c.shadowRoot!.querySelector('[data-line]');
+        if (line) fontSize = getComputedStyle(line).fontSize;
+      }
+      return { problems: problems.slice(0, 5), rows, fontSize };
+    });
+    expect(layout.fontSize).toBe('24px');
+    expect(layout.rows).toBeGreaterThan(3);
+    expect(layout.problems).toEqual([]);
+    expect(await viewer.frame().evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--diffs-line-height').trim())).toBe('40px');
+    await resetSettings(viewer);
+  });
+
   test('the tree can sit on the right of the diffs', async ({ page }) => {
     const viewer = await openPierre(page, SANDBOX, 'hash');
     await resetSettings(viewer);
@@ -238,6 +277,12 @@ test.describe('sandbox PR', () => {
     await viewer.locator.getByTestId('display-menu').click();
     await viewer.locator.locator('label.field', { hasText: 'Tree position' }).locator('select').selectOption('right');
     await expect.poll(async () => { const s = await sides(); return s.tree > s.main; }).toBe(true);
+    // DOM order matches the screen (keyboard focus goes diffs first, then the tree).
+    expect(
+      await viewer.frame().evaluate(
+        () => (document.querySelector('.pierre-main')!.compareDocumentPosition(document.querySelector('.pierre-tree-pane')!) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+      ),
+    ).toBe(true);
     await page.keyboard.press('Escape');
     // The tree still works there: selecting a file scrolls its diff into view.
     const path = 'src/util/math.ts';
