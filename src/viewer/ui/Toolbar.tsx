@@ -3,6 +3,7 @@
  * Each control subscribes to its own slice, so diff loading never re-renders the toolbar.
  */
 import { memo } from 'react';
+import { resolveDiffChoice } from '../../shared/github-defaults';
 import { useSettings } from '../state/settings';
 import { usePr } from '../state/store';
 import { CommitRangePicker } from './CommitRangePicker';
@@ -10,7 +11,8 @@ import { DisplayMenu } from './DisplayMenu';
 import { ReviewMenu } from './ReviewMenu';
 
 const DiffStyleToggle = memo(function DiffStyleToggle() {
-  const diffStyle = useSettings((s) => s.settings.diff.diffStyle);
+  // 'default' shows as the layout it resolves to (GitHub's: unified).
+  const diffStyle = useSettings((s) => resolveDiffChoice('diffStyle', s.settings.diff.diffStyle));
   const update = useSettings((s) => s.update);
   return (
     <span className="seg" role="group" aria-label="Diff layout">
@@ -29,7 +31,7 @@ const DiffStyleToggle = memo(function DiffStyleToggle() {
 });
 
 const WrapToggle = memo(function WrapToggle() {
-  const wrap = useSettings((s) => s.settings.diff.overflow === 'wrap');
+  const wrap = useSettings((s) => resolveDiffChoice('overflow', s.settings.diff.overflow) === 'wrap');
   const update = useSettings((s) => s.update);
   return (
     <button className={`pill ${wrap ? 'pill-on' : ''}`} aria-pressed={wrap} onClick={() => update({ diff: { overflow: wrap ? 'scroll' : 'wrap' } })}>

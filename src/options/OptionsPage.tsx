@@ -1,6 +1,7 @@
 /** The extension's options page: tokens, display settings (shared with the viewer's Display menu) and a live sample. */
 import { useEffect } from 'react';
 import { BRAND } from '../shared/brand';
+import { resolveDiffChoice } from '../shared/github-defaults';
 import { initSettings, useSettings } from '../viewer/state/settings';
 import { DisplaySettingsForm } from '../viewer/ui/DisplaySettingsForm';
 import { SampleDiff } from './SampleDiff';
@@ -10,7 +11,7 @@ export function OptionsPage() {
   const settings = useSettings((s) => s.settings);
   const loaded = useSettings((s) => s.loaded);
   const update = useSettings((s) => s.update);
-  const themeType = settings.diff.themeType;
+  const themeType = resolveDiffChoice('themeType', settings.diff.themeType);
 
   useEffect(() => initSettings(), []);
   useEffect(() => {

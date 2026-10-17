@@ -1,16 +1,29 @@
 /**
  * Every `DisplaySettings` field (src/shared/settings.ts) as a form, shared by the viewer's Display menu and the
- * options page. Enumerations apply at once; numeric inputs are debounced (chrome.storage.sync is rate limited)
- * and a pending edit is flushed when the form unmounts or the page is hidden, so closing the menu or the tab
- * right after typing does not lose it. Invalid values are shown but never committed.
+ * options page. Enumerations apply at once, with 'default' first as "Default (GitHub)"; numeric and text inputs
+ * are debounced (chrome.storage.sync is rate limited) and a pending edit is flushed when the form unmounts or the
+ * page is hidden, so closing the menu or the tab right after typing does not lose it. Invalid values are shown
+ * (marked aria-invalid) but never committed.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DARK_THEMES, LIGHT_THEMES, SETTING_CHOICES, type DeepPartial, type DisplaySettings } from '../../shared/settings';
+import { GITHUB_FONTS } from '../../shared/github-defaults';
+import {
+  DEFAULT_CHOICE,
+  FONT_SIZE_MAX,
+  FONT_SIZE_MIN,
+  isFontText,
+  SETTING_CHOICES,
+  type DeepPartial,
+  type DisplaySettings,
+  type FontSettings,
+} from '../../shared/settings';
 
 /** Pause after the last keystroke before a numeric edit is saved (sync storage allows ~120 writes per minute). */
 export const INPUT_DEBOUNCE_MS = 400;
 
 export type Update = (patch: DeepPartial<DisplaySettings>) => void;
+
+export const DEFAULT_LABEL = 'Default (GitHub)';
 
 function Select<T extends string>({ label, value, choices, onChange }: { label: string; value: T; choices: readonly T[]; onChange(v: T): void }) {
   // A stored value outside the list (a dark theme chosen as the light one) stays visible instead of snapping.
@@ -21,7 +34,7 @@ function Select<T extends string>({ label, value, choices, onChange }: { label: 
       <select value={value} onChange={(e) => onChange(e.target.value as T)}>
         {shown.map((c) => (
           <option key={c} value={c}>
-            {c}
+            {c === DEFAULT_CHOICE ? DEFAULT_LABEL : c}
           </option>
         ))}
       </select>
@@ -75,11 +88,53 @@ function useDebounced<T>(value: T, commit: (v: T) => void, valid: (v: T) => bool
 }
 
 function NumberField({ label, value, min, onChange }: { label: string; value: number; min: number; onChange(v: number): void }) {
-  const [draft, change] = useDebounced(String(value), (v) => onChange(Number(v)), (v) => /^\d+$/.test(v) && Number(v) >= min);
+  const valid = (v: string) => /^\d+$/.test(v) && Number(v) >= min;
+  const [draft, change] = useDebounced(String(value), (v) => onChange(Number(v)), valid);
   return (
     <label className="field">
       <span>{label}</span>
-      <input type="number" min={min} step={1} value={draft} onChange={(e) => change(e.target.value)} />
+      <input type="number" min={min} step={1} value={draft} aria-invalid={!valid(draft) || undefined} onChange={(e) => change(e.target.value)} />
+    </label>
+  );
+}
+
+/** Free font text (goes into a CSS custom property); empty = the GitHub default shown as placeholder. */
+function FontTextField({ label, value, placeholder, onChange }: { label: string; value: string; placeholder: string; onChange(v: string): void }) {
+  const [draft, change] = useDebounced(value, onChange, isFontText);
+  return (
+    <label className="field field-text">
+      <span>{label}</span>
+      <input
+        type="text"
+        value={draft}
+        placeholder={placeholder}
+        title={placeholder}
+        spellCheck={false}
+        aria-invalid={!isFontText(draft) || undefined}
+        onChange={(e) => change(e.target.value)}
+      />
+    </label>
+  );
+}
+
+const sizeValid = (v: string) => v === '' || (/^\d+$/.test(v) && Number(v) >= FONT_SIZE_MIN && Number(v) <= FONT_SIZE_MAX);
+
+/** Code font size in px; empty = 'default' (GitHub's 12 px, shown as placeholder). */
+function FontSizeField({ value, onChange }: { value: FontSettings['codeFontSize']; onChange(v: FontSettings['codeFontSize']): void }) {
+  const [draft, change] = useDebounced(value === DEFAULT_CHOICE ? '' : String(value), (v) => onChange(v === '' ? DEFAULT_CHOICE : Number(v)), sizeValid);
+  return (
+    <label className="field">
+      <span>Code font size (px)</span>
+      <input
+        type="number"
+        min={FONT_SIZE_MIN}
+        max={FONT_SIZE_MAX}
+        step={1}
+        value={draft}
+        placeholder={String(GITHUB_FONTS.codeSize)}
+        aria-invalid={!sizeValid(draft) || undefined}
+        onChange={(e) => change(e.target.value)}
+      />
     </label>
   );
 }
@@ -89,6 +144,8 @@ export function DisplaySettingsForm({ settings, update }: { settings: DisplaySet
   const t = settings.tree;
   const diff = (p: Partial<DisplaySettings['diff']>) => update({ diff: p });
   const tree = (p: Partial<DisplaySettings['tree']>) => update({ tree: p });
+  const fonts = (p: Partial<DisplaySettings['fonts']>) => update({ fonts: p });
+  const f = settings.fonts;
   const C = SETTING_CHOICES;
   const expansion = typeof t.initialExpansion === 'number' ? String(t.initialExpansion) : t.initialExpansion;
   const density = typeof t.density === 'number' ? 'default' : t.density;
@@ -115,8 +172,10 @@ export function DisplaySettingsForm({ settings, update }: { settings: DisplaySet
           onChange={(v) => diff({ collapsedContextThreshold: v })}
         />
         <Select label="Mode" value={d.themeType} choices={C.diff.themeType} onChange={(v) => diff({ themeType: v })} />
-        <Select label="Light theme" value={d.themeLight} choices={LIGHT_THEMES} onChange={(v) => diff({ themeLight: v })} />
-        <Select label="Dark theme" value={d.themeDark} choices={DARK_THEMES} onChange={(v) => diff({ themeDark: v })} />
+        <Select label="Light theme" value={d.themeLight} choices={C.diff.themeLight as readonly string[]} onChange={(v) => diff({ themeLight: v })} />
+        <Select label="Dark theme" value={d.themeDark} choices={C.diff.themeDark as readonly string[]} onChange={(v) => diff({ themeDark: v })} />
+        <Select label="Change colors" value={d.changeColors} choices={C.diff.changeColors} onChange={(v) => diff({ changeColors: v })} />
+        <Select label="File headers" value={d.fileHeaderStyle} choices={C.diff.fileHeaderStyle} onChange={(v) => diff({ fileHeaderStyle: v })} />
       </fieldset>
       <fieldset>
         <legend>Tree</legend>
@@ -126,14 +185,28 @@ export function DisplaySettingsForm({ settings, update }: { settings: DisplaySet
         <Select
           label="Folders start"
           value={expansion}
-          choices={['closed', 'open', '1', '2', '3'] as const}
-          onChange={(v) => tree({ initialExpansion: v === 'open' || v === 'closed' ? v : Number(v) })}
+          choices={[...C.tree.initialExpansion, '1', '2', '3'] as const}
+          onChange={(v) => tree({ initialExpansion: v === 'open' || v === 'closed' || v === DEFAULT_CHOICE ? v : Number(v) })}
         />
         <Check label="Flatten single-child folders" value={t.flattenEmptyDirectories} onChange={(v) => tree({ flattenEmptyDirectories: v })} />
         <Check label="Sticky folders" value={t.stickyFolders} onChange={(v) => tree({ stickyFolders: v })} />
         <Select label="Density" value={density} choices={C.tree.density} onChange={(v) => tree({ density: v })} />
         <Select label="Icons" value={t.icons} choices={C.tree.icons} onChange={(v) => tree({ icons: v })} />
         <Check label="Colored icons" value={t.coloredIcons} onChange={(v) => tree({ coloredIcons: v })} />
+        <Check label="Git status letters" value={t.showGitStatus} onChange={(v) => tree({ showGitStatus: v })} hint="A / M / D badges in the tree" />
+        <Select
+          label="Tree position"
+          value={settings.layout.treePosition}
+          choices={C.layout.treePosition}
+          onChange={(v) => update({ layout: { treePosition: v } })}
+        />
+      </fieldset>
+      <fieldset>
+        <legend>Fonts</legend>
+        <FontTextField label="Code font" value={f.codeFontFamily} placeholder={GITHUB_FONTS.code} onChange={(v) => fonts({ codeFontFamily: v })} />
+        <FontSizeField value={f.codeFontSize} onChange={(v) => fonts({ codeFontSize: v })} />
+        <FontTextField label="Code font features" value={f.codeFontFeatures} placeholder={GITHUB_FONTS.features} onChange={(v) => fonts({ codeFontFeatures: v })} />
+        <FontTextField label="UI font" value={f.uiFontFamily} placeholder={GITHUB_FONTS.ui} onChange={(v) => fonts({ uiFontFamily: v })} />
       </fieldset>
       <fieldset>
         <legend>Review</legend>

@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FileSummary, PrData } from '../../src/viewer/github/private';
+import { useSettings } from '../../src/viewer/state/settings';
 import { usePr } from '../../src/viewer/state/store';
 import { Toolbar } from '../../src/viewer/ui/Toolbar';
 
@@ -60,6 +61,21 @@ describe('Toolbar', () => {
 
     await act(async () => usePr.getState().setViewedLocal('b.ts', true));
     expect(container.querySelector('[data-testid="viewed-counter"]')!.textContent).toBe('2 / 3 viewed');
+    await act(async () => root.unmount());
+  });
+
+  it("shows the layout and wrap that 'default' resolves to (GitHub: Unified, wrapped)", async () => {
+    usePr.getState().setPr(pr);
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(createElement(Toolbar)));
+    const pressed = (name: string) =>
+      [...container.querySelectorAll('button')].find((b) => b.textContent === name)!.getAttribute('aria-pressed');
+    expect(useSettings.getState().settings.diff.diffStyle).toBe('default');
+    expect(pressed('Unified')).toBe('true');
+    expect(pressed('Split')).toBe('false');
+    expect(pressed('Wrap')).toBe('true');
     await act(async () => root.unmount());
   });
 });

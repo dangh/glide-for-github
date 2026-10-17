@@ -6,7 +6,14 @@
  * who never touched that option, and the item stays far below the 8 KB per-item sync quota.
  *
  * ---------------------------------------------------------------------------------------------------------
- * Option inventory (derived from the installed @pierre/diffs 1.5.x and @pierre/trees 1.0.0-beta.6 .d.ts/.js)
+ * 'default' (feedback round 1): every enumerated option also takes the value 'default', listed first and labelled
+ * "Default (GitHub)"; it resolves to the value that looks most like GitHub's Files changed page (the mapping table
+ * and the colors / fonts / icons live in ./github-defaults.ts). DEFAULT_SETTINGS uses 'default' wherever it
+ * applies; booleans and numbers default to their GitHub-closest values (table in ./github-defaults.ts). Explicit
+ * values stored by older versions keep working as overrides; invalid values fall back to the default.
+ *
+ * Option inventory (derived from the installed @pierre/diffs 1.5.x and @pierre/trees 1.0.0-beta.6 .d.ts/.js).
+ * The "default" column below is Pierre's own default, i.e. what an explicit choice of that value means.
  * ---------------------------------------------------------------------------------------------------------
  * Diff options are the ones accepted by the React `CodeViewReactOptions`, i.e. the pass-through keys listed in
  * `CODE_VIEW_DIFF_OPTION_KEYS` plus the CodeView-level keys (diffs/dist/components/CodeView.d.ts), which
@@ -53,6 +60,15 @@
  *
  * INCLUDED, review: hideWhitespace (boolean, default false; extension-owned, not a Pierre option).
  *
+ * INCLUDED, extension-owned (feedback round 1):
+ *   diff.changeColors         'default' (GitHub's diffBlob colors) | 'theme' (Pierre's theme-derived colors)
+ *   diff.fileHeaderStyle      'default' (GitHub file box) | 'pierre' (Glide's flat header bar)
+ *   tree.showGitStatus        boolean, false: A/M/D letters and folder roll-ups (@pierre/trees `gitStatus`)
+ *   fonts.*                   codeFontFamily / uiFontFamily / codeFontFeatures (free text, '' or 'default' = GitHub's),
+ *                             codeFontSize ('default' = 12 px, or 8-32 px). The text goes into CSS custom properties,
+ *                             so it is at most 300 chars and never contains ; { } < >.
+ *   layout.treePosition       'left' | 'right', default 'left'
+ *
  * EXCLUDED, with reasons:
  *   preferredHighlighter        not a user option: toDiffOptions always sets 'shiki-js' (global no-WASM constraint)
  *   theme as a single string    covered by themeLight/themeDark (the extension always passes the light/dark pair)
@@ -83,6 +99,8 @@ import type {
   FileTreeSearchBlurBehavior,
   FileTreeSearchMode,
 } from '@pierre/trees';
+import { GITHUB_CHANGE_CSS, GITHUB_TREE, resolveDiff } from './github-defaults';
+import { GITHUB_TREE_CSS, GITHUB_TREE_ICONS } from './github-tree-icons';
 
 // ---------------------------------------------------------------------------------------------------------
 // Types
@@ -91,22 +109,33 @@ import type {
 /** `InteractionManagerBaseOptions['lineHoverHighlight']`, which @pierre/diffs does not export as its own type. */
 export type LineHoverHighlight = 'disabled' | 'both' | 'number' | 'line';
 
+/** The choice that resolves to GitHub's look (see ./github-defaults.ts). */
+export const DEFAULT_CHOICE = 'default';
+export type Default = typeof DEFAULT_CHOICE;
+type OrDefault<T> = Default | T;
+
 export interface DiffSettings {
-  diffStyle: 'split' | 'unified';
-  overflow: 'scroll' | 'wrap';
-  lineDiffType: LineDiffTypes;
-  diffIndicators: DiffIndicators;
+  diffStyle: OrDefault<'split' | 'unified'>;
+  overflow: OrDefault<'scroll' | 'wrap'>;
+  lineDiffType: OrDefault<LineDiffTypes>;
+  diffIndicators: OrDefault<DiffIndicators>;
   disableBackground: boolean;
   disableLineNumbers: boolean;
-  hunkSeparators: Exclude<HunkSeparators, 'custom'>;
+  hunkSeparators: OrDefault<Exclude<HunkSeparators, 'custom'>>;
   expandUnchanged: boolean;
   expansionLineCount: number;
   collapsedContextThreshold: number;
   stickyHeader: boolean;
+  /** A bundled light theme name, or 'default'. */
   themeLight: string;
+  /** A bundled dark theme name, or 'default'. */
   themeDark: string;
-  themeType: ThemeTypes;
-  lineHoverHighlight: LineHoverHighlight;
+  themeType: OrDefault<ThemeTypes>;
+  lineHoverHighlight: OrDefault<LineHoverHighlight>;
+  /** Addition/deletion backgrounds: GitHub's colors, or the ones Pierre derives from the theme. */
+  changeColors: OrDefault<'theme'>;
+  /** Per-file header look: GitHub's file box, or Glide's flat bar. */
+  fileHeaderStyle: OrDefault<'pierre'>;
   tokenizeMaxLineLength: number;
   tokenizeMaxLength: number;
   maxLineDiffLength: number;
@@ -117,14 +146,32 @@ export interface DiffSettings {
 
 export interface TreeSettings {
   flattenEmptyDirectories: boolean;
-  initialExpansion: FileTreeInitialExpansion;
-  fileTreeSearchMode: FileTreeSearchMode;
+  initialExpansion: OrDefault<FileTreeInitialExpansion>;
+  fileTreeSearchMode: OrDefault<FileTreeSearchMode>;
+  /** Pierre's own density keyword 'default' is also the GitHub-closest one, so 'default' needs no resolution. */
   density: FileTreeDensity;
-  icons: FileTreeBuiltInIconSet;
+  icons: OrDefault<FileTreeBuiltInIconSet>;
   coloredIcons: boolean;
   stickyFolders: boolean;
   search: boolean;
-  searchBlurBehavior: FileTreeSearchBlurBehavior;
+  searchBlurBehavior: OrDefault<FileTreeSearchBlurBehavior>;
+  /** A/M/D letters (and folder roll-ups) in the tree. */
+  showGitStatus: boolean;
+}
+
+export interface FontSettings {
+  /** CSS font-family list for code; '' or 'default' = GitHub's monospace stack. */
+  codeFontFamily: string;
+  /** CSS font-family list for the viewer's own UI and the tree; '' or 'default' = GitHub's system stack. */
+  uiFontFamily: string;
+  /** Code font size in px (FONT_SIZE_MIN-FONT_SIZE_MAX), or 'default' (12 px). */
+  codeFontSize: OrDefault<number>;
+  /** CSS font-feature-settings for code; '' or 'default' = normal. */
+  codeFontFeatures: string;
+}
+
+export interface LayoutSettings {
+  treePosition: 'left' | 'right';
 }
 
 export interface ReviewSettings {
@@ -134,8 +181,13 @@ export interface ReviewSettings {
 export interface DisplaySettings {
   diff: DiffSettings;
   tree: TreeSettings;
+  fonts: FontSettings;
+  layout: LayoutSettings;
   review: ReviewSettings;
 }
+
+/** The sections of `DisplaySettings`, in storage order. */
+export const SETTINGS_SECTIONS = ['diff', 'tree', 'fonts', 'layout', 'review'] as const;
 
 export type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] };
 
@@ -155,6 +207,11 @@ const ICON_SETS = ['minimal', 'standard', 'complete'] as const;
 const SEARCH_BLUR_BEHAVIORS = ['close', 'retain'] as const;
 const DENSITY_KEYWORDS = ['compact', 'default', 'relaxed'] as const;
 const EXPANSION_KEYWORDS = ['open', 'closed'] as const;
+const CHANGE_COLORS = ['theme'] as const;
+const FILE_HEADER_STYLES = ['pierre'] as const;
+const TREE_POSITIONS = ['left', 'right'] as const;
+/** A choice list with 'default' first. */
+const withDefault = <const L extends readonly string[]>(list: L) => [DEFAULT_CHOICE, ...list] as const;
 
 /**
  * Themes Pierre can load by name: the `@pierre/theming` bundled collection (Pierre's own plus Shiki's), split by
@@ -177,10 +234,10 @@ export const DARK_THEMES = [
   'one-dark-pro', 'plastic', 'poimandres', 'red', 'rose-pine', 'rose-pine-moon', 'slack-dark', 'solarized-dark', 'synthwave-84',
   'tokyo-night', 'vesper', 'vitesse-black', 'vitesse-dark',
 ] as const;
-const ALL_THEMES: readonly string[] = [...LIGHT_THEMES, ...DARK_THEMES];
+const ALL_THEMES: readonly string[] = [DEFAULT_CHOICE, ...LIGHT_THEMES, ...DARK_THEMES];
 
 /** Compile-time proof that a choice list covers every member of the library union (fails typecheck if Pierre adds one). */
-type Covers<Union, List extends readonly unknown[]> = [Union] extends [List[number]] ? true : never;
+type Covers<Union, List extends readonly unknown[]> = [Exclude<Union, Default>] extends [List[number]] ? true : never;
 const _exhaustive: [
   Covers<DiffSettings['diffStyle'], typeof DIFF_STYLES>,
   Covers<DiffSettings['overflow'], typeof OVERFLOWS>,
@@ -193,29 +250,42 @@ const _exhaustive: [
   Covers<TreeSettings['icons'], typeof ICON_SETS>,
   Covers<TreeSettings['searchBlurBehavior'], typeof SEARCH_BLUR_BEHAVIORS>,
   Covers<Extract<TreeSettings['density'], string>, typeof DENSITY_KEYWORDS>,
-  Covers<Extract<TreeSettings['initialExpansion'], string>, typeof EXPANSION_KEYWORDS>,
+  Covers<Exclude<Extract<TreeSettings['initialExpansion'], string>, Default>, typeof EXPANSION_KEYWORDS>,
 ] = [true, true, true, true, true, true, true, true, true, true, true, true];
 void _exhaustive;
 
 /** Allowed values for every enumerated setting, keyed like `DisplaySettings` (drives Display menu / options page controls). */
 export const SETTING_CHOICES = {
   diff: {
-    diffStyle: DIFF_STYLES,
-    overflow: OVERFLOWS,
-    lineDiffType: LINE_DIFF_TYPES,
-    diffIndicators: DIFF_INDICATORS,
-    hunkSeparators: HUNK_SEPARATORS,
-    themeType: THEME_TYPES,
-    lineHoverHighlight: LINE_HOVER_HIGHLIGHTS,
+    diffStyle: withDefault(DIFF_STYLES),
+    overflow: withDefault(OVERFLOWS),
+    lineDiffType: withDefault(LINE_DIFF_TYPES),
+    diffIndicators: withDefault(DIFF_INDICATORS),
+    hunkSeparators: withDefault(HUNK_SEPARATORS),
+    themeType: withDefault(THEME_TYPES),
+    lineHoverHighlight: withDefault(LINE_HOVER_HIGHLIGHTS),
+    themeLight: withDefault(LIGHT_THEMES),
+    themeDark: withDefault(DARK_THEMES),
+    changeColors: withDefault(CHANGE_COLORS),
+    fileHeaderStyle: withDefault(FILE_HEADER_STYLES),
   },
   tree: {
-    fileTreeSearchMode: SEARCH_MODES,
-    icons: ICON_SETS,
-    searchBlurBehavior: SEARCH_BLUR_BEHAVIORS,
-    density: DENSITY_KEYWORDS,
-    initialExpansion: EXPANSION_KEYWORDS,
+    fileTreeSearchMode: withDefault(SEARCH_MODES),
+    icons: withDefault(ICON_SETS),
+    searchBlurBehavior: withDefault(SEARCH_BLUR_BEHAVIORS),
+    // Pierre's keyword 'default' doubles as ours (see TreeSettings.density): 'default' first, then the others.
+    density: ['default', 'compact', 'relaxed'] as const,
+    initialExpansion: withDefault(EXPANSION_KEYWORDS),
+  },
+  layout: {
+    treePosition: TREE_POSITIONS,
   },
 } as const;
+
+/** Limits for the font settings (they end up in CSS custom properties). */
+export const FONT_TEXT_MAX = 300;
+export const FONT_SIZE_MIN = 8;
+export const FONT_SIZE_MAX = 32;
 
 // ---------------------------------------------------------------------------------------------------------
 // Defaults
@@ -226,42 +296,50 @@ function deepFreeze<T extends object>(value: T): T {
   return Object.freeze(value);
 }
 
-/** Pierre's own defaults (sources in the header comment), except `tree.search` which is the extension's default. Frozen; `loadSettings` returns fresh mutable copies. */
+/**
+ * 'default' (GitHub's look) for every enumerated option; booleans and numbers at their GitHub-closest values (the
+ * table with the reasons is in ./github-defaults.ts). Frozen; `loadSettings` returns fresh mutable copies.
+ */
 export const DEFAULT_SETTINGS: DisplaySettings = deepFreeze({
   diff: {
-    diffStyle: 'split',
-    overflow: 'scroll',
-    lineDiffType: 'word-alt',
-    diffIndicators: 'bars',
+    diffStyle: 'default',
+    overflow: 'default',
+    lineDiffType: 'default',
+    diffIndicators: 'default',
     disableBackground: false,
     disableLineNumbers: false,
-    hunkSeparators: 'line-info',
+    hunkSeparators: 'default',
     expandUnchanged: false,
-    expansionLineCount: 100,
+    expansionLineCount: 20,
     collapsedContextThreshold: 1,
-    stickyHeader: false,
-    themeLight: 'pierre-light',
-    themeDark: 'pierre-dark',
-    themeType: 'system',
-    lineHoverHighlight: 'disabled',
+    stickyHeader: true,
+    themeLight: 'default',
+    themeDark: 'default',
+    themeType: 'default',
+    lineHoverHighlight: 'default',
+    changeColors: 'default',
+    fileHeaderStyle: 'default',
     tokenizeMaxLineLength: 1000,
     tokenizeMaxLength: 100000,
     maxLineDiffLength: 1000,
-    layoutGap: 8,
-    layoutPaddingTop: 8,
-    layoutPaddingBottom: 8,
+    layoutGap: 16,
+    layoutPaddingTop: 16,
+    layoutPaddingBottom: 16,
   },
   tree: {
     flattenEmptyDirectories: true,
-    initialExpansion: 'closed',
-    fileTreeSearchMode: 'hide-non-matches',
+    initialExpansion: 'default',
+    fileTreeSearchMode: 'default',
     density: 'default',
-    icons: 'complete',
+    icons: 'default',
     coloredIcons: true,
     stickyFolders: false,
     search: true, // extension default (Pierre's is false); see header
-    searchBlurBehavior: 'close',
+    searchBlurBehavior: 'default',
+    showGitStatus: false,
   },
+  fonts: { codeFontFamily: '', uiFontFamily: '', codeFontSize: 'default', codeFontFeatures: '' },
+  layout: { treePosition: 'left' },
   review: { hideWhitespace: false },
 });
 
@@ -279,25 +357,34 @@ const oneOf = <const L extends readonly string[]>(list: L): Guard<L[number]> =>
 
 const isDensity: Guard<FileTreeDensity> = (v): v is FileTreeDensity =>
   oneOf(DENSITY_KEYWORDS)(v) || (typeof v === 'number' && Number.isFinite(v) && v > 0);
-const isInitialExpansion: Guard<FileTreeInitialExpansion> = (v): v is FileTreeInitialExpansion =>
-  oneOf(EXPANSION_KEYWORDS)(v) || isInt(v, 0);
+const isInitialExpansion: Guard<TreeSettings['initialExpansion']> = (v): v is TreeSettings['initialExpansion'] =>
+  oneOf(SETTING_CHOICES.tree.initialExpansion)(v) || isInt(v, 0);
 
+/** Font text that is safe inside a CSS custom property: a string of at most FONT_TEXT_MAX chars without ; { } < >. */
+export const isFontText: Guard<string> = (v): v is string => typeof v === 'string' && v.length <= FONT_TEXT_MAX && !/[;{}<>]/.test(v);
+/** 'default' or an integer px size in FONT_SIZE_MIN..FONT_SIZE_MAX. */
+export const isFontSize: Guard<FontSettings['codeFontSize']> = (v): v is FontSettings['codeFontSize'] =>
+  v === DEFAULT_CHOICE || (isInt(v, FONT_SIZE_MIN) && v <= FONT_SIZE_MAX);
+
+const C = SETTING_CHOICES;
 const DIFF_SCHEMA: Schema<DiffSettings> = {
-  diffStyle: oneOf(DIFF_STYLES),
-  overflow: oneOf(OVERFLOWS),
-  lineDiffType: oneOf(LINE_DIFF_TYPES),
-  diffIndicators: oneOf(DIFF_INDICATORS),
+  diffStyle: oneOf(C.diff.diffStyle),
+  overflow: oneOf(C.diff.overflow),
+  lineDiffType: oneOf(C.diff.lineDiffType),
+  diffIndicators: oneOf(C.diff.diffIndicators),
   disableBackground: isBool,
   disableLineNumbers: isBool,
-  hunkSeparators: oneOf(HUNK_SEPARATORS),
+  hunkSeparators: oneOf(C.diff.hunkSeparators),
   expandUnchanged: isBool,
   expansionLineCount: (v): v is number => isInt(v, 1),
   collapsedContextThreshold: (v): v is number => isInt(v, 0),
   stickyHeader: isBool,
   themeLight: oneOf(ALL_THEMES),
   themeDark: oneOf(ALL_THEMES),
-  themeType: oneOf(THEME_TYPES),
-  lineHoverHighlight: oneOf(LINE_HOVER_HIGHLIGHTS),
+  themeType: oneOf(C.diff.themeType),
+  lineHoverHighlight: oneOf(C.diff.lineHoverHighlight),
+  changeColors: oneOf(C.diff.changeColors),
+  fileHeaderStyle: oneOf(C.diff.fileHeaderStyle),
   tokenizeMaxLineLength: (v): v is number => isInt(v, 1),
   tokenizeMaxLength: (v): v is number => isInt(v, 1),
   maxLineDiffLength: (v): v is number => isInt(v, 1),
@@ -309,16 +396,28 @@ const DIFF_SCHEMA: Schema<DiffSettings> = {
 const TREE_SCHEMA: Schema<TreeSettings> = {
   flattenEmptyDirectories: isBool,
   initialExpansion: isInitialExpansion,
-  fileTreeSearchMode: oneOf(SEARCH_MODES),
+  fileTreeSearchMode: oneOf(C.tree.fileTreeSearchMode),
   density: isDensity,
-  icons: oneOf(ICON_SETS),
+  icons: oneOf(C.tree.icons),
   coloredIcons: isBool,
   stickyFolders: isBool,
   search: isBool,
-  searchBlurBehavior: oneOf(SEARCH_BLUR_BEHAVIORS),
+  searchBlurBehavior: oneOf(C.tree.searchBlurBehavior),
+  showGitStatus: isBool,
 };
 
+const FONT_SCHEMA: Schema<FontSettings> = {
+  codeFontFamily: isFontText,
+  uiFontFamily: isFontText,
+  codeFontSize: isFontSize,
+  codeFontFeatures: isFontText,
+};
+
+const LAYOUT_SCHEMA: Schema<LayoutSettings> = { treePosition: oneOf(C.layout.treePosition) };
+
 const REVIEW_SCHEMA: Schema<ReviewSettings> = { hideWhitespace: isBool };
+
+const SCHEMAS = { diff: DIFF_SCHEMA, tree: TREE_SCHEMA, fonts: FONT_SCHEMA, layout: LAYOUT_SCHEMA, review: REVIEW_SCHEMA } as const;
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
@@ -336,13 +435,8 @@ function pick<T extends object>(schema: Schema<T>, raw: unknown): Partial<T> {
 function sanitizeOverrides(raw: unknown): DeepPartial<DisplaySettings> {
   const src = isRecord(raw) ? raw : {};
   const out: DeepPartial<DisplaySettings> = {};
-  const sections = [
-    ['diff', DIFF_SCHEMA],
-    ['tree', TREE_SCHEMA],
-    ['review', REVIEW_SCHEMA],
-  ] as const;
-  for (const [name, schema] of sections) {
-    const picked = pick(schema as Schema<object>, Object.hasOwn(src, name) ? src[name] : undefined);
+  for (const name of SETTINGS_SECTIONS) {
+    const picked = pick(SCHEMAS[name] as Schema<object>, Object.hasOwn(src, name) ? src[name] : undefined);
     if (Object.keys(picked).length > 0) (out as Record<string, unknown>)[name] = picked;
   }
   return out;
@@ -353,7 +447,7 @@ function mergeOverrides(
   patch: DeepPartial<DisplaySettings>,
 ): DeepPartial<DisplaySettings> {
   const out: Record<string, Record<string, unknown>> = {};
-  for (const name of ['diff', 'tree', 'review'] as const) {
+  for (const name of SETTINGS_SECTIONS) {
     const merged = { ...base[name], ...patch[name] };
     if (Object.keys(merged).length > 0) out[name] = merged;
   }
@@ -366,6 +460,8 @@ function resolve(raw: unknown): DisplaySettings {
   return {
     diff: { ...DEFAULT_SETTINGS.diff, ...o.diff },
     tree: { ...DEFAULT_SETTINGS.tree, ...o.tree },
+    fonts: { ...DEFAULT_SETTINGS.fonts, ...o.fonts },
+    layout: { ...DEFAULT_SETTINGS.layout, ...o.layout },
     review: { ...DEFAULT_SETTINGS.review, ...o.review },
   };
 }
@@ -518,14 +614,16 @@ export function onSettingsChange(cb: (settings: DisplaySettings) => void): () =>
 }
 
 /**
- * Options for the React `CodeView`. `preferredHighlighter` is fixed to 'shiki-js' (global constraint: no WASM) and
- * is deliberately not a setting. Viewer-owned options (lineAnnotations, enableGutterUtility, enableLineSelection,
- * collapsed, callbacks) are not set here; spread this and add them.
+ * Options for the React `CodeView`, with every 'default' resolved to GitHub's look (./github-defaults.ts).
+ * `preferredHighlighter` is fixed to 'shiki-js' (global constraint: no WASM) and is deliberately not a setting.
+ * Viewer-owned options (lineAnnotations, enableGutterUtility, enableLineSelection, collapsed, callbacks) are not
+ * set here; spread this and add them. `unsafeCSS` is a fixed string (never user text): with GitHub's change colors
+ * it makes Pierre use the colors as they are instead of mixing them into the background.
  */
 export function toDiffOptions<LAnnotation = undefined, Caret = undefined>(
   s: DisplaySettings,
 ): CodeViewReactOptions<LAnnotation, Caret> {
-  const d = s.diff;
+  const d = resolveDiff(s.diff);
   return {
     theme: { light: d.themeLight, dark: d.themeDark },
     themeType: d.themeType,
@@ -547,6 +645,7 @@ export function toDiffOptions<LAnnotation = undefined, Caret = undefined>(
     maxLineDiffLength: d.maxLineDiffLength,
     layout: { gap: d.layoutGap, paddingTop: d.layoutPaddingTop, paddingBottom: d.layoutPaddingBottom },
     preferredHighlighter: 'shiki-js',
+    ...(s.diff.changeColors === DEFAULT_CHOICE ? { unsafeCSS: GITHUB_CHANGE_CSS } : {}),
   };
 }
 
@@ -560,19 +659,25 @@ export type TreeDisplayOptions = Pick<
   | 'stickyFolders'
   | 'search'
   | 'searchBlurBehavior'
+  | 'unsafeCSS'
 >;
 
-/** Display-only `@pierre/trees` options; add `paths`, `gitStatus`, `onSelectionChange` etc. at the call site. */
+/**
+ * Display-only `@pierre/trees` options, 'default' resolved; add `paths`, `onSelectionChange` etc. at the call site,
+ * and `gitStatus` only when `tree.showGitStatus` is on. `unsafeCSS` is a fixed string that goes with the GitHub icons.
+ */
 export function toTreeOptions(s: DisplaySettings): TreeDisplayOptions {
   const t = s.tree;
+  const github = t.icons === DEFAULT_CHOICE;
   return {
     flattenEmptyDirectories: t.flattenEmptyDirectories,
-    initialExpansion: t.initialExpansion,
-    fileTreeSearchMode: t.fileTreeSearchMode,
+    initialExpansion: t.initialExpansion === DEFAULT_CHOICE ? GITHUB_TREE.initialExpansion : t.initialExpansion,
+    fileTreeSearchMode: t.fileTreeSearchMode === DEFAULT_CHOICE ? GITHUB_TREE.fileTreeSearchMode : t.fileTreeSearchMode,
     density: t.density,
-    icons: { set: t.icons, colored: t.coloredIcons },
+    icons: github ? GITHUB_TREE_ICONS : { set: t.icons as FileTreeBuiltInIconSet, colored: t.coloredIcons },
     stickyFolders: t.stickyFolders,
     search: t.search,
-    searchBlurBehavior: t.searchBlurBehavior,
+    searchBlurBehavior: t.searchBlurBehavior === DEFAULT_CHOICE ? GITHUB_TREE.searchBlurBehavior : t.searchBlurBehavior,
+    ...(github ? { unsafeCSS: GITHUB_TREE_CSS } : {}),
   };
 }

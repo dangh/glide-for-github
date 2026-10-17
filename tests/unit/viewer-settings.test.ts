@@ -83,7 +83,17 @@ describe('viewer settings identity', () => {
     expect(merged).not.toBe(prev);
     expect(merged.diff).toBe(prev.diff);
     expect(merged.review).toBe(prev.review);
+    expect(merged.fonts).toBe(prev.fonts);
+    expect(merged.layout).toBe(prev.layout);
     expect(merged.tree).toBe(next.tree);
+
+    // The new sections reconcile like the others.
+    const fonts = { ...merged, fonts: { ...merged.fonts, codeFontSize: 14 } };
+    const withFonts = reconcileSettings(merged, fonts);
+    expect(withFonts.fonts).toBe(fonts.fonts);
+    expect(withFonts.diff).toBe(prev.diff);
+    const layout = { ...withFonts, layout: { treePosition: 'right' as const } };
+    expect(reconcileSettings(withFonts, layout).layout).toBe(layout.layout);
     expect(SETTINGS_STORAGE_KEY).toBe('pierre.settings');
   });
 });

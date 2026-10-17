@@ -4,12 +4,15 @@
  */
 import type { ThemeTypes } from '@pierre/diffs';
 import { create } from 'zustand';
+import { resolveDiffChoice } from '../../shared/github-defaults';
 import {
   DEFAULT_SETTINGS,
   loadSettings,
   onSettingsChange,
   saveSettings,
+  SETTINGS_SECTIONS,
   type DeepPartial,
+  type DiffSettings,
   type DisplaySettings,
 } from '../../shared/settings';
 
@@ -33,18 +36,20 @@ const shallowEqual = (a: object, b: object) => {
  * the diff view's options untouched.
  */
 export function reconcileSettings(prev: DisplaySettings, next: DisplaySettings): DisplaySettings {
-  const diff = shallowEqual(prev.diff, next.diff) ? prev.diff : next.diff;
-  const tree = shallowEqual(prev.tree, next.tree) ? prev.tree : next.tree;
-  const review = shallowEqual(prev.review, next.review) ? prev.review : next.review;
-  return diff === prev.diff && tree === prev.tree && review === prev.review ? prev : { diff, tree, review };
+  const out = {} as Record<keyof DisplaySettings, object>;
+  let changed = false;
+  for (const name of SETTINGS_SECTIONS) {
+    const same = shallowEqual(prev[name], next[name]);
+    out[name] = same ? prev[name] : next[name];
+    if (!same) changed = true;
+  }
+  return changed ? (out as unknown as DisplaySettings) : prev;
 }
 
 function merge(s: DisplaySettings, patch: DeepPartial<DisplaySettings>): DisplaySettings {
-  return reconcileSettings(s, {
-    diff: { ...s.diff, ...(patch.diff as Partial<DisplaySettings['diff']>) },
-    tree: { ...s.tree, ...(patch.tree as Partial<DisplaySettings['tree']>) },
-    review: { ...s.review, ...(patch.review as Partial<DisplaySettings['review']>) },
-  });
+  const next = {} as Record<keyof DisplaySettings, object>;
+  for (const name of SETTINGS_SECTIONS) next[name] = { ...s[name], ...(patch[name] as object | undefined) };
+  return reconcileSettings(s, next as unknown as DisplaySettings);
 }
 
 export const useSettings = create<SettingsState>()((set, get) => ({
@@ -74,10 +79,11 @@ export function initSettings(): () => void {
 }
 
 /**
- * The theme type Pierre renders with. `system` follows GitHub's own color mode when GitHub forces one
- * (`light` / `dark`); GitHub's `auto` keeps `system` (the OS preference, like GitHub).
+ * The theme type Pierre renders with. `system` (also what 'default' resolves to) follows GitHub's own color mode
+ * when GitHub forces one (`light` / `dark`); GitHub's `auto` keeps `system` (the OS preference, like GitHub).
  */
-export function effectiveThemeType(themeType: ThemeTypes, colorMode: string | undefined): ThemeTypes {
-  if (themeType !== 'system') return themeType;
+export function effectiveThemeType(themeType: DiffSettings['themeType'], colorMode: string | undefined): ThemeTypes {
+  const resolved = resolveDiffChoice('themeType', themeType);
+  if (resolved !== 'system') return resolved;
   return colorMode === 'light' || colorMode === 'dark' ? colorMode : 'system';
 }

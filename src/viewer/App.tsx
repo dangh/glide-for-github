@@ -5,6 +5,7 @@
 import { WorkerPoolContext } from '@pierre/diffs/react';
 import { getOrCreateWorkerPoolSingleton, type WorkerPoolManager } from '@pierre/diffs/worker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { resolveDiff } from '../shared/github-defaults';
 import type { PrRef } from '../shared/pr-url';
 import type { DisplaySettings } from '../shared/settings';
 import { PORT_TIMEOUT_MESSAGE } from './connection';
@@ -22,12 +23,15 @@ import { TokenPromptHost } from './ui/TokenPrompt';
 import { Toolbar } from './ui/Toolbar';
 import { TreePane } from './ui/TreePane';
 
-const workerRenderOptions = (d: DisplaySettings['diff']) => ({
-  theme: { light: d.themeLight, dark: d.themeDark },
-  lineDiffType: d.lineDiffType,
-  maxLineDiffLength: d.maxLineDiffLength,
-  tokenizeMaxLineLength: d.tokenizeMaxLineLength,
-});
+const workerRenderOptions = (diff: DisplaySettings['diff']) => {
+  const d = resolveDiff(diff);
+  return {
+    theme: { light: d.themeLight, dark: d.themeDark },
+    lineDiffType: d.lineDiffType,
+    maxLineDiffLength: d.maxLineDiffLength,
+    tokenizeMaxLineLength: d.tokenizeMaxLineLength,
+  };
+};
 
 /** Pierre's worker pool, or undefined (main-thread highlighting) when workers cannot be created. */
 function createWorkerPool(settings: DisplaySettings): WorkerPoolManager | undefined {

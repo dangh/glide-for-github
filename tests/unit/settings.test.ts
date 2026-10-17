@@ -1,18 +1,18 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { themes as bundledThemes } from '@pierre/theming/themes';
-import {
-  DEFAULT_CODE_VIEW_LAYOUT,
-  DEFAULT_COLLAPSED_CONTEXT_THRESHOLD,
-  DEFAULT_THEMES,
-  DEFAULT_TOKENIZE_MAX_LENGTH,
-} from '@pierre/diffs';
+import { DEFAULT_COLLAPSED_CONTEXT_THRESHOLD, DEFAULT_TOKENIZE_MAX_LENGTH } from '@pierre/diffs';
 import {
   DARK_THEMES,
   DEFAULT_SETTINGS,
   LIGHT_THEMES,
   SETTINGS_STORAGE_KEY,
   SETTING_CHOICES,
+  FONT_SIZE_MAX,
+  FONT_SIZE_MIN,
+  FONT_TEXT_MAX,
+  isFontSize,
+  isFontText,
   loadSettings,
   onSettingsChange,
   saveSettings,
@@ -22,6 +22,7 @@ import {
   type DisplaySettings,
   type SettingsStorage,
 } from '../../src/shared/settings';
+import { GITHUB_CHANGE_CSS, GITHUB_TREE_CSS, GITHUB_TREE_ICONS } from '../../src/shared/github-defaults';
 
 type Changes = Record<string, { newValue?: unknown; oldValue?: unknown }>;
 type ChangeListener = (changes: Changes, areaName: string) => void;
@@ -69,54 +70,54 @@ afterEach(() => {
 });
 
 describe('DEFAULT_SETTINGS', () => {
-  it('deep-equals the documented Pierre defaults', () => {
+  it("uses 'default' (GitHub's look) for every enumerated option, and GitHub-like values for the rest", () => {
     expect(DEFAULT_SETTINGS).toEqual({
       diff: {
-        diffStyle: 'split',
-        overflow: 'scroll',
-        lineDiffType: 'word-alt',
-        diffIndicators: 'bars',
+        diffStyle: 'default',
+        overflow: 'default',
+        lineDiffType: 'default',
+        diffIndicators: 'default',
         disableBackground: false,
         disableLineNumbers: false,
-        hunkSeparators: 'line-info',
+        hunkSeparators: 'default',
         expandUnchanged: false,
-        expansionLineCount: 100,
+        expansionLineCount: 20,
         collapsedContextThreshold: 1,
-        stickyHeader: false,
-        themeLight: 'pierre-light',
-        themeDark: 'pierre-dark',
-        themeType: 'system',
-        lineHoverHighlight: 'disabled',
+        stickyHeader: true,
+        themeLight: 'default',
+        themeDark: 'default',
+        themeType: 'default',
+        lineHoverHighlight: 'default',
+        changeColors: 'default',
+        fileHeaderStyle: 'default',
         tokenizeMaxLineLength: 1000,
         tokenizeMaxLength: 100000,
         maxLineDiffLength: 1000,
-        layoutGap: 8,
-        layoutPaddingTop: 8,
-        layoutPaddingBottom: 8,
+        layoutGap: 16,
+        layoutPaddingTop: 16,
+        layoutPaddingBottom: 16,
       },
       tree: {
         flattenEmptyDirectories: true,
-        initialExpansion: 'closed',
-        fileTreeSearchMode: 'hide-non-matches',
+        initialExpansion: 'default',
+        fileTreeSearchMode: 'default',
         density: 'default',
-        icons: 'complete',
+        icons: 'default',
         coloredIcons: true,
         stickyFolders: false,
         search: true,
-        searchBlurBehavior: 'close',
+        searchBlurBehavior: 'default',
+        showGitStatus: false,
       },
+      fonts: { codeFontFamily: '', uiFontFamily: '', codeFontSize: 'default', codeFontFeatures: '' },
+      layout: { treePosition: 'left' },
       review: { hideWhitespace: false },
     } satisfies DisplaySettings);
   });
 
-  it('agrees with the constants exported by the installed @pierre/diffs', () => {
-    expect(DEFAULT_SETTINGS.diff.themeLight).toBe(DEFAULT_THEMES.light);
-    expect(DEFAULT_SETTINGS.diff.themeDark).toBe(DEFAULT_THEMES.dark);
+  it('keeps the Pierre limits it does not change in step with the installed @pierre/diffs', () => {
     expect(DEFAULT_SETTINGS.diff.collapsedContextThreshold).toBe(DEFAULT_COLLAPSED_CONTEXT_THRESHOLD);
     expect(DEFAULT_SETTINGS.diff.tokenizeMaxLength).toBe(DEFAULT_TOKENIZE_MAX_LENGTH);
-    expect(DEFAULT_SETTINGS.diff.layoutGap).toBe(DEFAULT_CODE_VIEW_LAYOUT.gap);
-    expect(DEFAULT_SETTINGS.diff.layoutPaddingTop).toBe(DEFAULT_CODE_VIEW_LAYOUT.paddingTop);
-    expect(DEFAULT_SETTINGS.diff.layoutPaddingBottom).toBe(DEFAULT_CODE_VIEW_LAYOUT.paddingBottom);
   });
 
   it('is immutable so a stray write cannot corrupt the defaults', () => {
@@ -133,6 +134,34 @@ describe('DEFAULT_SETTINGS', () => {
       }
     }
   });
+
+  it("lists 'default' first in every enumerated choice list except the tree position", () => {
+    for (const [section, choices] of Object.entries(SETTING_CHOICES)) {
+      for (const [key, values] of Object.entries(choices)) {
+        if (section === 'layout' && key === 'treePosition') continue;
+        expect((values as readonly unknown[])[0], `${section}.${key}`).toBe('default');
+      }
+    }
+    expect(SETTING_CHOICES.layout.treePosition).toEqual(['left', 'right']);
+    expect(SETTING_CHOICES.diff.changeColors).toEqual(['default', 'theme']);
+    expect(SETTING_CHOICES.diff.fileHeaderStyle).toEqual(['default', 'pierre']);
+  });
+
+  it("keeps Pierre's own values after 'default' (no value lost or renamed)", () => {
+    expect(SETTING_CHOICES.diff.diffStyle).toEqual(['default', 'split', 'unified']);
+    expect(SETTING_CHOICES.diff.overflow).toEqual(['default', 'scroll', 'wrap']);
+    expect(SETTING_CHOICES.diff.lineDiffType).toEqual(['default', 'word-alt', 'word-line', 'word', 'char', 'none']);
+    expect(SETTING_CHOICES.diff.diffIndicators).toEqual(['default', 'classic', 'bars', 'none']);
+    expect(SETTING_CHOICES.diff.hunkSeparators).toEqual(['default', 'line-info', 'line-info-basic', 'metadata', 'simple']);
+    expect(SETTING_CHOICES.diff.themeType).toEqual(['default', 'system', 'light', 'dark']);
+    expect(SETTING_CHOICES.diff.lineHoverHighlight).toEqual(['default', 'disabled', 'both', 'number', 'line']);
+    expect(SETTING_CHOICES.tree.icons).toEqual(['default', 'minimal', 'standard', 'complete']);
+    expect(SETTING_CHOICES.tree.fileTreeSearchMode).toEqual(['default', 'expand-matches', 'collapse-non-matches', 'hide-non-matches']);
+    expect(SETTING_CHOICES.tree.searchBlurBehavior).toEqual(['default', 'close', 'retain']);
+    expect(SETTING_CHOICES.tree.initialExpansion).toEqual(['default', 'open', 'closed']);
+    // Pierre's own density keyword is also 'default' (30 px rows, the closest to GitHub's tree): one entry serves both.
+    expect(SETTING_CHOICES.tree.density).toEqual(['default', 'compact', 'relaxed']);
+  });
 });
 
 describe('theme names', () => {
@@ -141,9 +170,14 @@ describe('theme names', () => {
     expect([...DARK_THEMES]).toEqual([...bundledThemes.getThemeNames({ colorScheme: 'dark' })]);
   });
 
-  it('contains the defaults', () => {
-    expect(LIGHT_THEMES).toContain(DEFAULT_SETTINGS.diff.themeLight);
-    expect(DARK_THEMES).toContain(DEFAULT_SETTINGS.diff.themeDark);
+  it("contains the GitHub themes that 'default' resolves to", () => {
+    expect(LIGHT_THEMES).toContain('github-light-default');
+    expect(DARK_THEMES).toContain('github-dark-default');
+  });
+
+  it("offers 'default' first in both theme lists", () => {
+    expect(SETTING_CHOICES.diff.themeLight).toEqual(['default', ...LIGHT_THEMES]);
+    expect(SETTING_CHOICES.diff.themeDark).toEqual(['default', ...DARK_THEMES]);
   });
 
   it('loadSettings falls back to the default for an unknown theme name and keeps a known one', async () => {
@@ -165,8 +199,8 @@ describe('loadSettings', () => {
     expect(s).toEqual(DEFAULT_SETTINGS);
     expect(s).not.toBe(DEFAULT_SETTINGS);
     s.diff.diffStyle = 'unified';
-    expect(DEFAULT_SETTINGS.diff.diffStyle).toBe('split');
-    expect((await loadSettings()).diff.diffStyle).toBe('split');
+    expect(DEFAULT_SETTINGS.diff.diffStyle).toBe('default');
+    expect((await loadSettings()).diff.diffStyle).toBe('default');
   });
 
   it('overlays stored values on the defaults', async () => {
@@ -174,7 +208,7 @@ describe('loadSettings', () => {
     const s = await loadSettings();
     expect(s.diff.diffStyle).toBe('unified');
     expect(s.review.hideWhitespace).toBe(true);
-    expect(s.diff.overflow).toBe('scroll');
+    expect(s.diff.overflow).toBe('default');
     expect(s.tree).toEqual(DEFAULT_SETTINGS.tree);
   });
 
@@ -186,7 +220,7 @@ describe('loadSettings', () => {
       review: { hideWhitespace: true, other: 1 },
     };
     const s = await loadSettings();
-    expect(Object.keys(s).sort()).toEqual(['diff', 'review', 'tree']);
+    expect(Object.keys(s).sort()).toEqual(['diff', 'fonts', 'layout', 'review', 'tree']);
     expect(Object.keys(s.diff).sort()).toEqual(Object.keys(DEFAULT_SETTINGS.diff).sort());
     expect(Object.keys(s.tree).sort()).toEqual(Object.keys(DEFAULT_SETTINGS.tree).sort());
     expect(Object.keys(s.review)).toEqual(['hideWhitespace']);
@@ -245,12 +279,79 @@ describe('loadSettings', () => {
     expect(s.diff).toMatchObject({ layoutGap: 0, layoutPaddingTop: 0, layoutPaddingBottom: 16, tokenizeMaxLength: 50000 });
   });
 
+  it('keeps explicit values stored by older versions (they are overrides of the GitHub default)', async () => {
+    fake.data[SETTINGS_STORAGE_KEY] = {
+      diff: { diffStyle: 'split', overflow: 'scroll', lineDiffType: 'word-alt', diffIndicators: 'bars', hunkSeparators: 'line-info', themeLight: 'pierre-light', themeDark: 'pierre-dark', themeType: 'system' },
+      tree: { icons: 'complete', initialExpansion: 'closed', searchBlurBehavior: 'close', density: 'compact' },
+    };
+    const s = await loadSettings();
+    expect(s.diff).toMatchObject({ diffStyle: 'split', overflow: 'scroll', lineDiffType: 'word-alt', diffIndicators: 'bars', hunkSeparators: 'line-info', themeLight: 'pierre-light', themeDark: 'pierre-dark', themeType: 'system' });
+    expect(s.tree).toMatchObject({ icons: 'complete', initialExpansion: 'closed', searchBlurBehavior: 'close', density: 'compact' });
+  });
+
+  it("accepts 'default' for every enumerated option", async () => {
+    const diff = Object.fromEntries(Object.keys(SETTING_CHOICES.diff).map((k) => [k, 'default']));
+    const tree = Object.fromEntries(Object.keys(SETTING_CHOICES.tree).map((k) => [k, 'default']));
+    fake.data[SETTINGS_STORAGE_KEY] = { diff: { ...diff, diffStyle: 'unified' }, tree };
+    await saveSettings({ diff: { diffStyle: 'default' } });
+    const s = await loadSettings();
+    for (const k of Object.keys(diff)) expect((s.diff as unknown as Record<string, unknown>)[k], k).toBe('default');
+    for (const k of Object.keys(tree)) expect((s.tree as unknown as Record<string, unknown>)[k], k).toBe('default');
+  });
+
+  it('falls back to the default for invalid values of the new options', async () => {
+    fake.data[SETTINGS_STORAGE_KEY] = {
+      diff: { changeColors: 'pink', fileHeaderStyle: 'github' },
+      tree: { showGitStatus: 'yes' },
+      layout: { treePosition: 'top' },
+      fonts: { codeFontSize: 7, codeFontFamily: 12, uiFontFamily: null, codeFontFeatures: [] },
+    };
+    const s = await loadSettings();
+    expect(s.diff.changeColors).toBe('default');
+    expect(s.diff.fileHeaderStyle).toBe('default');
+    expect(s.tree.showGitStatus).toBe(false);
+    expect(s.layout.treePosition).toBe('left');
+    expect(s.fonts).toEqual(DEFAULT_SETTINGS.fonts);
+  });
+
+  it('keeps valid new options', async () => {
+    fake.data[SETTINGS_STORAGE_KEY] = {
+      diff: { changeColors: 'theme', fileHeaderStyle: 'pierre' },
+      tree: { showGitStatus: true },
+      layout: { treePosition: 'right' },
+      fonts: { codeFontSize: 14, codeFontFamily: '"JetBrains Mono", monospace', uiFontFamily: 'Inter, sans-serif', codeFontFeatures: '"calt" 0, "liga" 1' },
+    };
+    const s = await loadSettings();
+    expect(s.diff).toMatchObject({ changeColors: 'theme', fileHeaderStyle: 'pierre' });
+    expect(s.tree.showGitStatus).toBe(true);
+    expect(s.layout.treePosition).toBe('right');
+    expect(s.fonts).toEqual({ codeFontSize: 14, codeFontFamily: '"JetBrains Mono", monospace', uiFontFamily: 'Inter, sans-serif', codeFontFeatures: '"calt" 0, "liga" 1' });
+  });
+
+  it('validates font text (at most 300 chars, none of ; { } < >) and size (integer 8-32 px, or default)', async () => {
+    expect(isFontText('')).toBe(true);
+    expect(isFontText('default')).toBe(true);
+    expect(isFontText('a'.repeat(FONT_TEXT_MAX))).toBe(true);
+    expect(isFontText('a'.repeat(FONT_TEXT_MAX + 1))).toBe(false);
+    for (const bad of ['Menlo; color: red', 'x{', 'x}', '<style>', 'a>b']) expect(isFontText(bad), bad).toBe(false);
+    expect(isFontText(3)).toBe(false);
+
+    expect(isFontSize('default')).toBe(true);
+    expect(isFontSize(FONT_SIZE_MIN)).toBe(true);
+    expect(isFontSize(FONT_SIZE_MAX)).toBe(true);
+    for (const bad of [FONT_SIZE_MIN - 1, FONT_SIZE_MAX + 1, 12.5, '12', Number.NaN, null]) expect(isFontSize(bad), String(bad)).toBe(false);
+    expect([FONT_TEXT_MAX, FONT_SIZE_MIN, FONT_SIZE_MAX]).toEqual([300, 8, 32]);
+
+    fake.data[SETTINGS_STORAGE_KEY] = { fonts: { codeFontFamily: 'Menlo; } body { display:none', codeFontSize: 33, codeFontFeatures: 'a'.repeat(301), uiFontFamily: 'Inter' } };
+    expect((await loadSettings()).fonts).toEqual({ ...DEFAULT_SETTINGS.fonts, uiFontFamily: 'Inter' });
+  });
+
   it('survives garbage in storage', async () => {
     for (const garbage of [null, 'str', 42, [], [1, 2]]) {
       fake.data[SETTINGS_STORAGE_KEY] = garbage;
       expect(await loadSettings()).toEqual(DEFAULT_SETTINGS);
     }
-    fake.data[SETTINGS_STORAGE_KEY] = { diff: 'nope', tree: [], review: null };
+    fake.data[SETTINGS_STORAGE_KEY] = { diff: 'nope', tree: [], review: null, fonts: 5, layout: 'right' };
     expect(await loadSettings()).toEqual(DEFAULT_SETTINGS);
   });
 });
@@ -260,7 +361,7 @@ describe('saveSettings', () => {
     const result = await saveSettings({ diff: { diffStyle: 'unified' } });
     expect(fake.data[SETTINGS_STORAGE_KEY]).toEqual({ diff: { diffStyle: 'unified' } });
     expect(result.diff.diffStyle).toBe('unified');
-    expect(result.diff.overflow).toBe('scroll');
+    expect(result.diff.overflow).toBe('default');
     expect((await loadSettings()).diff.diffStyle).toBe('unified');
   });
 
@@ -341,7 +442,7 @@ describe('onSettingsChange', () => {
     await saveSettings({ diff: { diffStyle: 'unified' } });
     expect(cb).toHaveBeenCalledTimes(1);
     expect(cb.mock.calls[0]![0].diff.diffStyle).toBe('unified');
-    expect(cb.mock.calls[0]![0].diff.overflow).toBe('scroll');
+    expect(cb.mock.calls[0]![0].diff.overflow).toBe('default');
 
     fake.fire({ [SETTINGS_STORAGE_KEY]: { newValue: { diff: { overflow: 'wrap', junk: 1 }, junk: 1 } } }, 'sync');
     expect(cb).toHaveBeenCalledTimes(2);
@@ -493,40 +594,42 @@ describe('toDiffOptions', () => {
     expect(toDiffOptions(await loadSettings()).preferredHighlighter).toBe('shiki-js');
   });
 
-  it('maps every diff setting onto the CodeView option it drives', () => {
-    const s: DisplaySettings = {
-      ...DEFAULT_SETTINGS,
-      diff: {
-        diffStyle: 'unified',
-        overflow: 'wrap',
-        lineDiffType: 'char',
-        diffIndicators: 'classic',
-        disableBackground: true,
-        disableLineNumbers: true,
-        hunkSeparators: 'metadata',
-        expandUnchanged: true,
-        expansionLineCount: 25,
-        collapsedContextThreshold: 4,
-        stickyHeader: true,
-        themeLight: 'github-light',
-        themeDark: 'github-dark',
-        themeType: 'dark',
-        lineHoverHighlight: 'both',
-        tokenizeMaxLineLength: 500,
-        tokenizeMaxLength: 60000,
-        maxLineDiffLength: 2000,
-        layoutGap: 12,
-        layoutPaddingTop: 4,
-        layoutPaddingBottom: 20,
-      },
-    };
+  /** Explicit (non-default) values for every diff option. */
+  const explicitDiff: DisplaySettings['diff'] = {
+    diffStyle: 'split',
+    overflow: 'scroll',
+    lineDiffType: 'char',
+    diffIndicators: 'bars',
+    disableBackground: true,
+    disableLineNumbers: true,
+    hunkSeparators: 'metadata',
+    expandUnchanged: true,
+    expansionLineCount: 25,
+    collapsedContextThreshold: 4,
+    stickyHeader: false,
+    themeLight: 'github-light',
+    themeDark: 'github-dark',
+    themeType: 'dark',
+    lineHoverHighlight: 'both',
+    changeColors: 'theme',
+    fileHeaderStyle: 'pierre',
+    tokenizeMaxLineLength: 500,
+    tokenizeMaxLength: 60000,
+    maxLineDiffLength: 2000,
+    layoutGap: 12,
+    layoutPaddingTop: 4,
+    layoutPaddingBottom: 20,
+  };
+
+  it('maps every explicit diff setting onto the CodeView option it drives (Pierre values pass through unchanged)', () => {
+    const s: DisplaySettings = { ...DEFAULT_SETTINGS, diff: explicitDiff };
     expect(toDiffOptions(s)).toEqual({
       theme: { light: 'github-light', dark: 'github-dark' },
       themeType: 'dark',
-      diffStyle: 'unified',
-      overflow: 'wrap',
+      diffStyle: 'split',
+      overflow: 'scroll',
       lineDiffType: 'char',
-      diffIndicators: 'classic',
+      diffIndicators: 'bars',
       disableBackground: true,
       disableLineNumbers: true,
       hunkSeparators: 'metadata',
@@ -534,7 +637,7 @@ describe('toDiffOptions', () => {
       expansionLineCount: 25,
       collapsedContextThreshold: 4,
       // CodeView names the sticky-header option in the plural; BaseCodeOptions' `stickyHeader` is not accepted.
-      stickyHeaders: true,
+      stickyHeaders: false,
       lineHoverHighlight: 'both',
       tokenizeMaxLineLength: 500,
       tokenizeMaxLength: 60000,
@@ -545,30 +648,65 @@ describe('toDiffOptions', () => {
     expect(toDiffOptions(s)).not.toHaveProperty('stickyHeader');
   });
 
-  it('emits the library default layout for the default settings', () => {
-    expect(toDiffOptions(DEFAULT_SETTINGS).layout).toEqual(DEFAULT_CODE_VIEW_LAYOUT);
+  it("resolves every 'default' to GitHub's Files changed look", () => {
+    const o = toDiffOptions(DEFAULT_SETTINGS);
+    expect(o).toMatchObject({
+      theme: { light: 'github-light-default', dark: 'github-dark-default' },
+      themeType: 'system',
+      diffStyle: 'unified',
+      overflow: 'wrap',
+      lineDiffType: 'word',
+      diffIndicators: 'classic',
+      // No "@@ -a,b +c,d @@" rows by default: a plain separator with the expand affordance.
+      hunkSeparators: 'simple',
+      lineHoverHighlight: 'disabled',
+      stickyHeaders: true,
+      expansionLineCount: 20,
+      layout: { gap: 16, paddingTop: 16, paddingBottom: 16 },
+    });
+  });
+
+  it("resolves 'default' option by option, leaving explicit siblings alone", () => {
+    const o = toDiffOptions({ ...DEFAULT_SETTINGS, diff: { ...explicitDiff, themeLight: 'default', hunkSeparators: 'default' } });
+    expect(o.theme).toEqual({ light: 'github-light-default', dark: 'github-dark' });
+    expect(o.hunkSeparators).toBe('simple');
+    expect(o.diffStyle).toBe('split');
+  });
+
+  it("GitHub change colors ('default') come with the CSS that makes Pierre use them unmixed; 'theme' has none", () => {
+    const github = toDiffOptions(DEFAULT_SETTINGS) as Record<string, unknown>;
+    expect(github.unsafeCSS).toBe(GITHUB_CHANGE_CSS);
+    expect(GITHUB_CHANGE_CSS).toMatch(/--mix-light:\s*0%/);
+    const theme = toDiffOptions({ ...DEFAULT_SETTINGS, diff: { ...DEFAULT_SETTINGS.diff, changeColors: 'theme' } }) as Record<string, unknown>;
+    expect(theme).not.toHaveProperty('unsafeCSS');
   });
 
   it('does not set options the viewer owns', () => {
     const o = toDiffOptions(DEFAULT_SETTINGS) as Record<string, unknown>;
-    for (const owned of ['collapsed', 'enableGutterUtility', 'enableLineSelection', 'unsafeCSS', 'disableFileHeader']) {
+    for (const owned of ['collapsed', 'enableGutterUtility', 'enableLineSelection', 'disableFileHeader']) {
       expect(o).not.toHaveProperty(owned);
     }
   });
 });
 
 describe('toTreeOptions', () => {
-  it('maps the tree settings onto @pierre/trees options', () => {
-    expect(toTreeOptions(DEFAULT_SETTINGS)).toEqual({
+  it("resolves the defaults to GitHub's tree: open folders, plain octicons, filter text kept, no git status", () => {
+    const o = toTreeOptions(DEFAULT_SETTINGS);
+    expect(o).toEqual({
       flattenEmptyDirectories: true,
-      initialExpansion: 'closed',
+      initialExpansion: 'open',
       fileTreeSearchMode: 'hide-non-matches',
       density: 'default',
-      icons: { set: 'complete', colored: true },
+      icons: GITHUB_TREE_ICONS,
       stickyFolders: false,
       search: true,
-      searchBlurBehavior: 'close',
+      searchBlurBehavior: 'retain',
+      unsafeCSS: GITHUB_TREE_CSS,
     });
+    expect(o).not.toHaveProperty('gitStatus');
+  });
+
+  it('maps explicit tree settings onto @pierre/trees options', () => {
     expect(
       toTreeOptions({
         ...DEFAULT_SETTINGS,
@@ -581,7 +719,8 @@ describe('toTreeOptions', () => {
           coloredIcons: false,
           stickyFolders: true,
           search: false,
-          searchBlurBehavior: 'retain',
+          searchBlurBehavior: 'close',
+          showGitStatus: true,
         },
       }),
     ).toEqual({
@@ -592,7 +731,7 @@ describe('toTreeOptions', () => {
       icons: { set: 'minimal', colored: false },
       stickyFolders: true,
       search: false,
-      searchBlurBehavior: 'retain',
+      searchBlurBehavior: 'close',
     });
   });
 });
