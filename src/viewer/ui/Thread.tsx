@@ -5,7 +5,7 @@
  * Outdated threads (line from an older commit; placed at the top of the file) and resolved threads start
  * collapsed with an "Outdated" / "Resolved" label and expand on click. Expansion survives remounts (virtualization).
  */
-import { memo, useCallback, useState, useSyncExternalStore } from 'react';
+import { memo, useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { isNoTokenError } from '../auth/requireToken';
 import type { ReactionContent } from '../github/api';
 import type { CommentModel, ThreadModel } from '../github/threads';
@@ -13,6 +13,7 @@ import { deleteComment, errorMessage, REACTIONS, setResolved, toggleReaction } f
 import { draftKey, threadByKey, usePr } from '../state/store';
 import { Composer, focusComposer } from './Composer';
 import { CommentBody } from './Markdown';
+import { useDismiss } from './dismiss';
 import { SuggestionActions } from './ApplySuggestions';
 import { canApply } from '../state/suggestions';
 
@@ -74,6 +75,9 @@ export function formatTime(iso: string): string {
 
 const Reactions = memo(function Reactions({ comment }: { comment: CommentModel }) {
   const [picking, setPicking] = useState(false);
+  const picker = useRef<HTMLSpanElement>(null);
+  const closePicker = useCallback(() => setPicking(false), []);
+  useDismiss(picking, picker, closePicker);
   const { busy, error, run } = useAction();
   const toggle = (content: ReactionContent) => {
     setPicking(false);
@@ -96,7 +100,7 @@ const Reactions = memo(function Reactions({ comment }: { comment: CommentModel }
           {r.emoji} {r.group!.count}
         </button>
       ))}
-      <span className="reaction-picker">
+      <span className="reaction-picker" ref={picker}>
         <button type="button" className="reaction reaction-add" aria-label="Add reaction" aria-expanded={picking} onClick={() => setPicking((p) => !p)} disabled={busy}>
           ☺+
         </button>

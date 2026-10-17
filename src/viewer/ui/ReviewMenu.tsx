@@ -11,6 +11,10 @@ import { isNoTokenError } from '../auth/requireToken';
 import type { ReviewEvent } from '../github/api';
 import { discardReview, errorMessage, submitReview } from '../state/review';
 import { draftKey, usePr } from '../state/store';
+import { useDismiss } from './dismiss';
+
+/** A mousedown in a dialog (the token prompt opened by Submit) keeps the menu open. */
+const inDialog = (target: Element) => target.closest?.('[role="dialog"]') != null;
 
 const SAVE_DEBOUNCE_MS = 300;
 
@@ -37,21 +41,7 @@ export const ReviewMenu = memo(function ReviewMenu() {
   const root = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (root.current && !root.current.contains(e.target as Node) && !(e.target as Element).closest?.('[role="dialog"]')) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
+  useDismiss(open, root, close, inDialog);
 
   return (
     <div className="popover review-menu" ref={root}>

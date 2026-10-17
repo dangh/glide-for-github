@@ -146,6 +146,18 @@ describe('Thread', () => {
     expect(usePr.getState().threads[0]!.comments[0]!.reactions[0]).toEqual({ content: 'THUMBS_UP', count: 0, viewerHasReacted: false });
   });
 
+  it('the reaction picker closes on frame blur and on an outside mousedown', async () => {
+    usePr.getState().setThreads([thread('1')]);
+    await render(<Thread threadKey="10" />);
+    await click(container.querySelector('[aria-label="Add reaction"]')!);
+    expect(container.querySelector('.reaction-menu')).not.toBeNull();
+    await act(async () => void window.dispatchEvent(new Event('blur')));
+    expect(container.querySelector('.reaction-menu')).toBeNull();
+    await click(container.querySelector('[aria-label="Add reaction"]')!);
+    await act(async () => void document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+    expect(container.querySelector('.reaction-menu')).toBeNull();
+  });
+
   it('a failed reaction is reverted and shown with Retry', async () => {
     usePr.getState().setThreads([thread('1')]);
     fetchMock.mockResolvedValue(json(200, { errors: [{ type: 'FORBIDDEN', message: 'nope' }] }));

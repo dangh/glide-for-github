@@ -122,6 +122,14 @@ describe('ReviewMenu', () => {
     expect(button(/^Review/)!.textContent).toContain('Review (2 pending)');
   });
 
+  it('closes when focus leaves the frame for the GitHub page (window blur)', async () => {
+    await render(<ReviewMenu />);
+    await click(button(/^Review/)!);
+    expect(document.querySelector('.review-panel')).not.toBeNull();
+    await act(async () => void window.dispatchEvent(new Event('blur')));
+    expect(document.querySelector('.review-panel')).toBeNull();
+  });
+
   it('the PR author cannot Approve or Request changes (GitHub\'s wording); Comment stays available', async () => {
     await render(<ReviewMenu />);
     await click(button(/^Review/)!);

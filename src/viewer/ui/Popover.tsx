@@ -1,5 +1,6 @@
-/** Minimal toolbar popover: a toggle button and a panel that closes on outside click or Escape. */
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+/** Minimal toolbar popover: a toggle button and a panel that closes on outside click, Escape or frame blur (dismiss.ts). */
+import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { useDismiss } from './dismiss';
 
 export function Popover({
   label,
@@ -17,21 +18,8 @@ export function Popover({
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (root.current && !root.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(open, root, close);
 
   return (
     <div className={`popover ${className ?? ''}`} ref={root}>
@@ -45,7 +33,7 @@ export function Popover({
       >
         {label}
       </button>
-      {open && <div className="popover-panel">{children(() => setOpen(false))}</div>}
+      {open && <div className="popover-panel">{children(close)}</div>}
     </div>
   );
 }
