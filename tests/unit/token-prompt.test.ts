@@ -122,6 +122,35 @@ describe('requireToken', () => {
     expect(await listTokens()).toEqual([{ owner: 'dangh', login: 'dangh', kind: 'classic' }]);
   });
 
+  it('does not copy the token into a DOM attribute (controlled inputs mirror value into the attribute)', async () => {
+    const pending = requireToken('dangh', 'comment');
+    await settle();
+    await type(input(), TOKEN);
+    expect(input().value).toBe(TOKEN);
+    expect(input().getAttribute('value')).toBeNull();
+    expect(button('Save token').disabled).toBe(false);
+    expect(document.body.outerHTML).not.toContain(TOKEN);
+    await click(button('Save token'));
+    await settle();
+    await pending;
+    expect(document.body.outerHTML).not.toContain(TOKEN);
+  });
+
+  it('saving for all owners replaces a stale owner token that triggered the forced prompt', async () => {
+    await setToken('dangh', 'ghp_staleRevokedToken000', { login: 'dangh' });
+    await setToken('other', FINE, { login: 'dangh' });
+    const pending = requireToken('dangh', 'comment', { force: true, problem: 'GitHub rejected the token for dangh.' });
+    await settle();
+    await type(input(), TOKEN);
+    await click(checkbox());
+    await click(button('Save token'));
+    await settle();
+    await pending;
+    expect(await getToken('dangh')).toBe(TOKEN); // the stale owner token no longer wins over *
+    expect(await getToken('other')).toBe(FINE); // other owners keep their own tokens
+    expect((await listTokens()).map((t) => t.owner)).toEqual(['*', 'other']);
+  });
+
   it('"Use this token for all owners" saves under *', async () => {
     const pending = requireToken('dangh', 'comment');
     await settle();

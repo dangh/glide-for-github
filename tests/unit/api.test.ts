@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GithubApi } from '../../src/viewer/github/api';
-import { classifyGraphqlErrors, classifyResponse, WriteError, type WriteErrorKind } from '../../src/viewer/github/errors';
+import { classifyGraphqlErrors, classifyResponse, isAuthError, WriteError, type WriteErrorKind } from '../../src/viewer/github/errors';
 import type { PrRef } from '../../src/shared/pr-url';
 
 const TOKEN = 'ghp_SuperSecretTokenValue0123456789';
@@ -259,7 +259,9 @@ describe('classifies auth failures', () => {
     expect(kind(res(403, { 'X-GitHub-SSO': 'required; url=https://github.com/orgs/acme/sso?authorization_request=1' }), { message: 'Resource protected by organization SAML enforcement.' })).toBe('forbidden-sso');
     expect(kind(res(403), { message: 'Resource not accessible by personal access token' })).toBe('forbidden-scope');
     expect(kind(res(403, { 'X-Accepted-GitHub-Permissions': 'pull_requests=write' }), { message: 'Forbidden' })).toBe('forbidden-scope');
-    expect(kind(res(404, { 'X-Accepted-GitHub-Permissions': 'pull_requests=read' }), { message: 'Not Found' })).toBe('forbidden-scope');
+    // 404 is always not-found, whatever headers it has: it must not count as an auth error or re-open the prompt.
+    expect(kind(res(404, { 'X-Accepted-GitHub-Permissions': 'pull_requests=read' }), { message: 'Not Found' })).toBe('not-found');
+    expect(kind(res(404), { message: 'Resource not accessible by personal access token' })).toBe('not-found');
     expect(kind(res(404), { message: 'Not Found' })).toBe('not-found');
     expect(kind(res(409), { message: 'Conflict' })).toBe('conflict');
     expect(kind(res(422), { message: 'Validation Failed', errors: [{ message: 'line must be part of the diff' }] })).toBe('validation');
@@ -279,12 +281,31 @@ describe('classifies auth failures', () => {
   it('classifies GraphQL error payloads', () => {
     const c = (type: string, message = 'm') => classifyGraphqlErrors([{ type, message }], 'o').kind;
     expect(c('NOT_FOUND')).toBe('not-found');
-    expect(c('FORBIDDEN')).toBe('forbidden-scope');
     expect(c('INSUFFICIENT_SCOPES')).toBe('forbidden-scope');
+    expect(c('FORBIDDEN', 'Resource not accessible by personal access token')).toBe('forbidden-scope');
+    // Genuine permission denials are not token problems.
+    expect(c('FORBIDDEN', 'You do not have permission to resolve this thread')).toBe('forbidden');
     expect(c('RATE_LIMITED')).toBe('rate-limited');
     expect(c('UNPROCESSABLE', 'Could not resolve')).toBe('validation');
     expect(c('WHATEVER', 'Resource not accessible by personal access token')).toBe('forbidden-scope');
     expect(c('WHATEVER')).toBe('unknown');
+  });
+
+  it('GraphQL SSO: X-GitHub-SSO header or SAML message wins over FORBIDDEN', () => {
+    const errors = [{ type: 'FORBIDDEN', message: 'Resource protected by organization SAML enforcement. You must grant your Personal Access token access to this organization.' }];
+    const withHeader = classifyGraphqlErrors(errors, 'acme', undefined, 200, new Headers({ 'X-GitHub-SSO': 'required; url=https://github.com/orgs/acme/sso?x=1' }));
+    expect(withHeader).toMatchObject({ kind: 'forbidden-sso', ssoUrl: 'https://github.com/orgs/acme/sso?x=1', status: 200 });
+    expect(classifyGraphqlErrors([{ type: 'FORBIDDEN', message: 'anything' }], 'acme', undefined, 200, new Headers({ 'X-GitHub-SSO': 'required; url=https://github.com/x' })).kind).toBe('forbidden-sso');
+    expect(classifyGraphqlErrors(errors, 'acme').kind).toBe('forbidden-sso'); // message alone
+    // `partial-results` rides on successful responses and is not a block.
+    expect(classifyGraphqlErrors([{ type: 'NOT_FOUND', message: 'x' }], 'acme', undefined, 200, new Headers({ 'X-GitHub-SSO': 'partial-results; organizations=1' })).kind).toBe('not-found');
+  });
+
+  it('isAuthError covers token problems only', () => {
+    const mk = (kind: WriteError['kind']) => new WriteError(kind, 'm', { owner: 'o' });
+    for (const k of ['no-token', 'unauthorized', 'forbidden-sso', 'forbidden-scope'] as const) expect(isAuthError(mk(k)), k).toBe(true);
+    for (const k of ['forbidden', 'not-found', 'conflict', 'validation', 'rate-limited', 'network', 'unknown'] as const) expect(isAuthError(mk(k)), k).toBe(false);
+    expect(isAuthError(new Error('x'))).toBe(false);
   });
 
   it('GithubApi throws WriteError with the right kind end to end', async () => {
@@ -296,6 +317,15 @@ describe('classifies auth failures', () => {
       [{ status: 409, json: { message: 'Conflict' } }, 'conflict'],
       [new TypeError('Failed to fetch'), 'network'],
       [{ status: 200, json: { data: null, errors: [{ type: 'FORBIDDEN', message: 'Resource not accessible by personal access token' }] } }, 'forbidden-scope'],
+      [
+        {
+          status: 200,
+          json: { data: { resolveReviewThread: null }, errors: [{ type: 'FORBIDDEN', message: 'Resource protected by organization SAML enforcement.' }] },
+          headers: { 'X-GitHub-SSO': 'required; url=https://github.com/orgs/o/sso' },
+        },
+        'forbidden-sso',
+      ],
+      [{ status: 200, json: { data: null, errors: [{ type: 'FORBIDDEN', message: 'You do not have permission to resolve this thread' }] } }, 'forbidden'],
       [{ status: 200, json: { data: { resolveReviewThread: null }, errors: [{ type: 'NOT_FOUND', message: 'Could not resolve to a node' }] } }, 'not-found'],
     ];
     for (const [reply, expected] of cases) {

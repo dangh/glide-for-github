@@ -170,7 +170,7 @@ export class GithubApi {
     const { res, json } = await this.#send('/graphql', 'POST', { query, variables });
     const payload = asObj(json);
     if (Array.isArray(payload.errors) && payload.errors.length > 0) {
-      throw classifyGraphqlErrors(payload.errors as GraphqlError[], this.#ref.owner, this.#redact, res.status);
+      throw classifyGraphqlErrors(payload.errors as GraphqlError[], this.#ref.owner, this.#redact, res.status, res.headers);
     }
     if (typeof payload.data !== 'object' || payload.data === null) throw this.#unexpected();
     return payload.data as Json;

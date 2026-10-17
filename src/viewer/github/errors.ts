@@ -11,6 +11,7 @@ export type WriteErrorKind =
   | 'unauthorized'
   | 'forbidden-sso'
   | 'forbidden-scope'
+  | 'forbidden'
   | 'not-found'
   | 'conflict'
   | 'validation'
@@ -58,6 +59,7 @@ export type Redact = (text: string) => string;
 const identity: Redact = (s) => s;
 
 const SCOPE_MESSAGE = /resource not accessible by (personal access token|integration)/i;
+const SAML_MESSAGE = /SAML enforcement/i;
 const RATE_MESSAGE = /rate limit/i;
 const MAX_DETAIL = 300;
 
@@ -90,8 +92,10 @@ function messageFor(kind: WriteErrorKind, owner: string, detail: string, status?
       return `The token for ${owner} is not authorized for the organization's SAML SSO. Authorize it on GitHub, then try again.`;
     case 'forbidden-scope':
       return `The token for ${owner} does not have permission for this. Fine-grained tokens need Pull requests: read and write and Contents: read on the repository; classic tokens need the repo scope.`;
+    case 'forbidden':
+      return `GitHub denied this action. You may not have permission on this repository.${suffix}`;
     case 'not-found':
-      return 'GitHub could not find this item. It may have been deleted or moved.';
+      return 'GitHub could not find this item. It may have been deleted or moved, or your token may not have access to this repository.';
     case 'conflict':
       return `GitHub reported a conflict; the item changed in the meantime. Reload and try again.${suffix}`;
     case 'validation':
@@ -119,10 +123,16 @@ function retryAfterOf(res: Response): number | undefined {
   return undefined;
 }
 
+/** `X-GitHub-SSO: required; url=https://github.com/orgs/acme/sso?...` -> the authorization URL. */
+function ssoInit(header: string): { ssoUrl?: string } {
+  const url = /url=(\S+)/.exec(header)?.[1];
+  return url ? { ssoUrl: url } : {};
+}
+
 /**
  * Classifies a non-2xx REST/GraphQL HTTP response. `body` is the parsed JSON (or text) already read from `res`.
- * SSO: 403 + `X-GitHub-SSO`. Scope: 403/404 carrying `X-Accepted-GitHub-Permissions` or GitHub's
- * "Resource not accessible by personal access token" message.
+ * SSO: 403 + `X-GitHub-SSO`. Scope: 403 carrying `X-Accepted-GitHub-Permissions` or GitHub's
+ * "Resource not accessible by personal access token" message. 404 is always `not-found`.
  */
 export function classifyResponse(res: Response, body: unknown, owner: string, redact: Redact = identity): WriteError {
   const status = res.status;
@@ -131,18 +141,18 @@ export function classifyResponse(res: Response, body: unknown, owner: string, re
   const sso = res.headers.get('x-github-sso');
 
   if (status === 401) return build('unauthorized', owner, redact, init, detail);
-  if (status === 403 || status === 404) {
-    if (status === 403 && sso !== null) {
-      const url = /url=(\S+)/.exec(sso)?.[1];
-      return build('forbidden-sso', owner, redact, { ...init, ...(url ? { ssoUrl: url } : {}) }, detail);
-    }
+  // A 404 is always `not-found`, whatever headers it carries (GitHub also hides inaccessible repositories behind
+  // 404, and a deleted comment must not re-open the token prompt); the message hints that access may be missing.
+  if (status === 404) return build('not-found', owner, redact, init, detail);
+  if (status === 403) {
+    if (sso !== null) return build('forbidden-sso', owner, redact, { ...init, ...ssoInit(sso) }, detail);
     if (SCOPE_MESSAGE.test(detail)) return build('forbidden-scope', owner, redact, init, detail);
-    if (status === 403 && (res.headers.get('x-ratelimit-remaining') === '0' || res.headers.has('retry-after') || RATE_MESSAGE.test(detail))) {
+    if (res.headers.get('x-ratelimit-remaining') === '0' || res.headers.has('retry-after') || RATE_MESSAGE.test(detail)) {
       const retryAfter = retryAfterOf(res);
       return build('rate-limited', owner, redact, { ...init, ...(retryAfter !== undefined ? { retryAfter } : {}) }, detail);
     }
     if (res.headers.has('x-accepted-github-permissions')) return build('forbidden-scope', owner, redact, init, detail);
-    return build(status === 404 ? 'not-found' : 'unknown', owner, redact, init, detail);
+    return build('unknown', owner, redact, init, detail);
   }
   if (status === 409) return build('conflict', owner, redact, init, detail);
   if (status === 422) return build('validation', owner, redact, init, detail);
@@ -158,14 +168,30 @@ export interface GraphqlError {
   message?: string;
 }
 
-/** Classifies the `errors` array of a GraphQL response (GitHub answers HTTP 200 for most of these). */
-export function classifyGraphqlErrors(errors: GraphqlError[], owner: string, redact: Redact = identity, status?: number): WriteError {
+/**
+ * Classifies the `errors` array of a GraphQL response (GitHub answers HTTP 200 for most of these). `headers` are the
+ * response headers: SAML-protected orgs answer FORBIDDEN with an `X-GitHub-SSO` header.
+ * Only INSUFFICIENT_SCOPES, "Resource not accessible by personal access token" and SSO are token problems; any other
+ * FORBIDDEN is a genuine permission denial (`forbidden`) that a different token would not fix.
+ */
+export function classifyGraphqlErrors(
+  errors: GraphqlError[],
+  owner: string,
+  redact: Redact = identity,
+  status?: number,
+  headers?: Headers,
+): WriteError {
   const detail = errors.map((e) => e.message ?? '').filter(Boolean).join('; ');
   const types = new Set(errors.map((e) => e.type));
   const init = status !== undefined ? { status } : {};
-  if (types.has('FORBIDDEN') || types.has('INSUFFICIENT_SCOPES') || SCOPE_MESSAGE.test(detail)) return build('forbidden-scope', owner, redact, init, detail);
+  // `X-GitHub-SSO: partial-results; ...` also rides on successful partial responses: only `required` is a block.
+  const header = headers?.get('x-github-sso') ?? null;
+  const sso = header !== null && /^required/i.test(header.trim()) ? header : null;
+  if (sso !== null || SAML_MESSAGE.test(detail)) return build('forbidden-sso', owner, redact, { ...init, ...(sso !== null ? ssoInit(sso) : {}) }, detail);
+  if (types.has('INSUFFICIENT_SCOPES') || SCOPE_MESSAGE.test(detail)) return build('forbidden-scope', owner, redact, init, detail);
   if (types.has('RATE_LIMITED')) return build('rate-limited', owner, redact, init, detail);
   if (types.has('NOT_FOUND')) return build('not-found', owner, redact, init, detail);
+  if (types.has('FORBIDDEN')) return build('forbidden', owner, redact, init, detail);
   if (types.has('UNPROCESSABLE')) return build('validation', owner, redact, init, detail);
   return build('unknown', owner, redact, init, detail);
 }

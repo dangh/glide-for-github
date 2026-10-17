@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import type { PrRef } from '../../shared/pr-url';
 import { cancelPrompt, completePrompt, useTokenPrompt, type TokenPromptRequest } from '../auth/requireToken';
-import { DEFAULT_OWNER_KEY, setToken } from '../auth/tokens';
+import { DEFAULT_OWNER_KEY, removeToken, setToken } from '../auth/tokens';
 import { GithubApi } from '../github/api';
 import { isWriteError } from '../github/errors';
 
@@ -41,7 +41,8 @@ function reasonText(owner: string, reason: string | undefined, ref: PrRef): stri
 
 export function TokenPrompt({ request }: { request: TokenPromptRequest }) {
   const { owner, reason, problem, ref } = request;
-  const [token, setTokenValue] = useState('');
+  // The field is uncontrolled: React would copy a controlled value into the `value` attribute, where DOM snapshots capture it.
+  const [hasValue, setHasValue] = useState(false);
   const [allOwners, setAllOwners] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +88,7 @@ export function TokenPrompt({ request }: { request: TokenPromptRequest }) {
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
-    const value = token.trim();
+    const value = (field.current?.value ?? '').trim();
     if (!value || busy) return;
     setBusy(true);
     setError(null);
@@ -100,6 +101,8 @@ export function TokenPrompt({ request }: { request: TokenPromptRequest }) {
         return;
       }
       await setToken(allOwners ? DEFAULT_OWNER_KEY : owner, value, { login });
+      // An owner-specific token would keep winning over `*`; if it was the stale one that caused this prompt, drop it.
+      if (allOwners && owner.toLowerCase() !== DEFAULT_OWNER_KEY) await removeToken(owner);
       if (!alive.current) return;
       completePrompt(request, api);
     } catch (err) {
@@ -140,8 +143,7 @@ export function TokenPrompt({ request }: { request: TokenPromptRequest }) {
               name="pierre-token"
               autoComplete="off"
               spellCheck={false}
-              value={token}
-              onChange={(e) => setTokenValue(e.target.value)}
+              onChange={(e) => setHasValue(e.target.value.trim() !== '')}
               aria-describedby={error ? 'token-prompt-error' : undefined}
               aria-invalid={error ? true : undefined}
             />
@@ -158,7 +160,7 @@ export function TokenPrompt({ request }: { request: TokenPromptRequest }) {
             <button type="button" className="btn" onClick={cancel}>
               Cancel
             </button>
-            <button type="submit" className="btn-primary" disabled={busy || token.trim() === ''}>
+            <button type="submit" className="btn-primary" disabled={busy || !hasValue}>
               {busy ? 'Checking…' : 'Save token'}
             </button>
           </div>
