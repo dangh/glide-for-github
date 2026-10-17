@@ -14,8 +14,16 @@
   --pierre-attention: light-dark(#9a6700, #d29922);
   --pierre-done: light-dark(#8250df, #ab7df8);
   --pierre-primary-bg: light-dark(#1f883d, #238636);
-  --pierre-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+  /* GitHub's stacks; the Fonts settings override both on the root element (DisplayStyle.tsx). */
+  --pierre-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
   --pierre-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+/* Form controls do not inherit fonts by default; the UI font setting covers them too. */
+input,
+select,
+textarea {
+  font-family: var(--pierre-font);
 }
 
 * {
@@ -282,6 +290,40 @@ button {
 .pierre-loading {
   padding: 24px;
   color: var(--pierre-muted);
+}
+
+/*
+ * GitHub file box (diff.fileHeaderStyle 'default', `data-file-header="github"` on the root): each file is a box
+ * with a 1px border and 6px radius, 16px from the pane edges. The border is an overlay on the item (no layout
+ * change: CodeView sizes items itself), above Pierre's positioned rows and the sticky header; the item is not
+ * clipped, so thread popovers can still overflow it.
+ */
+[data-file-header='github'] .pierre-diffs {
+  padding-inline: 16px;
+}
+
+[data-file-header='github'] .pierre-diffs diffs-container {
+  position: relative;
+}
+
+[data-file-header='github'] .pierre-diffs diffs-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 6;
+}
+
+[data-file-header='github'] .fh {
+  padding: 0 8px;
+  border-radius: 6px 6px 0 0;
+}
+
+/* GitHub's file header shows no status letter. */
+[data-file-header='github'] .fh-badge {
+  display: none;
 }
 
 /* File header (slotted into each Pierre item) */

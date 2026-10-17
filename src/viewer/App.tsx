@@ -18,6 +18,7 @@ import { usePr } from './state/store';
 import { filesChangedUrl } from './state/view';
 import { BatchBar, CommitDialogHost } from './ui/ApplySuggestions';
 import { DiffPane } from './ui/DiffPane';
+import { DisplayStyle } from './ui/DisplayStyle';
 import { FatalError, Notice } from './ui/Notice';
 import { TokenPromptHost } from './ui/TokenPrompt';
 import { Toolbar } from './ui/Toolbar';
@@ -108,6 +109,7 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
   return (
     <WorkerPoolContext.Provider value={pool}>
       <div className="pierre-app">
+        <DisplayStyle />
         <Toolbar />
         <BatchBar />
         <div className="pierre-body">

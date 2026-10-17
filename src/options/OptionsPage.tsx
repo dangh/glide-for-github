@@ -4,6 +4,7 @@ import { BRAND } from '../shared/brand';
 import { resolveDiffChoice } from '../shared/github-defaults';
 import { initSettings, useSettings } from '../viewer/state/settings';
 import { DisplaySettingsForm } from '../viewer/ui/DisplaySettingsForm';
+import { DisplayStyle } from '../viewer/ui/DisplayStyle';
 import { SampleDiff } from './SampleDiff';
 import { TokenSettings } from './TokenSettings';
 
@@ -23,6 +24,7 @@ export function OptionsPage() {
 
   return (
     <main className="options">
+      <DisplayStyle />
       <h1>{BRAND.name}</h1>
       <TokenSettings />
       <section className="options-section" aria-labelledby="display-heading">
