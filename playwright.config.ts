@@ -15,6 +15,8 @@
  * Env: PIERRE_E2E_CHROME (Chrome for Testing binary; default: newest ~/.agent-browser/browsers/chrome-*),
  *      PIERRE_E2E_HEADLESS=1 (headless; the default is headed on $DISPLAY or :0, with WAYLAND_DISPLAY cleared).
  *
+ * `npm run perf` runs tests/e2e/perf.spec.ts only (the performance budget on public PRs, read-only; see that file).
+ *
  * viewer.spec.ts is read-only. review.spec.ts WRITES, only on the sandbox PR (tests/sandbox.json), with the token
  * saved in .e2e-profile's extension storage by `npm run e2e:token` (it skips when no token is stored); it removes
  * what it creates. Viewed-state checks rewrite GitHub's route response inside the test browser only.
@@ -24,6 +26,8 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: 'tests/e2e',
   testMatch: '**/*.spec.ts',
+  // perf.spec.ts (Task 12) is long-running: only with `npm run perf` (PIERRE_PERF=1).
+  testIgnore: process.env.PIERRE_PERF === '1' ? [] : ['**/perf.spec.ts'],
   timeout: 180_000,
   expect: { timeout: 30_000 },
   workers: 1,

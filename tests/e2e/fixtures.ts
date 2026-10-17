@@ -102,13 +102,17 @@ export class Viewer {
 
   /** Waits for the viewer to have the PR data and its first file header. */
   async ready(timeout = 60_000) {
-    // The content script may remount the iframe once while GitHub hydrates: wait until the same viewer
-    // frame has the PR and stays attached.
+    // GitHub replaces its page layout once during load (~0.5 s after the load event, with or without Pierre), which
+    // remounts the iframe. With the route prefetched (Task 12) the first viewer can already show the PR by then, so
+    // wait for the page's load event and until the same viewer frame has the PR and stays attached for 1.5 s.
+    await this.page.waitForLoadState('load', { timeout });
     for (let attempt = 0; attempt < 4; attempt++) {
       await expect(this.locator.locator('.fh').first()).toBeVisible({ timeout });
-      await expect.poll(() => this.frame().evaluate(() => window.__pierre?.store.getState().pr !== null), { timeout }).toBe(true);
+      await expect
+        .poll(() => this.frame().evaluate(() => window.__pierre?.store.getState().pr !== null).catch(() => false), { timeout })
+        .toBe(true);
       const frame = this.frame();
-      await this.page.waitForTimeout(500);
+      await this.page.waitForTimeout(1500);
       if (!frame.isDetached() && this.frame() === frame) return;
     }
     throw new Error('Pierre viewer frame did not settle');
