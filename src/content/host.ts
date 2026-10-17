@@ -93,6 +93,10 @@ export function mountViewer(doc: Document, ref: PrRef): ViewerHost {
     channel.port1.close();
     channel.port2.close();
     channel = new MessageChannel();
+    // The bridge may already have accepted our first port (it was queued before the bridge started
+    // listening, and ready was posted after it) and ignores further ports while one is active. Messages
+    // are delivered in order, so a reset first frees it; with no active port the reset is a no-op.
+    win.postMessage({ type: 'pierre:bridge-reset' }, win.location.origin);
     sendToBridge();
     if (loaded) sendToViewer(); // otherwise onLoad sends the newest port1
   };

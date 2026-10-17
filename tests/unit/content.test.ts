@@ -193,6 +193,12 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
 
         deliverMessage({ type: 'pierre:bridge-ready' });
 
+        // A reset goes first so a bridge that already accepted the first port takes the new one.
+        expect(vi.mocked(window.postMessage).mock.calls.map((c) => (c[0] as { type: string }).type)).toEqual([
+          'pierre:bridge-port',
+          'pierre:bridge-reset',
+          'pierre:bridge-port',
+        ]);
         expect(bridgeCalls()).toHaveLength(2);
         expect(bridgeCalls()[1]![1]).toBe(window.location.origin);
         expect(bridgeCalls()[1]![2]).toHaveLength(1);
