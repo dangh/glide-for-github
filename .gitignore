@@ -3,3 +3,5 @@ dist
 .e2e-profile
 .superpowers
 *.zip
+test-results
+playwright-report
