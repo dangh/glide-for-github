@@ -1,8 +1,12 @@
-# Pierre for GitHub
+# Glide for GitHub
 
-A Chrome extension (Manifest V3) that adds a **Pierre** tab next to **Files changed** on GitHub pull requests. The tab
-shows the same pull request with Pierre's diff viewer and file tree, and keeps the GitHub
+A Chrome extension (Manifest V3) that adds a **Glide** tab next to **Files changed** on GitHub pull requests. The tab
+shows the same pull request with a fast diff viewer and file tree, powered by
+[Pierre](https://diffs.com) ([@pierre/diffs](https://www.npmjs.com/package/@pierre/diffs),
+[@pierre/trees](https://www.npmjs.com/package/@pierre/trees)), and keeps the GitHub
 review features: comments, suggestions, resolving threads, viewed files and review submission.
+
+![Glide tab with the file tree and diffs](store/screenshots/1-glide-tab.png)
 
 ## What it does
 
@@ -23,20 +27,27 @@ review features: comments, suggestions, resolving threads, viewed files and revi
 
 ## Install
 
-The extension is not in the Chrome Web Store yet. Install it unpacked:
+**From the Chrome Web Store:** coming soon (listing link to be added once the first version is published).
+
+**From a release (unpacked):** download `glide-for-github.zip` from the
+[latest release](https://github.com/dangh/glide-for-github/releases/latest), unzip it into a folder, open
+`chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose the folder.
+
+**From source:**
 
 1. Build it: `npm install && npm run build`. This writes the extension to `dist/`.
-   (Or run `npm run zip` and unzip `pierre-for-github.zip` into a folder of your own.)
+   (Or run `npm run zip` and unzip `glide-for-github.zip` into a folder of your own.)
 2. Open `chrome://extensions` and turn on **Developer mode**.
 3. Click **Load unpacked** and choose the `dist/` folder (or the unzipped folder).
-4. Open any pull request on github.com. The **Pierre** tab appears after **Files changed**.
+4. Open any pull request on github.com. The **Glide** tab appears after **Files changed**. (Links ending in `#glide`
+   open it directly; `#pierre` links from before the rename still work.)
 
 Requires Node 20.19 or newer to build, and a Chromium-based browser that supports Manifest V3.
 
 ## Token setup
 
 Reading a pull request works without a token, and so do applying suggestions, resolving threads and marking files viewed
-(they use your signed-in GitHub session). To post comments, replies, reviews, edits or reactions, Pierre asks for a
+(they use your signed-in GitHub session). To post comments, replies, reviews, edits or reactions, Glide asks for a
 GitHub token the first time you need one. You can also add and remove tokens on the options page (right-click the
 extension icon, then **Options**).
 
@@ -46,8 +57,8 @@ extension icon, then **Options**).
 - **Classic token.** Needs the `repo` scope (or `public_repo`, which works for public repositories only). One classic
   token can serve every owner ("Use this token for all owners").
 - If your organization uses SAML SSO, authorize the token for it after creating it.
-- Resolving threads and marking files viewed: with a token stored, Pierre uses GitHub's GraphQL API first, which some
-  fine-grained tokens cannot call. If no token is stored, or GitHub refuses it for that action, Pierre uses your
+- Resolving threads and marking files viewed: with a token stored, Glide uses GitHub's GraphQL API first, which some
+  fine-grained tokens cannot call. If no token is stored, or GitHub refuses it for that action, Glide uses your
   signed-in GitHub session instead. It asks for a token only if the session is refused as well.
 
 ## Privacy
@@ -66,7 +77,7 @@ GitHub offers no public API for applying a suggestion, so **Apply suggestion** (
 session, not your token. The session fallback for **resolving threads** (`page_data/resolve_thread`,
 `unresolve_thread`) and **marking files viewed** (`file_review`) uses private endpoints in the same way.
 
-These can break without notice if GitHub changes them. When one fails, Pierre says so and you can do the action on
+These can break without notice if GitHub changes them. When one fails, Glide says so and you can do the action on
 GitHub instead. Comments, replies, reviews, edits and reactions use GitHub's documented REST and GraphQL APIs with your
 token, and so do resolve and viewed whenever the token is allowed to.
 
@@ -91,14 +102,21 @@ npm install
 npm run build        # dist/
 npm test             # unit tests (vitest)
 npm run typecheck
-npm run zip          # build and write pierre-for-github.zip
+npm run zip          # build and write glide-for-github.zip
 npm run e2e          # headed Playwright tests against real GitHub, see playwright.config.ts for setup
 npm run perf         # performance budget, see PERF.md
 ```
 
 The end-to-end tests need the logged-in browser profile described in `playwright.config.ts`.
 
-## Credits
+CI (`.github/workflows/build.yml`) type-checks, tests and zips every push and pull request. A `v*` tag that matches
+`manifest.json`'s version also creates a GitHub release and, when the store secrets are set, publishes to the Chrome Web
+Store. See [store/README.md](store/README.md) for the store listing and release steps.
 
-Built on Pierre ([@pierre/diffs](https://www.npmjs.com/package/@pierre/diffs),
-[@pierre/trees](https://www.npmjs.com/package/@pierre/trees)).
+## Credits and license
+
+Glide's diff viewer and file tree are Pierre's: [@pierre/diffs](https://www.npmjs.com/package/@pierre/diffs) and
+[@pierre/trees](https://www.npmjs.com/package/@pierre/trees), both Apache-2.0. Their licenses and those of the other
+bundled packages ship in the extension as `THIRD_PARTY_NOTICES.txt`. Glide is not affiliated with Pierre or GitHub.
+
+Glide's own code is released under the [MIT license](LICENSE). Privacy policy: [store/PRIVACY.md](store/PRIVACY.md).
