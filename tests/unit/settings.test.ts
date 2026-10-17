@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { themes as bundledThemes } from '@pierre/theming/themes';
 import {
   DEFAULT_CODE_VIEW_LAYOUT,
   DEFAULT_COLLAPSED_CONTEXT_THRESHOLD,
@@ -7,7 +8,9 @@ import {
   DEFAULT_TOKENIZE_MAX_LENGTH,
 } from '@pierre/diffs';
 import {
+  DARK_THEMES,
   DEFAULT_SETTINGS,
+  LIGHT_THEMES,
   SETTINGS_STORAGE_KEY,
   SETTING_CHOICES,
   loadSettings,
@@ -129,6 +132,30 @@ describe('DEFAULT_SETTINGS', () => {
         expect(values, `${section}.${key}`).toContain(def);
       }
     }
+  });
+});
+
+describe('theme names', () => {
+  it('lists exactly the themes bundled with the installed @pierre/theming (guards drift on upgrades)', () => {
+    expect([...LIGHT_THEMES]).toEqual([...bundledThemes.getThemeNames({ colorScheme: 'light' })]);
+    expect([...DARK_THEMES]).toEqual([...bundledThemes.getThemeNames({ colorScheme: 'dark' })]);
+  });
+
+  it('contains the defaults', () => {
+    expect(LIGHT_THEMES).toContain(DEFAULT_SETTINGS.diff.themeLight);
+    expect(DARK_THEMES).toContain(DEFAULT_SETTINGS.diff.themeDark);
+  });
+
+  it('loadSettings falls back to the default for an unknown theme name and keeps a known one', async () => {
+    fake.data[SETTINGS_STORAGE_KEY] = { diff: { themeLight: 'not-a-theme', themeDark: 'dracula' } };
+    const s = await loadSettings();
+    expect(s.diff.themeLight).toBe(DEFAULT_SETTINGS.diff.themeLight);
+    expect(s.diff.themeDark).toBe('dracula');
+  });
+
+  it('saveSettings never stores an unknown theme name', async () => {
+    await saveSettings({ diff: { themeLight: 'github-light-typo', themeDark: 'nord' } });
+    expect(fake.data[SETTINGS_STORAGE_KEY]).toEqual({ diff: { themeDark: 'nord' } });
   });
 });
 
@@ -344,6 +371,95 @@ describe('onSettingsChange', () => {
     expect(fake.listeners.size).toBe(0);
     await saveSettings({ diff: { diffStyle: 'unified' } });
     expect(cb).not.toHaveBeenCalled();
+  });
+});
+
+describe('saving while the page closes (pagehide flush)', () => {
+  /** A `set` spy; with `defer`, change events are collected instead of fired, to be delivered later. */
+  function watchSet(defer = false) {
+    const sync = fake.chrome.storage.sync;
+    const original = sync.set.bind(sync);
+    const calls: Record<string, unknown>[] = [];
+    const held: Changes[] = [];
+    sync.set = async (items: Record<string, unknown>) => {
+      calls.push(structuredClone(items));
+      if (!defer) return original(items);
+      const changes: Changes = {};
+      for (const [k, v] of Object.entries(items)) {
+        changes[k] = { oldValue: fake.data[k], newValue: structuredClone(v) };
+        fake.data[k] = structuredClone(v);
+      }
+      held.push(changes);
+    };
+    return { calls, held, deliver: () => held.splice(0).forEach((c) => fake.fire(c, 'sync')) };
+  }
+
+  it('issues the write in the same tick once settings are loaded and followed, so a closing page cannot drop it', async () => {
+    fake.data[SETTINGS_STORAGE_KEY] = { diff: { diffStyle: 'unified' } };
+    await loadSettings();
+    onSettingsChange(() => {});
+    const spy = watchSet();
+    const saved = saveSettings({ diff: { overflow: 'wrap' } });
+    expect(spy.calls).toEqual([{ [SETTINGS_STORAGE_KEY]: { diff: { diffStyle: 'unified', overflow: 'wrap' } } }]);
+    expect((await saved).diff.overflow).toBe('wrap');
+  });
+
+  it('reads storage first when nobody follows changes (the cache could be stale)', async () => {
+    await loadSettings();
+    const spy = watchSet();
+    const saved = saveSettings({ diff: { overflow: 'wrap' } });
+    expect(spy.calls).toEqual([]);
+    await saved;
+    expect(spy.calls).toHaveLength(1);
+  });
+
+  it('merges a change made by another context into the next write', async () => {
+    await loadSettings();
+    onSettingsChange(() => {});
+    fake.data[SETTINGS_STORAGE_KEY] = { tree: { density: 'compact' } };
+    fake.fire({ [SETTINGS_STORAGE_KEY]: { newValue: { tree: { density: 'compact' } } } }, 'sync');
+    await saveSettings({ diff: { overflow: 'wrap' } });
+    expect(fake.data[SETTINGS_STORAGE_KEY]).toEqual({ diff: { overflow: 'wrap' }, tree: { density: 'compact' } });
+  });
+
+  it('late echoes of its own earlier writes do not roll the cache back', async () => {
+    await loadSettings();
+    onSettingsChange(() => {});
+    const spy = watchSet(true);
+    void saveSettings({ diff: { diffStyle: 'unified' } });
+    void saveSettings({ diff: { overflow: 'wrap' } });
+    expect(spy.calls).toHaveLength(2);
+    spy.deliver(); // both echoes arrive after both writes
+    void saveSettings({ tree: { stickyFolders: true } });
+    expect(spy.calls.at(-1)).toEqual({
+      [SETTINGS_STORAGE_KEY]: { diff: { diffStyle: 'unified', overflow: 'wrap' }, tree: { stickyFolders: true } },
+    });
+  });
+
+  it('forgets the cache after a failed write and reads storage again', async () => {
+    await loadSettings();
+    onSettingsChange(() => {});
+    const original = fake.chrome.storage.sync.set;
+    fake.chrome.storage.sync.set = async () => {
+      throw new Error('quota exceeded');
+    };
+    await expect(saveSettings({ diff: { diffStyle: 'unified' } })).rejects.toThrow('quota exceeded');
+    fake.chrome.storage.sync.set = original;
+    fake.data[SETTINGS_STORAGE_KEY] = { review: { hideWhitespace: true } };
+    const spy = watchSet();
+    const saved = saveSettings({ diff: { overflow: 'wrap' } });
+    expect(spy.calls).toEqual([]); // slow path: reads first
+    await saved;
+    expect(fake.data[SETTINGS_STORAGE_KEY]).toEqual({ diff: { overflow: 'wrap' }, review: { hideWhitespace: true } });
+  });
+
+  it('stops using the cache once the last listener is removed', async () => {
+    await loadSettings();
+    const off = onSettingsChange(() => {});
+    off();
+    const spy = watchSet();
+    void saveSettings({ diff: { overflow: 'wrap' } });
+    expect(spy.calls).toEqual([]);
   });
 });
 

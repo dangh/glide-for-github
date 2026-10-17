@@ -27,7 +27,8 @@
  *   stickyHeader              boolean                                     false      same renderer default. NOTE: CodeView takes
  *                             this as `stickyHeaders` (plural, CodeViewOptions); `BaseCodeOptions.stickyHeader` is not in
  *                             CodeViewReactOptions, so toDiffOptions emits `stickyHeaders`.
- *   themeLight / themeDark    theme name strings (ThemesType)             'pierre-light' / 'pierre-dark'   DEFAULT_THEMES (constants)
+ *   themeLight / themeDark    bundled theme names (LIGHT_THEMES / DARK_THEMES below; unknown names fall back to the default)
+ *                                                                         'pierre-light' / 'pierre-dark'   DEFAULT_THEMES (constants)
  *   themeType                 'system' | 'light' | 'dark'                 'system'   File.js / FileDiff.js (`themeType = "system"`)
  *   lineHoverHighlight        'disabled' | 'both' | 'number' | 'line'     'disabled' InteractionManager.js (`lineHoverHighlight = "disabled"`)
  *   tokenizeMaxLineLength     positive integer                            1000       DiffHunksRenderer.js (`1e3`)
@@ -155,6 +156,29 @@ const SEARCH_BLUR_BEHAVIORS = ['close', 'retain'] as const;
 const DENSITY_KEYWORDS = ['compact', 'default', 'relaxed'] as const;
 const EXPANSION_KEYWORDS = ['open', 'closed'] as const;
 
+/**
+ * Themes Pierre can load by name: the `@pierre/theming` bundled collection (Pierre's own plus Shiki's), split by
+ * color scheme. Listed statically so this module stays free of the theme loaders; tests/unit/settings.test.ts
+ * compares both lists with the installed collection, so an upgrade that adds or drops a theme fails the test.
+ */
+export const LIGHT_THEMES = [
+  'pierre-light', 'pierre-light-soft', 'pierre-light-vibrant', 'pierre-light-protanopia-deuteranopia', 'pierre-light-tritanopia',
+  'ayu-light', 'catppuccin-latte', 'everforest-light', 'github-light', 'github-light-default', 'github-light-high-contrast',
+  'gruvbox-light-hard', 'gruvbox-light-medium', 'gruvbox-light-soft', 'horizon-bright', 'kanagawa-lotus', 'light-plus',
+  'material-theme-lighter', 'min-light', 'night-owl-light', 'one-light', 'rose-pine-dawn', 'slack-ochin', 'snazzy-light',
+  'solarized-light', 'vitesse-light',
+] as const;
+export const DARK_THEMES = [
+  'pierre-dark', 'pierre-dark-soft', 'pierre-dark-vibrant', 'pierre-dark-protanopia-deuteranopia', 'pierre-dark-tritanopia',
+  'andromeeda', 'aurora-x', 'ayu-dark', 'ayu-mirage', 'catppuccin-frappe', 'catppuccin-macchiato', 'catppuccin-mocha', 'dark-plus',
+  'dracula', 'dracula-soft', 'everforest-dark', 'github-dark', 'github-dark-default', 'github-dark-dimmed', 'github-dark-high-contrast',
+  'gruvbox-dark-hard', 'gruvbox-dark-medium', 'gruvbox-dark-soft', 'horizon', 'houston', 'kanagawa-dragon', 'kanagawa-wave', 'laserwave',
+  'material-theme', 'material-theme-darker', 'material-theme-ocean', 'material-theme-palenight', 'min-dark', 'monokai', 'night-owl', 'nord',
+  'one-dark-pro', 'plastic', 'poimandres', 'red', 'rose-pine', 'rose-pine-moon', 'slack-dark', 'solarized-dark', 'synthwave-84',
+  'tokyo-night', 'vesper', 'vitesse-black', 'vitesse-dark',
+] as const;
+const ALL_THEMES: readonly string[] = [...LIGHT_THEMES, ...DARK_THEMES];
+
 /** Compile-time proof that a choice list covers every member of the library union (fails typecheck if Pierre adds one). */
 type Covers<Union, List extends readonly unknown[]> = [Union] extends [List[number]] ? true : never;
 const _exhaustive: [
@@ -249,7 +273,6 @@ type Guard<T> = (value: unknown) => value is T;
 type Schema<T> = { [K in keyof T]-?: Guard<T[K]> };
 
 const isBool: Guard<boolean> = (v): v is boolean => typeof v === 'boolean';
-const isNonEmptyString: Guard<string> = (v): v is string => typeof v === 'string' && v.trim() !== '';
 const isInt = (v: unknown, min: number): v is number => typeof v === 'number' && Number.isInteger(v) && v >= min;
 const oneOf = <const L extends readonly string[]>(list: L): Guard<L[number]> =>
   (v): v is L[number] => typeof v === 'string' && (list as readonly string[]).includes(v);
@@ -271,8 +294,8 @@ const DIFF_SCHEMA: Schema<DiffSettings> = {
   expansionLineCount: (v): v is number => isInt(v, 1),
   collapsedContextThreshold: (v): v is number => isInt(v, 0),
   stickyHeader: isBool,
-  themeLight: isNonEmptyString,
-  themeDark: isNonEmptyString,
+  themeLight: oneOf(ALL_THEMES),
+  themeDark: oneOf(ALL_THEMES),
   themeType: oneOf(THEME_TYPES),
   lineHoverHighlight: oneOf(LINE_HOVER_HIGHLIGHTS),
   tokenizeMaxLineLength: (v): v is number => isInt(v, 1),
@@ -383,6 +406,10 @@ let injectedStorage: SettingsStorage | undefined;
 /** Test seam: route settings through a fake storage. Pass `undefined` to go back to `chrome.storage.sync`. */
 export function setSettingsStorage(storage: SettingsStorage | undefined): void {
   injectedStorage = storage;
+  // Also resets what this module knows about storage (see `known`), so tests start clean.
+  known = undefined;
+  followers = 0;
+  outstanding = [];
 }
 
 const storage = (): SettingsStorage => injectedStorage ?? chromeSyncStorage();
@@ -396,34 +423,97 @@ async function readOverrides(area: SettingsStorageArea): Promise<DeepPartial<Dis
 // Public API
 // ---------------------------------------------------------------------------------------------------------
 
+/**
+ * Overrides as this context last knew them in storage (including its own writes), or undefined when unknown.
+ * It lets `saveSettings` issue its write in the same tick instead of after a read. That matters when a page is
+ * closing (pagehide): continuations of async reads never run in a dying page, an already issued write does.
+ * It is trusted only while something follows storage changes (`onSettingsChange`), so other contexts' changes
+ * keep it current; `outstanding` lets the echoes of this context's own writes be told from foreign changes.
+ */
+let known: DeepPartial<DisplaySettings> | undefined;
+let followers = 0;
+let outstanding: string[] = [];
+let slowWrites = 0;
+const fingerprint = (o: DeepPartial<DisplaySettings>): string => JSON.stringify(o);
+
+function forgetKnown(): void {
+  known = undefined;
+  outstanding = [];
+}
+
+/** A `storage.onChanged` value for our item: an echo of one of our writes (ignored) or a foreign change (adopted). */
+function observeStored(raw: unknown): void {
+  const next = sanitizeOverrides(raw);
+  const echo = outstanding.indexOf(fingerprint(next));
+  if (echo >= 0) {
+    outstanding.splice(0, echo + 1);
+    return;
+  }
+  outstanding = [];
+  known = next;
+}
+
 export async function loadSettings(): Promise<DisplaySettings> {
   const stored = await storage().area.get(SETTINGS_STORAGE_KEY);
-  return resolve(stored[SETTINGS_STORAGE_KEY]);
+  const overrides = sanitizeOverrides(stored[SETTINGS_STORAGE_KEY]);
+  // A read that raced with our own writes may be older than what `known` already holds.
+  if (outstanding.length === 0 && slowWrites === 0) known = overrides;
+  return resolve(overrides);
 }
 
 let writeQueue: Promise<unknown> = Promise.resolve();
 
 /**
  * Merges `patch` into the stored overrides (unknown keys and invalid values are dropped, never stored) and
- * resolves with the effective settings. Writes are serialized so concurrent calls cannot lose each other's keys.
+ * resolves with the effective settings. Writes are serialized so concurrent calls cannot lose each other's keys;
+ * with a trustworthy cache (see `known`) the write is issued immediately.
  */
 export function saveSettings(patch: DeepPartial<DisplaySettings>): Promise<DisplaySettings> {
-  const run = writeQueue.then(async () => {
-    const { area } = storage();
-    const next = mergeOverrides(await readOverrides(area), sanitizeOverrides(patch));
-    await area.set({ [SETTINGS_STORAGE_KEY]: next });
-    return resolve(next);
-  });
+  const clean = sanitizeOverrides(patch);
+  const { area } = storage();
+
+  const write = (next: DeepPartial<DisplaySettings>): Promise<DisplaySettings> => {
+    known = next;
+    outstanding.push(fingerprint(next));
+    return area.set({ [SETTINGS_STORAGE_KEY]: next }).then(
+      () => resolve(next),
+      (err: unknown) => {
+        forgetKnown();
+        throw err;
+      },
+    );
+  };
+
+  if (known !== undefined && followers > 0 && slowWrites === 0) {
+    const run = write(mergeOverrides(known, clean));
+    writeQueue = run.catch(() => undefined);
+    return run;
+  }
+
+  slowWrites++;
+  const run = writeQueue
+    .then(async () => write(mergeOverrides(await readOverrides(area), clean)))
+    .finally(() => void slowWrites--);
   writeQueue = run.catch(() => undefined);
   return run;
 }
 
 /** Calls `cb` with the effective settings whenever they change in `chrome.storage.sync` (any context). */
 export function onSettingsChange(cb: (settings: DisplaySettings) => void): () => void {
-  return storage().subscribe((changes) => {
+  followers++;
+  const off = storage().subscribe((changes) => {
     const change = changes[SETTINGS_STORAGE_KEY];
-    if (change) cb(resolve(change.newValue));
+    if (!change) return;
+    observeStored(change.newValue);
+    cb(resolve(change.newValue));
   });
+  let active = true;
+  return () => {
+    if (!active) return;
+    active = false;
+    off();
+    if (--followers === 0) forgetKnown();
+  };
 }
 
 /**

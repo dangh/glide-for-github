@@ -44,6 +44,16 @@ describe('build output', () => {
     expect(missing).toEqual([]);
   });
 
+  it('emits every stylesheet and script that the HTML pages reference', () => {
+    for (const page of ['options.html', 'viewer.html']) {
+      const html = readFileSync(join(dist, page), 'utf8');
+      const refs = [...html.matchAll(/(?:href|src)=["']([^"']+)["']/g)].map((m) => m[1]!);
+      expect(refs.length, page).toBeGreaterThan(0);
+      const missing = refs.filter((f) => !existsSync(join(dist, f)));
+      expect(missing, page).toEqual([]);
+    }
+  });
+
   it('emits the Pierre worker as a self-contained dist/pierre-worker.js', () => {
     const worker = readFileSync(join(dist, 'pierre-worker.js'), 'utf8');
     expect(worker.length).toBeGreaterThan(0);

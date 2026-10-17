@@ -1,3 +1,4 @@
 import { createRoot } from 'react-dom/client';
+import { OptionsPage } from './OptionsPage';
 
-createRoot(document.getElementById('root')!).render(<div>Pierre for GitHub options</div>);
+createRoot(document.getElementById('root')!).render(<OptionsPage />);
