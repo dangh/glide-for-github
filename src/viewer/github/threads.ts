@@ -17,6 +17,8 @@ export interface CommentModel {
   reactions: { content: string; count: number; viewerHasReacted: boolean }[];
   viewerCanUpdate: boolean;
   viewerCanDelete: boolean;
+  /** Added locally after a write, not yet confirmed by a thread refetch (body is plain text, no `bodyHTML`). */
+  provisional?: boolean;
 }
 
 export interface ThreadModel {
@@ -34,6 +36,8 @@ export interface ThreadModel {
   isResolved: boolean;
   comments: CommentModel[];
   viewerCanReply: boolean;
+  /** Created locally (id `local:<first comment databaseId>`) and not yet seen in a thread refetch. */
+  provisional?: boolean;
 }
 
 const fromGithubSide = (side: GithubDiffSide | string | null | undefined): DiffSide | undefined =>

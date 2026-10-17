@@ -270,6 +270,18 @@ export function threadsByPath(threads: ThreadModel[]): Map<string, ThreadModel[]
   return map;
 }
 
+const threadsByIdCache = new WeakMap<ThreadModel[], Map<string, ThreadModel>>();
+
+/** A thread by id; the index is cached per `threads` array. */
+export function threadById(threads: ThreadModel[], id: string): ThreadModel | undefined {
+  let map = threadsByIdCache.get(threads);
+  if (!map) {
+    map = new Map(threads.map((t) => [t.id, t]));
+    threadsByIdCache.set(threads, map);
+  }
+  return map.get(id);
+}
+
 /** Comment count per path (all comments of all threads on the file). */
 export function commentCount(threads: ThreadModel[] | undefined): number {
   let n = 0;

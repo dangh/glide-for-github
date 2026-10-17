@@ -2,17 +2,21 @@
  * Every file in one virtualized Pierre CodeView (uncontrolled: items are seeded once, then updated one by
  * one with `updateItem`, see state/items.ts).
  */
-import type { FileDiffLoadedFiles, FileDiffMetadata } from '@pierre/diffs';
+import type { DiffLineAnnotation, FileDiffLoadedFiles, FileDiffMetadata, LineAnnotation, SelectedLineRange } from '@pierre/diffs';
 import { CodeView, type CodeViewHandle } from '@pierre/diffs/react';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { fetchFullFile, type PrData, type Rpc } from '../github/private';
-import { ItemSync, noAnnotations, type AnnotationMeta, type AnnotationSource, type PierreItem } from '../state/items';
+import { createAnnotationSource } from '../state/annotations';
+import { targetFromRange } from '../state/compose';
+import { ItemSync, type AnnotationMeta, type AnnotationSource, type PierreItem } from '../state/items';
 import { rangeOids } from '../state/range';
 import { session } from '../state/session';
 import { useSettings } from '../state/settings';
 import { usePr } from '../state/store';
-import { createDiffOptionsBuilder, HEADER_HEIGHT, visibleFiles } from '../state/view';
+import { createDiffOptionsBuilder, HEADER_HEIGHT, visibleFiles, type DiffViewOptions } from '../state/view';
+import { Composer, openComposerAt } from './Composer';
 import { FileHeader } from './FileHeader';
+import { Thread } from './Thread';
 
 type Handle = CodeViewHandle<AnnotationMeta, undefined>;
 
@@ -44,23 +48,56 @@ function viewportFiles(handle: Handle): { ids: string[]; current?: string } {
   return visibleFiles(usePr.getState().order, (id) => instance.getTopForItem(id), instance.getScrollTop(), instance.getHeight(), HEADER_HEIGHT);
 }
 
+/** CodeView callbacks get the item context last; the item id is the file path. */
+const itemPath = (context: unknown): string | undefined => (context as { item?: { id?: string } } | undefined)?.item?.id;
+const isMultiLine = (r: SelectedLineRange) => r.start !== r.end || (r.endSide ?? r.side) !== r.side;
+
+/**
+ * Gutter "+" (click, or drag over lines) opens a composer for that line or range; a multi-line line selection
+ * (drag over line numbers) opens a range composer. Both fire for one gutter drag: opening is idempotent.
+ */
+const INTERACTIONS: DiffViewOptions = Object.freeze({
+  enableGutterUtility: true,
+  enableLineSelection: true,
+  onGutterUtilityClick: ((range: SelectedLineRange, context: unknown) => {
+    const path = itemPath(context);
+    if (path) openComposerAt(targetFromRange(path, range));
+  }) as DiffViewOptions['onGutterUtilityClick'],
+  onLineSelectionEnd: ((range: SelectedLineRange | null, context: unknown) => {
+    const path = itemPath(context);
+    if (path && range && isMultiLine(range)) openComposerAt(targetFromRange(path, range));
+  }) as DiffViewOptions['onLineSelectionEnd'],
+});
+
+/** Threads and open composers as line annotations; keyed so a slot never reuses another composer's textarea. */
+function renderAnnotation(annotation: DiffLineAnnotation<AnnotationMeta> | LineAnnotation<AnnotationMeta>) {
+  const meta = annotation.metadata;
+  return meta.kind === 'thread' ? (
+    <Thread key={`t:${meta.threadId}`} threadId={meta.threadId} />
+  ) : (
+    <Composer key={`c:${meta.key}`} draftKey={meta.key} mode="new" />
+  );
+}
+
 export interface DiffPaneProps {
   rpc: Rpc;
-  /** Task 9 passes the thread/composer annotation source. */
+  /** Thread/composer annotation source (default: `createAnnotationSource()`, one per pane). */
   annotations?: AnnotationSource;
 }
 
-export const DiffPane = memo(function DiffPane({ rpc, annotations = noAnnotations }: DiffPaneProps) {
+export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPaneProps) {
   const pr = usePr((s) => s.pr);
   const diffSettings = useSettings((s) => s.settings.diff);
   const colorMode = useSettings((s) => s.colorMode);
   const handleRef = useRef<Handle | null>(null);
-  const sync = useMemo(() => new ItemSync(annotations), [annotations]);
+  const defaultSource = useMemo(createAnnotationSource, []);
+  const source = annotations ?? defaultSource;
+  const sync = useMemo(() => new ItemSync(source), [source]);
 
   const loadDiffFiles = useMemo(() => (pr ? createFileLoader(rpc, pr) : undefined), [rpc, pr]);
 
   const buildOptions = useMemo(createDiffOptionsBuilder, []);
-  const options = buildOptions(diffSettings, colorMode, loadDiffFiles);
+  const options = buildOptions(diffSettings, colorMode, loadDiffFiles, INTERACTIONS);
 
   // Seeded once per PR; later changes go through `sync` → updateItem.
   const initialItems = useMemo<PierreItem[]>(() => (pr ? sync.seed(usePr.getState()) : []), [pr, sync]);
@@ -132,6 +169,7 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations = noAnnotation
       options={options}
       onScroll={onViewport}
       renderCustomHeader={renderCustomHeader}
+      renderAnnotation={renderAnnotation}
     />
   );
 });

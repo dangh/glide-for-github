@@ -576,3 +576,392 @@ button {
   outline: 2px solid var(--pierre-accent);
   outline-offset: 1px;
 }
+
+/* Inline threads and composers (Pierre line annotations, light DOM slotted into the diff) */
+.fh-icon-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--pierre-muted);
+  padding: 1px 6px;
+  cursor: pointer;
+  flex: none;
+  font-size: 12px;
+}
+
+.fh-icon-button:hover {
+  border-color: var(--pierre-border);
+  color: var(--pierre-fg);
+}
+
+.thread,
+.composer-new {
+  margin: 6px 8px;
+  max-width: 880px;
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+  background: var(--pierre-bg);
+  font: 13px/1.5 var(--pierre-font);
+  color: var(--pierre-fg);
+  white-space: normal;
+}
+
+.thread-fold {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: 0;
+  background: var(--pierre-bg-subtle);
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 12px;
+}
+
+.thread-fold[aria-expanded='true'] {
+  border-bottom: 1px solid var(--pierre-border);
+  border-radius: 6px 6px 0 0;
+}
+
+.thread-fold-text {
+  color: var(--pierre-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.label {
+  border: 1px solid var(--pierre-border);
+  border-radius: 999px;
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 17px;
+  flex: none;
+}
+
+.label-outdated {
+  color: var(--pierre-attention);
+  border-color: currentColor;
+}
+
+.label-resolved {
+  color: var(--pierre-done);
+  border-color: currentColor;
+}
+
+.label-pending {
+  color: var(--pierre-attention);
+  border-color: currentColor;
+}
+
+.comment {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--pierre-border);
+}
+
+.comment-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.comment-head .fh-link {
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.avatar {
+  border-radius: 50%;
+  flex: none;
+}
+
+.comment-author {
+  font-weight: 600;
+}
+
+.comment-time {
+  color: var(--pierre-muted);
+}
+
+.comment-confirm {
+  color: var(--pierre-danger);
+}
+
+.markdown-body {
+  overflow-wrap: anywhere;
+}
+
+.markdown-body > :first-child {
+  margin-top: 0;
+}
+
+.markdown-body > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body p,
+.markdown-body ul,
+.markdown-body ol,
+.markdown-body pre,
+.markdown-body blockquote,
+.markdown-body table {
+  margin: 0 0 8px;
+}
+
+.markdown-body pre,
+.markdown-body code {
+  font-family: var(--pierre-mono);
+  font-size: 12px;
+  background: var(--pierre-bg-subtle);
+  border-radius: 6px;
+}
+
+.markdown-body pre {
+  padding: 8px;
+  overflow: auto;
+}
+
+.markdown-body code {
+  padding: 1px 4px;
+}
+
+.markdown-body pre code {
+  padding: 0;
+}
+
+.markdown-body img {
+  max-width: 100%;
+}
+
+.markdown-body a {
+  color: var(--pierre-accent);
+}
+
+.markdown-body blockquote {
+  padding: 0 10px;
+  color: var(--pierre-muted);
+  border-left: 3px solid var(--pierre-border);
+}
+
+.markdown-body table {
+  border-collapse: collapse;
+}
+
+.markdown-body td,
+.markdown-body th {
+  border: 1px solid var(--pierre-border);
+  padding: 2px 8px;
+}
+
+.markdown-plain {
+  white-space: pre-wrap;
+}
+
+.reactions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.reaction {
+  border: 1px solid var(--pierre-border);
+  border-radius: 999px;
+  background: var(--pierre-bg);
+  padding: 0 8px;
+  font-size: 12px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.reaction-on {
+  background: var(--pierre-accent-bg);
+  border-color: var(--pierre-accent-border);
+}
+
+.reaction-add {
+  color: var(--pierre-muted);
+}
+
+.reaction-picker {
+  position: relative;
+  display: inline-flex;
+}
+
+.reaction-menu {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  z-index: 5;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background: var(--pierre-bg);
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(31, 35, 40, 0.15);
+}
+
+.reaction-choice {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  font-size: 15px;
+  line-height: 22px;
+  width: 30px;
+  cursor: pointer;
+}
+
+.reaction-choice:hover {
+  background: var(--pierre-bg-subtle);
+}
+
+.thread-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+}
+
+.thread-reply {
+  flex: 1;
+  max-width: 480px;
+  text-align: left;
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+  background: var(--pierre-bg-subtle);
+  color: var(--pierre-muted);
+  padding: 3px 8px;
+  cursor: text;
+}
+
+.thread-error,
+.composer-error {
+  color: var(--pierre-danger);
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.composer-note {
+  color: var(--pierre-muted);
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.composer {
+  padding: 8px;
+}
+
+.thread .composer {
+  border-top: 0;
+}
+
+.composer-target {
+  font-size: 12px;
+  color: var(--pierre-muted);
+  margin-bottom: 4px;
+}
+
+.composer-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.composer-tabs [role='tab'] {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  padding: 2px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--pierre-muted);
+}
+
+.composer-tabs [role='tab'].on {
+  border-color: var(--pierre-border);
+  background: var(--pierre-bg-subtle);
+  color: var(--pierre-fg);
+}
+
+.composer-tool {
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+  background: var(--pierre-bg);
+  font-size: 12px;
+  padding: 1px 8px;
+  cursor: pointer;
+}
+
+.composer-input {
+  display: block;
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  padding: 6px 8px;
+  font: 13px/1.5 var(--pierre-font);
+  color: var(--pierre-fg);
+  background: var(--pierre-bg);
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+}
+
+.composer-input:focus {
+  outline: 2px solid var(--pierre-accent);
+  outline-offset: -1px;
+  border-color: var(--pierre-accent-border);
+}
+
+.composer-input[hidden] {
+  display: none;
+}
+
+.composer-preview {
+  min-height: 72px;
+  padding: 6px 8px;
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+}
+
+.composer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.composer-actions button,
+.thread-actions .btn {
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--pierre-muted);
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--pierre-border);
+  border-top-color: var(--pierre-accent);
+  border-radius: 50%;
+  animation: pierre-spin 0.8s linear infinite;
+}
+
+@keyframes pierre-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -9,12 +9,15 @@
  * Run:
  *   agent-browser --session pierre-gh close   # the profile must not be in use while copying
  *   ./scripts/e2e-profile.sh
- *   npm run e2e                                # builds dist/, then runs tests/e2e
+ *   npm run e2e                                # builds dist/, then runs tests/e2e HEADED on DISPLAY (default :0)
+ *   npm run e2e:headless                       # same, headless (CI)
+ *   npm run e2e:token                          # once: paste a GitHub token into Pierre's prompt (write tests)
  * Env: PIERRE_E2E_CHROME (Chrome for Testing binary; default: newest ~/.agent-browser/browsers/chrome-*),
- *      PIERRE_E2E_HEADED=1 (show the browser; needs DISPLAY, e.g. DISPLAY=:0).
+ *      PIERRE_E2E_HEADLESS=1 (headless; the default is headed on $DISPLAY or :0, with WAYLAND_DISPLAY cleared).
  *
- * The tests are read-only: they never post, mark viewed or change anything on GitHub. Viewed-state checks
- * rewrite GitHub's route response inside the test browser only.
+ * viewer.spec.ts is read-only. review.spec.ts WRITES, only on the sandbox PR (tests/sandbox.json), with the token
+ * saved in .e2e-profile's extension storage by `npm run e2e:token` (it skips when no token is stored); it removes
+ * what it creates. Viewed-state checks rewrite GitHub's route response inside the test browser only.
  */
 import { defineConfig } from '@playwright/test';
 
@@ -28,4 +31,5 @@ export default defineConfig({
   retries: 0,
   reporter: [['list']],
   outputDir: 'test-results',
+  use: { actionTimeout: 30_000, screenshot: 'only-on-failure' },
 });

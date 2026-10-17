@@ -10,6 +10,7 @@ import type { DisplaySettings } from '../shared/settings';
 import { fetchPrData, fetchThreads, type Rpc } from './github/private';
 import { toThreadModels } from './github/threads';
 import { startLoader } from './state/controller';
+import { initPendingReview, resetReviewCaches } from './state/review';
 import { session } from './state/session';
 import { effectiveThemeType, useSettings } from './state/settings';
 import { usePr } from './state/store';
@@ -66,8 +67,10 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
     fetchPrData(rpc, prRef)
       .then((data) => {
         if (cancelled) return;
+        resetReviewCaches();
         usePr.getState().setPr(data);
-        // Threads only feed comment counts here (rendering them is Task 9); failures are not fatal.
+        void initPendingReview(data);
+        // Threads render inline (annotations) and feed the comment counts; failures are not fatal.
         fetchThreads(rpc, prRef, { markers: data.threadMarkers })
           .then((raw) => {
             if (!cancelled) usePr.getState().setThreads(toThreadModels(raw));

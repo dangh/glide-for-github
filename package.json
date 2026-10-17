@@ -11,7 +11,9 @@
     "build": "node build.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "e2e": "npm run build && playwright test",
+    "e2e": "npm run build && DISPLAY=${DISPLAY:-:0} WAYLAND_DISPLAY= playwright test",
+    "e2e:headless": "npm run build && PIERRE_E2E_HEADLESS=1 playwright test",
+    "e2e:token": "npm run build && DISPLAY=${DISPLAY:-:0} WAYLAND_DISPLAY= node scripts/token-setup.mjs",
     "zip": "npm run build && rm -f pierre-for-github.zip && cd dist && zip -qr ../pierre-for-github.zip ."
   },
   "dependencies": {

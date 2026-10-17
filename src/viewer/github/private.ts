@@ -38,6 +38,12 @@ export interface FileSummary {
 export interface PrData {
   ref: PrRef;
   nodeId?: string;
+  /** `pullRequest.id` (database id), for `/preview` (`issue`, `project`). */
+  databaseId?: number;
+  /** `repository.id`, for `/preview`. */
+  repositoryId?: number;
+  /** Comments in the viewer's pending review, when the route says one exists (`viewerPendingReview`). */
+  pendingReviewComments?: number;
   /** PR author login (Ruling 2). */
   author: string;
   baseOid: string;
@@ -213,7 +219,14 @@ interface GithubDiffEntry {
 }
 
 interface ChangesRoute {
-  pullRequest: { globalRelayId?: string; author?: { login: string } | null; comparison?: { baseOid: string; headOid: string } };
+  pullRequest: {
+    id?: number;
+    globalRelayId?: string;
+    author?: { login: string } | null;
+    comparison?: { baseOid: string; headOid: string };
+  };
+  repository?: { id?: number };
+  viewerPendingReview?: { id?: number | string | null; comments?: unknown[] } | null;
   comparison?: { fullDiff?: { baseOid: string; headOid: string } };
   commits?: { oid: string; shortOid: string; messageHeadline: string }[];
   user: { currentUserLogin: string; canApplySuggestion?: boolean; canComment?: boolean };
@@ -410,6 +423,9 @@ export async function fetchPrData(rpc: Rpc, ref: PrRef): Promise<PrData> {
   return {
     ref,
     ...(route.pullRequest.globalRelayId ? { nodeId: route.pullRequest.globalRelayId } : {}),
+    ...(typeof route.pullRequest.id === 'number' ? { databaseId: route.pullRequest.id } : {}),
+    ...(typeof route.repository?.id === 'number' ? { repositoryId: route.repository.id } : {}),
+    ...(route.viewerPendingReview?.id != null ? { pendingReviewComments: route.viewerPendingReview.comments?.length ?? 0 } : {}),
     author: route.pullRequest.author?.login ?? '',
     baseOid: full.baseOid,
     headOid: full.headOid,

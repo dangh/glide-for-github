@@ -20,16 +20,21 @@ export type DiffViewOptions = CodeViewReactOptions<AnnotationMeta, undefined>;
  * and the file loader are unchanged (by reference), so unrelated setting changes never call `setOptions`.
  */
 export function createDiffOptionsBuilder() {
-  let last: { diff: DiffSettings; colorMode: string | undefined; loadDiffFiles?: FileDiffContentsLoader; options: DiffViewOptions } | undefined;
-  return (diff: DiffSettings, colorMode: string | undefined, loadDiffFiles?: FileDiffContentsLoader): DiffViewOptions => {
-    if (last && last.diff === diff && last.colorMode === colorMode && last.loadDiffFiles === loadDiffFiles) return last.options;
+  let last:
+    | { diff: DiffSettings; colorMode: string | undefined; loadDiffFiles?: FileDiffContentsLoader; interactions?: DiffViewOptions; options: DiffViewOptions }
+    | undefined;
+  /** `interactions`: gutter "+" / line selection wiring (Task 9); pass a stable object. */
+  return (diff: DiffSettings, colorMode: string | undefined, loadDiffFiles?: FileDiffContentsLoader, interactions?: DiffViewOptions): DiffViewOptions => {
+    if (last && last.diff === diff && last.colorMode === colorMode && last.loadDiffFiles === loadDiffFiles && last.interactions === interactions)
+      return last.options;
     const options: DiffViewOptions = {
       ...toDiffOptions<AnnotationMeta>({ ...DEFAULT_SETTINGS, diff }),
       themeType: effectiveThemeType(diff.themeType, colorMode),
       itemMetrics: ITEM_METRICS,
       ...(loadDiffFiles ? { loadDiffFiles } : {}),
+      ...interactions,
     };
-    last = { diff, colorMode, ...(loadDiffFiles ? { loadDiffFiles } : {}), options };
+    last = { diff, colorMode, ...(loadDiffFiles ? { loadDiffFiles } : {}), ...(interactions ? { interactions } : {}), options };
     return options;
   };
 }

@@ -8,9 +8,11 @@
 import { memo, useCallback } from 'react';
 import { isNoTokenError, requireToken } from '../auth/requireToken';
 import type { FileSummary } from '../github/private';
+import { fileTarget } from '../state/compose';
 import { session } from '../state/session';
 import { commentCount, isCollapsed, threadsByPath, usePr, type FileLoadState } from '../state/store';
 import { filesChangedUrl, HEADER_HEIGHT } from '../state/view';
+import { openComposerAt } from './Composer';
 
 export { HEADER_HEIGHT };
 
@@ -156,6 +158,16 @@ export const FileHeader = memo(function FileHeader({ path }: { path: string }) {
           <CommentIcon /> {comments}
         </span>
       )}
+      <button
+        type="button"
+        className="fh-icon-button"
+        title="Comment on file"
+        aria-label="Comment on file"
+        data-testid="comment-on-file"
+        onClick={() => openComposerAt(fileTarget(path))}
+      >
+        <CommentIcon />+
+      </button>
       <label className="fh-viewed">
         <input type="checkbox" checked={viewed} onChange={onViewed} /> Viewed
       </label>

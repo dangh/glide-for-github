@@ -59,7 +59,9 @@ export function TokenPrompt({ request }: { request: TokenPromptRequest }) {
     field.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        // Captured and stopped: Esc closes the prompt only, never an inline composer underneath.
         e.preventDefault();
+        e.stopPropagation();
         cancel();
         return;
       }
@@ -78,10 +80,10 @@ export function TokenPrompt({ request }: { request: TokenPromptRequest }) {
         first.focus();
       }
     };
-    document.addEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKey, true);
     return () => {
       alive.current = false;
-      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onKey, true);
       opener?.focus?.();
     };
   }, [cancel]);

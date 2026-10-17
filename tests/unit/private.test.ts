@@ -34,6 +34,11 @@ describe('fetchPrData', () => {
     expect(pr.ref).toEqual(ref);
     expect(pr.nodeId).toBe(route.pullRequest.globalRelayId);
     expect(pr.nodeId).toMatch(/^PR_/);
+    // Ids GitHub's composer sends to /preview (R§6); no pending review in the fixture.
+    expect(pr.databaseId).toBe(route.pullRequest.id);
+    expect(pr.repositoryId).toBe(route.repository.id);
+    expect(typeof pr.databaseId).toBe('number');
+    expect(pr.pendingReviewComments).toBeUndefined();
     expect(pr.author).toBe('dangh');
     expect(pr.baseOid).toBe(route.comparison.fullDiff.baseOid);
     expect(pr.headOid).toBe(route.comparison.fullDiff.headOid);

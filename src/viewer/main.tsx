@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { createConnection, parsePrParam } from './connection';
+import * as review from './state/review';
 import { session } from './state/session';
 import { initSettings, useSettings } from './state/settings';
 import { usePr } from './state/store';
@@ -8,10 +9,10 @@ import { usePr } from './state/store';
 declare global {
   interface Window {
     /** Inspection hooks for e2e/perf tests (extension page only; never reachable from github.com). */
-    __pierre?: { store: typeof usePr; settings: typeof useSettings; session: typeof session };
+    __pierre?: { store: typeof usePr; settings: typeof useSettings; session: typeof session; review: typeof review };
   }
 }
-window.__pierre = { store: usePr, settings: useSettings, session };
+window.__pierre = { store: usePr, settings: useSettings, session, review };
 
 const root = createRoot(document.getElementById('root')!);
 const prRef = parsePrParam(location.search);

@@ -23,6 +23,14 @@ export const REACT: PrId = { owner: 'react', repo: 'react', number: 37778 };
 export const prUrl = (pr: PrId, suffix = '') => `https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}${suffix}`;
 
 /** Chrome for Testing binary: $PIERRE_E2E_CHROME, else the newest agent-browser download. */
+/**
+ * Headed by default, on the VNC desktop (DISPLAY, default :0) so runs can be watched; `PIERRE_E2E_HEADLESS=1`
+ * (`npm run e2e:headless`, CI) runs headless.
+ */
+export const HEADLESS = process.env.PIERRE_E2E_HEADLESS === '1';
+export const browserEnv = (): Record<string, string> =>
+  HEADLESS ? {} : { DISPLAY: process.env.DISPLAY || ':0', WAYLAND_DISPLAY: '' };
+
 export function chromePath(): string {
   if (process.env.PIERRE_E2E_CHROME) return process.env.PIERRE_E2E_CHROME;
   const dir = join(homedir(), '.agent-browser/browsers');
@@ -45,7 +53,8 @@ export const test = base.extend<{ page: Page }, { extContext: BrowserContext }>(
       if (!existsSync(join(DIST, 'manifest.json'))) throw new Error('No dist/: run npm run build first');
       const context = await chromium.launchPersistentContext(PROFILE, {
         executablePath: chromePath(),
-        headless: !process.env.PIERRE_E2E_HEADED,
+        headless: HEADLESS,
+        env: { ...(process.env as Record<string, string>), ...browserEnv() },
         args: [`--disable-extensions-except=${DIST}`, `--load-extension=${DIST}`],
         viewport: { width: 1400, height: 900 },
       });
