@@ -1,0 +1,74 @@
+{
+ "query": "thread_ids=2910292428,2910292404,2910292349",
+ "link": null,
+ "data": {
+  "threads": {
+   "2910292349": {
+    "commitOid": "324e2352e3e3db6a716b79fb84951521b0647cb7",
+    "diffLines": [
+     {
+      "html": "<span class=pl-kos>}</span>",
+      "left": 7,
+      "right": 7,
+      "text": " }",
+      "type": "CONTEXT"
+     },
+     {
+      "html": "<br>",
+      "left": 8,
+      "right": 8,
+      "text": " ",
+      "type": "CONTEXT"
+     },
+     {
+      "html": "<span class=pl-k>export</span> <span class=pl-k>function</span> <span class=pl-en>clamp</span><span class=pl-kos>(</span><span class=pl-s1>v</span>: <span class=pl-smi>number</span><span class=pl-kos>,</span> <span class=pl-s1>lo</span>: <span class=pl-smi>number</span><span class=pl-kos>,</span> <span class=pl-s1>hi</span>: <span class=pl-smi>number</span><span class=pl-kos>)</span>: <span class=pl-smi>number</span> <span class=pl-kos>{</span>",
+      "left": 9,
+      "right": 9,
+      "text": " export function clamp(v: number, lo: number, hi: number): number {",
+      "type": "CONTEXT"
+     },
+     {
+      "html": "  <span class=pl-k>if</span> <span class=pl-kos>(</span><span class=pl-s1>lo</span> <span class=pl-c1>&gt;</span> <span class=pl-s1>hi</span><span class=pl-kos>)</span> <span class=pl-kos>{</span>",
+      "left": 9,
+      "right": 10,
+      "text": "+  if (lo > hi) {",
+      "type": "ADDITION"
+     }
+    ],
+    "endDiffSide": "RIGHT",
+    "endLine": 10,
+    "path": "src/util/math.ts",
+    "isOutdated": true,
+    "originalDiffPathUri": "https://github.com/dangh/pierre-sandbox/pull/1/changes/324e2352e3e3db6a716b79fb84951521b0647cb7#r2910292349"
+   },
+   "2910292404": {
+    "commitOid": "324e2352e3e3db6a716b79fb84951521b0647cb7",
+    "diffLines": [
+     {
+      "html": "  <span class=pl-k>const</span> <span class=pl-s1>attr</span> <span class=pl-c1>=</span> <span class=pl-s1>p</span><span class=pl-kos>.</span><span class=pl-c1>disabled</span> ? <span class=pl-s>&quot; disabled&quot;</span> : <span class=pl-s>&quot;&quot;</span><span class=pl-kos>;</span>",
+      "left": 7,
+      "right": 8,
+      "text": "+  const attr = p.disabled ? \" disabled\" : \"\";",
+      "type": "ADDITION"
+     },
+     {
+      "html": "  <span class=pl-k>return</span> <span class=pl-s>`&lt;button id=&quot;<span class=pl-s1><span class=pl-kos>${</span><span class=pl-s1>p</span><span class=pl-kos>.</span><span class=pl-c1>id</span><span class=pl-kos>}</span></span>&quot;<span class=pl-s1><span class=pl-kos>${</span><span class=pl-s1>attr</span><span class=pl-kos>}</span></span>&gt;<span class=pl-s1><span class=pl-kos>${</span><span class=pl-s1>p</span><span class=pl-kos>.</span><span class=pl-c1>label</span><span class=pl-kos>}</span></span>&lt;/button&gt;`</span><span class=pl-kos>;</span>",
+      "left": 7,
+      "right": 9,
+      "text": "+  return `<button id=\"${p.id}\"${attr}>${p.label}</button>`;",
+      "type": "ADDITION"
+     }
+    ],
+    "endDiffSide": "RIGHT",
+    "endLine": 9,
+    "path": "src/components/Button.ts",
+    "startDiffSide": "RIGHT",
+    "startLine": 8
+   },
+   "2910292428": {
+    "commitOid": "324e2352e3e3db6a716b79fb84951521b0647cb7",
+    "path": "docs/with space.md"
+   }
+  }
+ }
+}

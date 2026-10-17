@@ -1,0 +1,1773 @@
+{
+ "query": "paths=assets%252Fadded.png%2Cassets%252Flogo.png%2Cconfig%252Fsettings.json%2Cdocs%252Fchangelog.md%2Cdocs%252Fguide.md%2Cdocs%252Fwith%2520space.md%2Cgenerated%252Fbig.generated.ts%2Cscripts%252Fbuild.py%2Cscripts%252Fextra.py%2Csrc%252Fapi%252Fauth.ts%2Csrc%252Fcomponents%252FButton.ts%2Csrc%252Fcomponents%252FTooltip.ts%2Csrc%252Flegacy%252Frenamed-pure.ts%2Csrc%252Fmodern%252Fhelper-renamed.ts%2Csrc%252Futil%252Fmath.ts%2Csrc%252F%25C3%25BCn%25C3%25AF%252Fc%25C3%25B6d%25C3%25A9.ts%2Csrc%252Fa%252Cb.ts%2Csrc%252Fhash%2523pct%2525.ts%2Csrc%252Fobsolete.ts%2Csrc%252Fwhitespace.ts&w=0",
+ "link": null,
+ "data": [
+  {
+   "isBinary": true,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [],
+   "linesAdded": 0,
+   "linesChanged": 0,
+   "linesDeleted": 0,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": null,
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "assets/added.png",
+    "lineCount": 28,
+    "isGenerated": false
+   },
+   "path": "assets/added.png",
+   "pathDigest": "f7a6cbf0a999c8facc8095aaa1ca4f22f1fc93a69eb7e4f9c99c7e8e226ac56b",
+   "richDiff": {
+    "canToggleRichDiff": false,
+    "defaultToRichDiff": true,
+    "proseDiffHtml": null,
+    "dependencyDiffPath": null
+   },
+   "submodule": null,
+   "status": "ADDED",
+   "truncatedReason": null,
+   "diffSize": "2.86 KB"
+  },
+  {
+   "isBinary": true,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [],
+   "linesAdded": 0,
+   "linesChanged": 0,
+   "linesDeleted": 0,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": {
+    "mode": 100644,
+    "path": "assets/logo.png",
+    "lineCount": 54
+   },
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "assets/logo.png",
+    "lineCount": 55,
+    "isGenerated": false
+   },
+   "path": "assets/logo.png",
+   "pathDigest": "90580d12fbd0edace7745ba49a090bc882d32c9f7d6bfa1345df935f7a6816d3",
+   "richDiff": {
+    "canToggleRichDiff": false,
+    "defaultToRichDiff": true,
+    "proseDiffHtml": null,
+    "dependencyDiffPath": null
+   },
+   "submodule": null,
+   "status": "MODIFIED",
+   "truncatedReason": null,
+   "diffSize": "-6 Bytes"
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [
+    {
+     "type": "HUNK",
+     "blobLineNumber": 0,
+     "position": 0,
+     "displayNoNewLineWarning": false,
+     "text": "@@ -1,6 +1,6 @@",
+     "html": "@@ -1,6 +1,6 @@",
+     "left": 0,
+     "right": 0,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 1,
+     "position": 1,
+     "displayNoNewLineWarning": false,
+     "text": " {",
+     "html": " {",
+     "left": 1,
+     "right": 1,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 2,
+     "position": 2,
+     "displayNoNewLineWarning": false,
+     "text": "   \"mode\": \"sandbox\",",
+     "html": "   <span class=\"pl-ent\">&quot;mode&quot;</span>: <span class=\"pl-s\"><span class=\"pl-pds\">&quot;</span>sandbox<span class=\"pl-pds\">&quot;</span></span>,",
+     "left": 2,
+     "right": 2,
+     "problems": []
+    },
+    {
+     "type": "DELETION",
+     "blobLineNumber": 3,
+     "position": 3,
+     "displayNoNewLineWarning": false,
+     "text": "-  \"retries\": 3,",
+     "html": "-  <span class=\"pl-ent\">\"retries\"</span>: <span class=\"pl-c1 x x-first x-last\">3</span>,",
+     "left": 3,
+     "right": 2,
+     "problems": []
+    },
+    {
+     "type": "DELETION",
+     "blobLineNumber": 4,
+     "position": 4,
+     "displayNoNewLineWarning": false,
+     "text": "-  \"timeoutMs\": 5000,",
+     "html": "-  <span class=\"pl-ent\">\"timeoutMs\"</span>: <span class=\"pl-c1 x x-first x-last\">5000</span>,",
+     "left": 4,
+     "right": 2,
+     "problems": []
+    },
+    {
+     "type": "DELETION",
+     "blobLineNumber": 5,
+     "position": 5,
+     "displayNoNewLineWarning": false,
+     "text": "-  \"features\": [\"alpha\", \"beta\"]",
+     "html": "-  <span class=\"pl-ent\">\"features\"</span>: [<span class=\"pl-s\"><span class=\"pl-pds\">\"</span>alpha<span class=\"pl-pds\">\"</span></span>, <span class=\"pl-s\"><span class=\"pl-pds\">\"</span>beta<span class=\"pl-pds\">\"</span></span>]",
+     "left": 5,
+     "right": 2,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 3,
+     "position": 6,
+     "displayNoNewLineWarning": false,
+     "text": "+  \"retries\": 5,",
+     "html": "+  <span class=\"pl-ent\">\"retries\"</span>: <span class=\"pl-c1 x x-first x-last\">5</span>,",
+     "left": 5,
+     "right": 3,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 4,
+     "position": 7,
+     "displayNoNewLineWarning": false,
+     "text": "+  \"timeoutMs\": 8000,",
+     "html": "+  <span class=\"pl-ent\">\"timeoutMs\"</span>: <span class=\"pl-c1 x x-first x-last\">8000</span>,",
+     "left": 5,
+     "right": 4,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 5,
+     "position": 8,
+     "displayNoNewLineWarning": false,
+     "text": "+  \"features\": [\"alpha\", \"beta\", \"gamma\"]",
+     "html": "+  <span class=\"pl-ent\">\"features\"</span>: [<span class=\"pl-s\"><span class=\"pl-pds\">\"</span>alpha<span class=\"pl-pds\">\"</span></span>, <span class=\"pl-s\"><span class=\"pl-pds\">\"</span>beta<span class=\"pl-pds\">\"</span></span><span class=\"x x-first\">, </span><span class=\"pl-s\"><span class=\"pl-pds x\">\"</span><span class=\"x\">gamma</span><span class=\"pl-pds x x-last\">\"</span></span>]",
+     "left": 5,
+     "right": 5,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 6,
+     "position": 9,
+     "displayNoNewLineWarning": false,
+     "text": " }",
+     "html": " }",
+     "left": 6,
+     "right": 6,
+     "problems": []
+    }
+   ],
+   "linesAdded": 3,
+   "linesChanged": 6,
+   "linesDeleted": 3,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": {
+    "mode": 100644,
+    "path": "config/settings.json",
+    "lineCount": 6
+   },
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "config/settings.json",
+    "lineCount": 6,
+    "isGenerated": false
+   },
+   "path": "config/settings.json",
+   "pathDigest": "980db14c03a9eed03f20baa57544d31f7131f368c35acc5c73f63713be77e81c",
+   "richDiff": null,
+   "submodule": null,
+   "status": "MODIFIED",
+   "truncatedReason": null,
+   "diffSize": ""
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [
+    {
+     "type": "HUNK",
+     "blobLineNumber": 0,
+     "position": 0,
+     "displayNoNewLineWarning": false,
+     "text": "@@ -0,0 +1,3 @@",
+     "html": "@@ -0,0 +1,3 @@",
+     "left": null,
+     "right": 0,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 1,
+     "position": 1,
+     "displayNoNewLineWarning": false,
+     "text": "+# Changelog",
+     "html": "+<span class=\"pl-mh\"># <span class=\"pl-en\">Changelog</span></span>",
+     "left": null,
+     "right": 1,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 2,
+     "position": 2,
+     "displayNoNewLineWarning": false,
+     "text": "+",
+     "html": "+",
+     "left": null,
+     "right": 2,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 3,
+     "position": 3,
+     "displayNoNewLineWarning": false,
+     "text": "+- Added auth, tooltip, extra script.",
+     "html": "+<span class=\"pl-v\">-</span> Added auth, tooltip, extra script.",
+     "left": null,
+     "right": 3,
+     "problems": []
+    }
+   ],
+   "linesAdded": 3,
+   "linesChanged": 3,
+   "linesDeleted": 0,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": null,
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "docs/changelog.md",
+    "lineCount": 3,
+    "isGenerated": false
+   },
+   "path": "docs/changelog.md",
+   "pathDigest": "77f023b99d3d58008351d3e82fc06e6d06ba1bc2da9e41be6329b7fa4f419f05",
+   "richDiff": {
+    "canToggleRichDiff": true,
+    "defaultToRichDiff": false,
+    "proseDiffHtml": null,
+    "dependencyDiffPath": null
+   },
+   "submodule": null,
+   "status": "ADDED",
+   "truncatedReason": null,
+   "diffSize": ""
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [
+    {
+     "type": "HUNK",
+     "blobLineNumber": 6,
+     "position": 0,
+     "displayNoNewLineWarning": false,
+     "text": "@@ -7,3 +7,7 @@ Run the build script.",
+     "html": "@@ -7,3 +7,7 @@ Run the build script.",
+     "left": 6,
+     "right": 6,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 7,
+     "position": 1,
+     "displayNoNewLineWarning": false,
+     "text": " ## Usage",
+     "html": " <span class=\"pl-mh\">## <span class=\"pl-en\">Usage</span></span>",
+     "left": 7,
+     "right": 7,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 8,
+     "position": 2,
+     "displayNoNewLineWarning": false,
+     "text": " ",
+     "html": "<br>",
+     "left": 8,
+     "right": 8,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 9,
+     "position": 3,
+     "displayNoNewLineWarning": false,
+     "text": " Call `main()` and inspect the output.",
+     "html": " Call <span class=\"pl-s\">`</span><span class=\"pl-c1\">main()</span><span class=\"pl-s\">`</span> and inspect the output.",
+     "left": 9,
+     "right": 9,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 10,
+     "position": 4,
+     "displayNoNewLineWarning": false,
+     "text": "+",
+     "html": "+",
+     "left": 9,
+     "right": 10,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 11,
+     "position": 5,
+     "displayNoNewLineWarning": false,
+     "text": "+## Troubleshooting",
+     "html": "+<span class=\"pl-mh\">## <span class=\"pl-en\">Troubleshooting</span></span>",
+     "left": 9,
+     "right": 11,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 12,
+     "position": 6,
+     "displayNoNewLineWarning": false,
+     "text": "+",
+     "html": "+",
+     "left": 9,
+     "right": 12,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 13,
+     "position": 7,
+     "displayNoNewLineWarning": false,
+     "text": "+If the build fails, check `config/settings.json`.",
+     "html": "+If the build fails, check <span class=\"pl-s\">`</span><span class=\"pl-c1\">config/settings.json</span><span class=\"pl-s\">`</span>.",
+     "left": 9,
+     "right": 13,
+     "problems": []
+    }
+   ],
+   "linesAdded": 4,
+   "linesChanged": 4,
+   "linesDeleted": 0,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": {
+    "mode": 100644,
+    "path": "docs/guide.md",
+    "lineCount": 9
+   },
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "docs/guide.md",
+    "lineCount": 13,
+    "isGenerated": false
+   },
+   "path": "docs/guide.md",
+   "pathDigest": "07fdd026b11c494c3b62c97f764f6939803c453389ebefd6b05e6f187d44859a",
+   "richDiff": {
+    "canToggleRichDiff": true,
+    "defaultToRichDiff": false,
+    "proseDiffHtml": null,
+    "dependencyDiffPath": null
+   },
+   "submodule": null,
+   "status": "MODIFIED",
+   "truncatedReason": null,
+   "diffSize": ""
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [
+    {
+     "type": "HUNK",
+     "blobLineNumber": 0,
+     "position": 0,
+     "displayNoNewLineWarning": false,
+     "text": "@@ -0,0 +1,3 @@",
+     "html": "@@ -0,0 +1,3 @@",
+     "left": null,
+     "right": 0,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 1,
+     "position": 1,
+     "displayNoNewLineWarning": false,
+     "text": "+# With space",
+     "html": "+<span class=\"pl-mh\"># <span class=\"pl-en\">With space</span></span>",
+     "left": null,
+     "right": 1,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 2,
+     "position": 2,
+     "displayNoNewLineWarning": false,
+     "text": "+",
+     "html": "+",
+     "left": null,
+     "right": 2,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 3,
+     "position": 3,
+     "displayNoNewLineWarning": false,
+     "text": "+This path contains a space.",
+     "html": "+This path contains a space.",
+     "left": null,
+     "right": 3,
+     "problems": []
+    }
+   ],
+   "linesAdded": 3,
+   "linesChanged": 3,
+   "linesDeleted": 0,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": null,
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "docs/with space.md",
+    "lineCount": 3,
+    "isGenerated": false
+   },
+   "path": "docs/with space.md",
+   "pathDigest": "18dd6a94f19504a2000702335ae31e0314fd15962cb44084afc4c8607cdb2fdb",
+   "richDiff": {
+    "canToggleRichDiff": true,
+    "defaultToRichDiff": false,
+    "proseDiffHtml": null,
+    "dependencyDiffPath": null
+   },
+   "submodule": null,
+   "status": "ADDED",
+   "truncatedReason": null,
+   "diffSize": ""
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": true,
+   "diffLines": [],
+   "linesAdded": 3000,
+   "linesChanged": 6000,
+   "linesDeleted": 3000,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": {
+    "mode": 100644,
+    "path": "generated/big.generated.ts",
+    "lineCount": 3003
+   },
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "generated/big.generated.ts",
+    "lineCount": 3003,
+    "isGenerated": false
+   },
+   "path": "generated/big.generated.ts",
+   "pathDigest": "06b5b0f9274111b82473a47d71b7aebc3ee1513d56b0a097f246a39c7d8987be",
+   "richDiff": null,
+   "submodule": null,
+   "status": "MODIFIED",
+   "truncatedReason": null,
+   "diffSize": ""
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [
+    {
+     "type": "HUNK",
+     "blobLineNumber": 0,
+     "position": 0,
+     "displayNoNewLineWarning": false,
+     "text": "@@ -1,7 +1,9 @@",
+     "html": "@@ -1,7 +1,9 @@",
+     "left": 0,
+     "right": 0,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 1,
+     "position": 1,
+     "displayNoNewLineWarning": false,
+     "text": " import sys",
+     "html": " <span class=pl-k>import</span> <span class=pl-s1>sys</span>",
+     "left": 1,
+     "right": 1,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 2,
+     "position": 2,
+     "displayNoNewLineWarning": false,
+     "text": " ",
+     "html": "<br>",
+     "left": 2,
+     "right": 2,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 3,
+     "position": 3,
+     "displayNoNewLineWarning": false,
+     "text": " ",
+     "html": "<br>",
+     "left": 3,
+     "right": 3,
+     "problems": []
+    },
+    {
+     "type": "DELETION",
+     "blobLineNumber": 4,
+     "position": 4,
+     "displayNoNewLineWarning": false,
+     "text": "-def build(target: str) -> str:",
+     "html": "-<span class=pl-k>def</span> <span class=pl-en>build</span>(<span class=pl-s1>target</span>: <span class=pl-smi>str</span>) <span class=pl-c1>-&gt;</span> <span class=pl-smi>str</span>:",
+     "left": 4,
+     "right": 3,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 4,
+     "position": 5,
+     "displayNoNewLineWarning": false,
+     "text": "+def build(target: str, verbose: bool = False) -> str:",
+     "html": "+<span class=pl-k>def</span> <span class=pl-en>build</span>(<span class=pl-s1>target</span>: <span class=pl-smi>str</span>, <span class=pl-s1>verbose</span>: <span class=pl-smi>bool</span> <span class=pl-c1>=</span> <span class=pl-c1>False</span>) <span class=pl-c1>-&gt;</span> <span class=pl-smi>str</span>:",
+     "left": 4,
+     "right": 4,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 5,
+     "position": 6,
+     "displayNoNewLineWarning": false,
+     "text": "+    if verbose:",
+     "html": "+    <span class=pl-k>if</span> <span class=pl-s1>verbose</span>:",
+     "left": 4,
+     "right": 5,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 6,
+     "position": 7,
+     "displayNoNewLineWarning": false,
+     "text": "+        print(\"building\", target)",
+     "html": "+        <span class=pl-en>print</span>(<span class=pl-s>&quot;building&quot;</span>, <span class=pl-s1>target</span>)",
+     "left": 4,
+     "right": 6,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 7,
+     "position": 8,
+     "displayNoNewLineWarning": false,
+     "text": "     return f\"built {target}\"",
+     "html": "     <span class=pl-k>return</span> <span class=pl-s>f&quot;built <span class=pl-s1><span class=pl-kos>{</span><span class=pl-s1>target</span><span class=pl-kos>}</span></span>&quot;</span>",
+     "left": 5,
+     "right": 7,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 8,
+     "position": 9,
+     "displayNoNewLineWarning": false,
+     "text": " ",
+     "html": "<br>",
+     "left": 6,
+     "right": 8,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 9,
+     "position": 10,
+     "displayNoNewLineWarning": false,
+     "text": " ",
+     "html": "<br>",
+     "left": 7,
+     "right": 9,
+     "problems": []
+    }
+   ],
+   "linesAdded": 3,
+   "linesChanged": 4,
+   "linesDeleted": 1,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": {
+    "mode": 100644,
+    "path": "scripts/build.py",
+    "lineCount": 9
+   },
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "scripts/build.py",
+    "lineCount": 11,
+    "isGenerated": false
+   },
+   "path": "scripts/build.py",
+   "pathDigest": "c786cc346fc8fdc17f1c85f11bc187c153a3511ae549390185c7c39343d2c95d",
+   "richDiff": null,
+   "submodule": null,
+   "status": "MODIFIED",
+   "truncatedReason": null,
+   "diffSize": ""
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [
+    {
+     "type": "HUNK",
+     "blobLineNumber": 0,
+     "position": 0,
+     "displayNoNewLineWarning": false,
+     "text": "@@ -0,0 +1,2 @@",
+     "html": "@@ -0,0 +1,2 @@",
+     "left": null,
+     "right": 0,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 1,
+     "position": 1,
+     "displayNoNewLineWarning": false,
+     "text": "+def extra():",
+     "html": "+<span class=pl-k>def</span> <span class=pl-en>extra</span>():",
+     "left": null,
+     "right": 1,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 2,
+     "position": 2,
+     "displayNoNewLineWarning": false,
+     "text": "+    return \"extra\"",
+     "html": "+    <span class=pl-k>return</span> <span class=pl-s>&quot;extra&quot;</span>",
+     "left": null,
+     "right": 2,
+     "problems": []
+    }
+   ],
+   "linesAdded": 2,
+   "linesChanged": 2,
+   "linesDeleted": 0,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": null,
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "scripts/extra.py",
+    "lineCount": 2,
+    "isGenerated": false
+   },
+   "path": "scripts/extra.py",
+   "pathDigest": "f5aa1594e34143648a8a8bdca4f0573fd4d9aad2804ee112ba72d197ea955e0f",
+   "richDiff": null,
+   "submodule": null,
+   "status": "ADDED",
+   "truncatedReason": null,
+   "diffSize": ""
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [
+    {
+     "type": "HUNK",
+     "blobLineNumber": 0,
+     "position": 0,
+     "displayNoNewLineWarning": false,
+     "text": "@@ -0,0 +1 @@",
+     "html": "@@ -0,0 +1 @@",
+     "left": null,
+     "right": 0,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 1,
+     "position": 1,
+     "displayNoNewLineWarning": false,
+     "text": "+export const commaPath = \"a,b\";",
+     "html": "+<span class=pl-k>export</span> <span class=pl-k>const</span> <span class=pl-s1>commaPath</span> <span class=pl-c1>=</span> <span class=pl-s>&quot;a,b&quot;</span><span class=pl-kos>;</span>",
+     "left": null,
+     "right": 1,
+     "problems": []
+    }
+   ],
+   "linesAdded": 1,
+   "linesChanged": 1,
+   "linesDeleted": 0,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": null,
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "src/a,b.ts",
+    "lineCount": 1,
+    "isGenerated": false
+   },
+   "path": "src/a,b.ts",
+   "pathDigest": "c27f9be39e50c1cb04b19cfa9b73649f526278aeca05e67a018ac7121d34ee6d",
+   "richDiff": null,
+   "submodule": null,
+   "status": "ADDED",
+   "truncatedReason": null,
+   "diffSize": ""
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [
+    {
+     "type": "HUNK",
+     "blobLineNumber": 0,
+     "position": 0,
+     "displayNoNewLineWarning": false,
+     "text": "@@ -0,0 +1,3 @@",
+     "html": "@@ -0,0 +1,3 @@",
+     "left": null,
+     "right": 0,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 1,
+     "position": 1,
+     "displayNoNewLineWarning": false,
+     "text": "+export function token(): string {",
+     "html": "+<span class=pl-k>export</span> <span class=pl-k>function</span> <span class=pl-en>token</span><span class=pl-kos>(</span><span class=pl-kos>)</span>: <span class=pl-smi>string</span> <span class=pl-kos>{</span>",
+     "left": null,
+     "right": 1,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 2,
+     "position": 2,
+     "displayNoNewLineWarning": false,
+     "text": "+  return \"placeholder\";",
+     "html": "+  <span class=pl-k>return</span> <span class=pl-s>&quot;placeholder&quot;</span><span class=pl-kos>;</span>",
+     "left": null,
+     "right": 2,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 3,
+     "position": 3,
+     "displayNoNewLineWarning": false,
+     "text": "+}",
+     "html": "+<span class=pl-kos>}</span>",
+     "left": null,
+     "right": 3,
+     "problems": []
+    }
+   ],
+   "linesAdded": 3,
+   "linesChanged": 3,
+   "linesDeleted": 0,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": null,
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "src/api/auth.ts",
+    "lineCount": 3,
+    "isGenerated": false
+   },
+   "path": "src/api/auth.ts",
+   "pathDigest": "4937285c2d1210b2f5924375f6eab1a4a2f084debdc5034adf1a15595632ae9c",
+   "richDiff": null,
+   "submodule": null,
+   "status": "ADDED",
+   "truncatedReason": null,
+   "diffSize": ""
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [
+    {
+     "type": "HUNK",
+     "blobLineNumber": 0,
+     "position": 0,
+     "displayNoNewLineWarning": false,
+     "text": "@@ -1,8 +1,10 @@",
+     "html": "@@ -1,8 +1,10 @@",
+     "left": 0,
+     "right": 0,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 1,
+     "position": 1,
+     "displayNoNewLineWarning": false,
+     "text": " export interface ButtonProps {",
+     "html": " <span class=pl-k>export</span> <span class=pl-k>interface</span> <span class=pl-smi>ButtonProps</span> <span class=pl-kos>{</span>",
+     "left": 1,
+     "right": 1,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 2,
+     "position": 2,
+     "displayNoNewLineWarning": false,
+     "text": "   id: string;",
+     "html": "   <span class=pl-c1>id</span>: <span class=pl-smi>string</span><span class=pl-kos>;</span>",
+     "left": 2,
+     "right": 2,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 3,
+     "position": 3,
+     "displayNoNewLineWarning": false,
+     "text": "   label: string;",
+     "html": "   <span class=pl-c1>label</span>: <span class=pl-smi>string</span><span class=pl-kos>;</span>",
+     "left": 3,
+     "right": 3,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 4,
+     "position": 4,
+     "displayNoNewLineWarning": false,
+     "text": "+  disabled?: boolean;",
+     "html": "+  <span class=pl-c1>disabled</span>?: <span class=pl-smi>boolean</span><span class=pl-kos>;</span>",
+     "left": 3,
+     "right": 4,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 5,
+     "position": 5,
+     "displayNoNewLineWarning": false,
+     "text": " }",
+     "html": " <span class=pl-kos>}</span>",
+     "left": 4,
+     "right": 5,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 6,
+     "position": 6,
+     "displayNoNewLineWarning": false,
+     "text": " ",
+     "html": "<br>",
+     "left": 5,
+     "right": 6,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 7,
+     "position": 7,
+     "displayNoNewLineWarning": false,
+     "text": " export function renderButton(p: ButtonProps): string {",
+     "html": " <span class=pl-k>export</span> <span class=pl-k>function</span> <span class=pl-en>renderButton</span><span class=pl-kos>(</span><span class=pl-s1>p</span>: <span class=pl-smi>ButtonProps</span><span class=pl-kos>)</span>: <span class=pl-smi>string</span> <span class=pl-kos>{</span>",
+     "left": 6,
+     "right": 7,
+     "problems": []
+    },
+    {
+     "type": "DELETION",
+     "blobLineNumber": 7,
+     "position": 8,
+     "displayNoNewLineWarning": false,
+     "text": "-  return `<div id=\"${p.id}\">${p.label}</div>`;",
+     "html": "-  <span class=pl-k>return</span> <span class=pl-s>`&lt;div id=&quot;<span class=pl-s1><span class=pl-kos>${</span><span class=pl-s1>p</span><span class=pl-kos>.</span><span class=pl-c1>id</span><span class=pl-kos>}</span></span>&quot;&gt;<span class=pl-s1><span class=pl-kos>${</span><span class=pl-s1>p</span><span class=pl-kos>.</span><span class=pl-c1>label</span><span class=pl-kos>}</span></span>&lt;/div&gt;`</span><span class=pl-kos>;</span>",
+     "left": 7,
+     "right": 7,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 8,
+     "position": 9,
+     "displayNoNewLineWarning": false,
+     "text": "+  const attr = p.disabled ? \" disabled\" : \"\";",
+     "html": "+  <span class=pl-k>const</span> <span class=pl-s1>attr</span> <span class=pl-c1>=</span> <span class=pl-s1>p</span><span class=pl-kos>.</span><span class=pl-c1>disabled</span> ? <span class=pl-s>&quot; disabled&quot;</span> : <span class=pl-s>&quot;&quot;</span><span class=pl-kos>;</span>",
+     "left": 7,
+     "right": 8,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 9,
+     "position": 10,
+     "displayNoNewLineWarning": false,
+     "text": "+  return `<button id=\"${p.id}\"${attr}>${p.label}</button>`;",
+     "html": "+  <span class=pl-k>return</span> <span class=pl-s>`&lt;button id=&quot;<span class=pl-s1><span class=pl-kos>${</span><span class=pl-s1>p</span><span class=pl-kos>.</span><span class=pl-c1>id</span><span class=pl-kos>}</span></span>&quot;<span class=pl-s1><span class=pl-kos>${</span><span class=pl-s1>attr</span><span class=pl-kos>}</span></span>&gt;<span class=pl-s1><span class=pl-kos>${</span><span class=pl-s1>p</span><span class=pl-kos>.</span><span class=pl-c1>label</span><span class=pl-kos>}</span></span>&lt;/button&gt;`</span><span class=pl-kos>;</span>",
+     "left": 7,
+     "right": 9,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 10,
+     "position": 11,
+     "displayNoNewLineWarning": false,
+     "text": " }",
+     "html": " <span class=pl-kos>}</span>",
+     "left": 8,
+     "right": 10,
+     "problems": []
+    }
+   ],
+   "linesAdded": 3,
+   "linesChanged": 4,
+   "linesDeleted": 1,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": {
+    "mode": 100644,
+    "path": "src/components/Button.ts",
+    "lineCount": 8
+   },
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "src/components/Button.ts",
+    "lineCount": 10,
+    "isGenerated": false
+   },
+   "path": "src/components/Button.ts",
+   "pathDigest": "8a45107d4ada11a47e7a2043c725674696a721d8486474d52ae7f5db7c0967cd",
+   "richDiff": null,
+   "submodule": null,
+   "status": "MODIFIED",
+   "truncatedReason": null,
+   "diffSize": ""
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [
+    {
+     "type": "HUNK",
+     "blobLineNumber": 0,
+     "position": 0,
+     "displayNoNewLineWarning": false,
+     "text": "@@ -0,0 +1,3 @@",
+     "html": "@@ -0,0 +1,3 @@",
+     "left": null,
+     "right": 0,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 1,
+     "position": 1,
+     "displayNoNewLineWarning": false,
+     "text": "+export function renderTooltip(text: string): string {",
+     "html": "+<span class=pl-k>export</span> <span class=pl-k>function</span> <span class=pl-en>renderTooltip</span><span class=pl-kos>(</span><span class=pl-s1>text</span>: <span class=pl-smi>string</span><span class=pl-kos>)</span>: <span class=pl-smi>string</span> <span class=pl-kos>{</span>",
+     "left": null,
+     "right": 1,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 2,
+     "position": 2,
+     "displayNoNewLineWarning": false,
+     "text": "+  return `<span title=\"${text}\"></span>`;",
+     "html": "+  <span class=pl-k>return</span> <span class=pl-s>`&lt;span title=&quot;<span class=pl-s1><span class=pl-kos>${</span><span class=pl-s1>text</span><span class=pl-kos>}</span></span>&quot;&gt;&lt;/span&gt;`</span><span class=pl-kos>;</span>",
+     "left": null,
+     "right": 2,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 3,
+     "position": 3,
+     "displayNoNewLineWarning": false,
+     "text": "+}",
+     "html": "+<span class=pl-kos>}</span>",
+     "left": null,
+     "right": 3,
+     "problems": []
+    }
+   ],
+   "linesAdded": 3,
+   "linesChanged": 3,
+   "linesDeleted": 0,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": null,
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "src/components/Tooltip.ts",
+    "lineCount": 3,
+    "isGenerated": false
+   },
+   "path": "src/components/Tooltip.ts",
+   "pathDigest": "8b85db1ed64a19ef8d483af6d8af1430516237f7af6f3beb924ad399011049e4",
+   "richDiff": null,
+   "submodule": null,
+   "status": "ADDED",
+   "truncatedReason": null,
+   "diffSize": ""
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [
+    {
+     "type": "HUNK",
+     "blobLineNumber": 0,
+     "position": 0,
+     "displayNoNewLineWarning": false,
+     "text": "@@ -0,0 +1 @@",
+     "html": "@@ -0,0 +1 @@",
+     "left": null,
+     "right": 0,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 1,
+     "position": 1,
+     "displayNoNewLineWarning": false,
+     "text": "+export const hashPct = \"hash#pct%\";",
+     "html": "+<span class=pl-k>export</span> <span class=pl-k>const</span> <span class=pl-s1>hashPct</span> <span class=pl-c1>=</span> <span class=pl-s>&quot;hash#pct%&quot;</span><span class=pl-kos>;</span>",
+     "left": null,
+     "right": 1,
+     "problems": []
+    }
+   ],
+   "linesAdded": 1,
+   "linesChanged": 1,
+   "linesDeleted": 0,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": null,
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "src/hash#pct%.ts",
+    "lineCount": 1,
+    "isGenerated": false
+   },
+   "path": "src/hash#pct%.ts",
+   "pathDigest": "5dba4050672fe376cda709ba0e61cd09be7250b7edde6e3d09b248164b4aa1a9",
+   "richDiff": null,
+   "submodule": null,
+   "status": "ADDED",
+   "truncatedReason": null,
+   "diffSize": ""
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [],
+   "linesAdded": 0,
+   "linesChanged": 0,
+   "linesDeleted": 0,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": {
+    "mode": 100644,
+    "path": "src/legacy/old-name.ts",
+    "lineCount": 0
+   },
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "src/legacy/renamed-pure.ts",
+    "lineCount": 14,
+    "isGenerated": false
+   },
+   "path": "src/legacy/renamed-pure.ts",
+   "pathDigest": "c2aee3b575e054efbfc593bf66f024153b80076b4a18f9343c1fda0cc614a95e",
+   "richDiff": null,
+   "submodule": null,
+   "status": "RENAMED",
+   "truncatedReason": null,
+   "diffSize": ""
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [
+    {
+     "type": "HUNK",
+     "blobLineNumber": 0,
+     "position": 0,
+     "displayNoNewLineWarning": false,
+     "text": "@@ -1,4 +1,4 @@",
+     "html": "@@ -1,4 +1,4 @@",
+     "left": 0,
+     "right": 0,
+     "problems": []
+    },
+    {
+     "type": "DELETION",
+     "blobLineNumber": 1,
+     "position": 1,
+     "displayNoNewLineWarning": false,
+     "text": "-// Rename-with-edit candidate.",
+     "html": "-<span class=\"pl-c\">// <span class=\"x x-first x-last\">Rename-with-edit candidate</span>.</span>",
+     "left": 1,
+     "right": 0,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 1,
+     "position": 2,
+     "displayNoNewLineWarning": false,
+     "text": "+// Renamed and lightly edited.",
+     "html": "+<span class=\"pl-c\">// <span class=\"x x-first x-last\">Renamed and lightly edited</span>.</span>",
+     "left": 1,
+     "right": 1,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 2,
+     "position": 3,
+     "displayNoNewLineWarning": false,
+     "text": " export function helperOne(n: number): number {",
+     "html": " <span class=pl-k>export</span> <span class=pl-k>function</span> <span class=pl-en>helperOne</span><span class=pl-kos>(</span><span class=pl-s1>n</span>: <span class=pl-smi>number</span><span class=pl-kos>)</span>: <span class=pl-smi>number</span> <span class=pl-kos>{</span>",
+     "left": 2,
+     "right": 2,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 3,
+     "position": 4,
+     "displayNoNewLineWarning": false,
+     "text": "   return n + 1;",
+     "html": "   <span class=pl-k>return</span> <span class=pl-s1>n</span> <span class=pl-c1>+</span> <span class=pl-c1>1</span><span class=pl-kos>;</span>",
+     "left": 3,
+     "right": 3,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 4,
+     "position": 5,
+     "displayNoNewLineWarning": false,
+     "text": " }",
+     "html": " <span class=pl-kos>}</span>",
+     "left": 4,
+     "right": 4,
+     "problems": []
+    },
+    {
+     "type": "HUNK",
+     "blobLineNumber": 11,
+     "position": 6,
+     "displayNoNewLineWarning": false,
+     "text": "@@ -12,5 +12,5 @@ export function helperThree(n: number): number {",
+     "html": "@@ -12,5 +12,5 @@ export function helperThree(n: number): number {",
+     "left": 11,
+     "right": 11,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 12,
+     "position": 7,
+     "displayNoNewLineWarning": false,
+     "text": " }",
+     "html": " <span class=pl-kos>}</span>",
+     "left": 12,
+     "right": 12,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 13,
+     "position": 8,
+     "displayNoNewLineWarning": false,
+     "text": " ",
+     "html": "<br>",
+     "left": 13,
+     "right": 13,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 14,
+     "position": 9,
+     "displayNoNewLineWarning": false,
+     "text": " export function helperFour(n: number): number {",
+     "html": " <span class=pl-k>export</span> <span class=pl-k>function</span> <span class=pl-en>helperFour</span><span class=pl-kos>(</span><span class=pl-s1>n</span>: <span class=pl-smi>number</span><span class=pl-kos>)</span>: <span class=pl-smi>number</span> <span class=pl-kos>{</span>",
+     "left": 14,
+     "right": 14,
+     "problems": []
+    },
+    {
+     "type": "DELETION",
+     "blobLineNumber": 15,
+     "position": 10,
+     "displayNoNewLineWarning": false,
+     "text": "-  return n + 4;",
+     "html": "-  <span class=\"pl-k\">return</span> <span class=\"pl-s1\">n</span> <span class=\"pl-c1\">+</span> <span class=\"pl-c1 x x-first x-last\">4</span><span class=\"pl-kos\">;</span>",
+     "left": 15,
+     "right": 14,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 15,
+     "position": 11,
+     "displayNoNewLineWarning": false,
+     "text": "+  return n + 40;",
+     "html": "+  <span class=\"pl-k\">return</span> <span class=\"pl-s1\">n</span> <span class=\"pl-c1\">+</span> <span class=\"pl-c1 x x-first x-last\">40</span><span class=\"pl-kos\">;</span>",
+     "left": 15,
+     "right": 15,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 16,
+     "position": 12,
+     "displayNoNewLineWarning": false,
+     "text": " }",
+     "html": " <span class=pl-kos>}</span>",
+     "left": 16,
+     "right": 16,
+     "problems": []
+    }
+   ],
+   "linesAdded": 2,
+   "linesChanged": 4,
+   "linesDeleted": 2,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": {
+    "mode": 100644,
+    "path": "src/legacy/helper.ts",
+    "lineCount": 16
+   },
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "src/modern/helper-renamed.ts",
+    "lineCount": 16,
+    "isGenerated": false
+   },
+   "path": "src/modern/helper-renamed.ts",
+   "pathDigest": "caaca0684115299248dc05e6935fc9704efedce8bd3dd2805f807fd9ae471038",
+   "richDiff": null,
+   "submodule": null,
+   "status": "RENAMED",
+   "truncatedReason": null,
+   "diffSize": ""
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [],
+   "linesAdded": 0,
+   "linesChanged": 6,
+   "linesDeleted": 6,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": {
+    "mode": 100644,
+    "path": "src/obsolete.ts",
+    "lineCount": 6
+   },
+   "newTreeEntry": null,
+   "path": "src/obsolete.ts",
+   "pathDigest": "26cb77e2b1d2fb7497c683d4f02af1c1af54c47ecc62dfa180f471626b42895e",
+   "richDiff": null,
+   "submodule": null,
+   "status": "REMOVED",
+   "truncatedReason": null,
+   "diffSize": ""
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [
+    {
+     "type": "HUNK",
+     "blobLineNumber": 6,
+     "position": 0,
+     "displayNoNewLineWarning": false,
+     "text": "@@ -7,5 +7,12 @@ export function mul(a: number, b: number): number {",
+     "html": "@@ -7,5 +7,12 @@ export function mul(a: number, b: number): number {",
+     "left": 6,
+     "right": 6,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 7,
+     "position": 1,
+     "displayNoNewLineWarning": false,
+     "text": " }",
+     "html": " <span class=pl-kos>}</span>",
+     "left": 7,
+     "right": 7,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 8,
+     "position": 2,
+     "displayNoNewLineWarning": false,
+     "text": " ",
+     "html": "<br>",
+     "left": 8,
+     "right": 8,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 9,
+     "position": 3,
+     "displayNoNewLineWarning": false,
+     "text": " export function clamp(v: number, lo: number, hi: number): number {",
+     "html": " <span class=pl-k>export</span> <span class=pl-k>function</span> <span class=pl-en>clamp</span><span class=pl-kos>(</span><span class=pl-s1>v</span>: <span class=pl-smi>number</span><span class=pl-kos>,</span> <span class=pl-s1>lo</span>: <span class=pl-smi>number</span><span class=pl-kos>,</span> <span class=pl-s1>hi</span>: <span class=pl-smi>number</span><span class=pl-kos>)</span>: <span class=pl-smi>number</span> <span class=pl-kos>{</span>",
+     "left": 9,
+     "right": 9,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 10,
+     "position": 4,
+     "displayNoNewLineWarning": false,
+     "text": "+  if (hi < lo) {",
+     "html": "+  <span class=pl-k>if</span> <span class=pl-kos>(</span><span class=pl-s1>hi</span> <span class=pl-c1>&lt;</span> <span class=pl-s1>lo</span><span class=pl-kos>)</span> <span class=pl-kos>{</span>",
+     "left": 9,
+     "right": 10,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 11,
+     "position": 5,
+     "displayNoNewLineWarning": false,
+     "text": "+    throw new RangeError(\"lo must be <= hi\");",
+     "html": "+    <span class=pl-k>throw</span> <span class=pl-k>new</span> <span class=pl-v>RangeError</span><span class=pl-kos>(</span><span class=pl-s>&quot;lo must be &lt;= hi&quot;</span><span class=pl-kos>)</span><span class=pl-kos>;</span>",
+     "left": 9,
+     "right": 11,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 12,
+     "position": 6,
+     "displayNoNewLineWarning": false,
+     "text": "+  }",
+     "html": "+  <span class=pl-kos>}</span>",
+     "left": 9,
+     "right": 12,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 13,
+     "position": 7,
+     "displayNoNewLineWarning": false,
+     "text": "   return Math.min(hi, Math.max(lo, v));",
+     "html": "   <span class=pl-k>return</span> <span class=pl-v>Math</span><span class=pl-kos>.</span><span class=pl-en>min</span><span class=pl-kos>(</span><span class=pl-s1>hi</span><span class=pl-kos>,</span> <span class=pl-v>Math</span><span class=pl-kos>.</span><span class=pl-en>max</span><span class=pl-kos>(</span><span class=pl-s1>lo</span><span class=pl-kos>,</span> <span class=pl-s1>v</span><span class=pl-kos>)</span><span class=pl-kos>)</span><span class=pl-kos>;</span>",
+     "left": 10,
+     "right": 13,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 14,
+     "position": 8,
+     "displayNoNewLineWarning": false,
+     "text": " }",
+     "html": " <span class=pl-kos>}</span>",
+     "left": 11,
+     "right": 14,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 15,
+     "position": 9,
+     "displayNoNewLineWarning": false,
+     "text": "+",
+     "html": "+",
+     "left": 11,
+     "right": 15,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 16,
+     "position": 10,
+     "displayNoNewLineWarning": false,
+     "text": "+export function sub(a: number, b: number): number {",
+     "html": "+<span class=pl-k>export</span> <span class=pl-k>function</span> <span class=pl-en>sub</span><span class=pl-kos>(</span><span class=pl-s1>a</span>: <span class=pl-smi>number</span><span class=pl-kos>,</span> <span class=pl-s1>b</span>: <span class=pl-smi>number</span><span class=pl-kos>)</span>: <span class=pl-smi>number</span> <span class=pl-kos>{</span>",
+     "left": 11,
+     "right": 16,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 17,
+     "position": 11,
+     "displayNoNewLineWarning": false,
+     "text": "+  return a - b;",
+     "html": "+  <span class=pl-k>return</span> <span class=pl-s1>a</span> <span class=pl-c1>-</span> <span class=pl-s1>b</span><span class=pl-kos>;</span>",
+     "left": 11,
+     "right": 17,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 18,
+     "position": 12,
+     "displayNoNewLineWarning": false,
+     "text": "+}",
+     "html": "+<span class=pl-kos>}</span>",
+     "left": 11,
+     "right": 18,
+     "problems": []
+    }
+   ],
+   "linesAdded": 7,
+   "linesChanged": 7,
+   "linesDeleted": 0,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": {
+    "mode": 100644,
+    "path": "src/util/math.ts",
+    "lineCount": 11
+   },
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "src/util/math.ts",
+    "lineCount": 18,
+    "isGenerated": false
+   },
+   "path": "src/util/math.ts",
+   "pathDigest": "36e12a9d7b7ff7c881e621047079153c0689eaee85697ed8f3267dcdc68fe9ce",
+   "richDiff": null,
+   "submodule": null,
+   "status": "MODIFIED",
+   "truncatedReason": null,
+   "diffSize": ""
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [
+    {
+     "type": "HUNK",
+     "blobLineNumber": 0,
+     "position": 0,
+     "displayNoNewLineWarning": false,
+     "text": "@@ -1,9 +1,9 @@",
+     "html": "@@ -1,9 +1,9 @@",
+     "left": 0,
+     "right": 0,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 1,
+     "position": 1,
+     "displayNoNewLineWarning": false,
+     "text": " export function sumAll(values: number[]): number {",
+     "html": " <span class=pl-k>export</span> <span class=pl-k>function</span> <span class=pl-en>sumAll</span><span class=pl-kos>(</span><span class=pl-s1>values</span>: <span class=pl-smi>number</span><span class=pl-kos>[</span><span class=pl-kos>]</span><span class=pl-kos>)</span>: <span class=pl-smi>number</span> <span class=pl-kos>{</span>",
+     "left": 1,
+     "right": 1,
+     "problems": []
+    },
+    {
+     "type": "DELETION",
+     "blobLineNumber": 2,
+     "position": 2,
+     "displayNoNewLineWarning": false,
+     "text": "-  let total = 0;",
+     "html": "-  <span class=pl-k>let</span> <span class=pl-s1>total</span> <span class=pl-c1>=</span> <span class=pl-c1>0</span><span class=pl-kos>;</span>",
+     "left": 2,
+     "right": 1,
+     "problems": []
+    },
+    {
+     "type": "DELETION",
+     "blobLineNumber": 3,
+     "position": 3,
+     "displayNoNewLineWarning": false,
+     "text": "-  for (const v of values) {",
+     "html": "-  <span class=pl-k>for</span> <span class=pl-kos>(</span><span class=pl-k>const</span> <span class=pl-s1>v</span> <span class=pl-k>of</span> <span class=pl-s1>values</span><span class=pl-kos>)</span> <span class=pl-kos>{</span>",
+     "left": 3,
+     "right": 1,
+     "problems": []
+    },
+    {
+     "type": "DELETION",
+     "blobLineNumber": 4,
+     "position": 4,
+     "displayNoNewLineWarning": false,
+     "text": "-    if (v > 0) {",
+     "html": "-    <span class=pl-k>if</span> <span class=pl-kos>(</span><span class=pl-s1>v</span> <span class=pl-c1>&gt;</span> <span class=pl-c1>0</span><span class=pl-kos>)</span> <span class=pl-kos>{</span>",
+     "left": 4,
+     "right": 1,
+     "problems": []
+    },
+    {
+     "type": "DELETION",
+     "blobLineNumber": 5,
+     "position": 5,
+     "displayNoNewLineWarning": false,
+     "text": "-      total += v;",
+     "html": "-      <span class=pl-s1>total</span> <span class=pl-c1>+=</span> <span class=pl-s1>v</span><span class=pl-kos>;</span>",
+     "left": 5,
+     "right": 1,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 2,
+     "position": 6,
+     "displayNoNewLineWarning": false,
+     "text": "+    let total = 0;",
+     "html": "+    <span class=pl-k>let</span> <span class=pl-s1>total</span> <span class=pl-c1>=</span> <span class=pl-c1>0</span><span class=pl-kos>;</span>",
+     "left": 5,
+     "right": 2,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 3,
+     "position": 7,
+     "displayNoNewLineWarning": false,
+     "text": "+    for (const v of values) {",
+     "html": "+    <span class=pl-k>for</span> <span class=pl-kos>(</span><span class=pl-k>const</span> <span class=pl-s1>v</span> <span class=pl-k>of</span> <span class=pl-s1>values</span><span class=pl-kos>)</span> <span class=pl-kos>{</span>",
+     "left": 5,
+     "right": 3,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 4,
+     "position": 8,
+     "displayNoNewLineWarning": false,
+     "text": "+        if (v > 0) {",
+     "html": "+        <span class=pl-k>if</span> <span class=pl-kos>(</span><span class=pl-s1>v</span> <span class=pl-c1>&gt;</span> <span class=pl-c1>0</span><span class=pl-kos>)</span> <span class=pl-kos>{</span>",
+     "left": 5,
+     "right": 4,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 5,
+     "position": 9,
+     "displayNoNewLineWarning": false,
+     "text": "+            total += v;",
+     "html": "+            <span class=pl-s1>total</span> <span class=pl-c1>+=</span> <span class=pl-s1>v</span><span class=pl-kos>;</span>",
+     "left": 5,
+     "right": 5,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 6,
+     "position": 10,
+     "displayNoNewLineWarning": false,
+     "text": "+        }",
+     "html": "+        <span class=pl-kos>}</span>",
+     "left": 5,
+     "right": 6,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 7,
+     "position": 11,
+     "displayNoNewLineWarning": false,
+     "text": "     }",
+     "html": "     <span class=pl-kos>}</span>",
+     "left": 6,
+     "right": 7,
+     "problems": []
+    },
+    {
+     "type": "DELETION",
+     "blobLineNumber": 7,
+     "position": 12,
+     "displayNoNewLineWarning": false,
+     "text": "-  }",
+     "html": "-  <span class=pl-kos>}</span>",
+     "left": 7,
+     "right": 7,
+     "problems": []
+    },
+    {
+     "type": "DELETION",
+     "blobLineNumber": 8,
+     "position": 13,
+     "displayNoNewLineWarning": false,
+     "text": "-  return total;",
+     "html": "-  <span class=pl-k>return</span> <span class=pl-s1>total</span><span class=pl-kos>;</span>",
+     "left": 8,
+     "right": 7,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 8,
+     "position": 14,
+     "displayNoNewLineWarning": false,
+     "text": "+    return total;",
+     "html": "+    <span class=pl-k>return</span> <span class=pl-s1>total</span><span class=pl-kos>;</span>",
+     "left": 8,
+     "right": 8,
+     "problems": []
+    },
+    {
+     "type": "CONTEXT",
+     "blobLineNumber": 9,
+     "position": 15,
+     "displayNoNewLineWarning": false,
+     "text": " }",
+     "html": " <span class=pl-kos>}</span>",
+     "left": 9,
+     "right": 9,
+     "problems": []
+    }
+   ],
+   "linesAdded": 6,
+   "linesChanged": 12,
+   "linesDeleted": 6,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": {
+    "mode": 100644,
+    "path": "src/whitespace.ts",
+    "lineCount": 9
+   },
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "src/whitespace.ts",
+    "lineCount": 9,
+    "isGenerated": false
+   },
+   "path": "src/whitespace.ts",
+   "pathDigest": "5efef5381cb99c0a491a4e0249b2a428e8c28dcb8dbb504eb122e060d40cde86",
+   "richDiff": null,
+   "submodule": null,
+   "status": "MODIFIED",
+   "truncatedReason": null,
+   "diffSize": ""
+  },
+  {
+   "isBinary": false,
+   "isSubmodule": false,
+   "isTooBig": false,
+   "diffLines": [
+    {
+     "type": "HUNK",
+     "blobLineNumber": 0,
+     "position": 0,
+     "displayNoNewLineWarning": false,
+     "text": "@@ -0,0 +1 @@",
+     "html": "@@ -0,0 +1 @@",
+     "left": null,
+     "right": 0,
+     "problems": []
+    },
+    {
+     "type": "ADDITION",
+     "blobLineNumber": 1,
+     "position": 1,
+     "displayNoNewLineWarning": false,
+     "text": "+export const unicodePath = \"ünï/cödé\";",
+     "html": "+<span class=pl-k>export</span> <span class=pl-k>const</span> <span class=pl-s1>unicodePath</span> <span class=pl-c1>=</span> <span class=pl-s>&quot;ünï/cödé&quot;</span><span class=pl-kos>;</span>",
+     "left": null,
+     "right": 1,
+     "problems": []
+    }
+   ],
+   "linesAdded": 1,
+   "linesChanged": 1,
+   "linesDeleted": 0,
+   "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+   "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+   "oldTreeEntry": null,
+   "newTreeEntry": {
+    "mode": 100644,
+    "path": "src/ünï/cödé.ts",
+    "lineCount": 1,
+    "isGenerated": false
+   },
+   "path": "src/ünï/cödé.ts",
+   "pathDigest": "66726140134a174a12b142a64114e96d21950adb32272decaa5f4df74c03934a",
+   "richDiff": null,
+   "submodule": null,
+   "status": "ADDED",
+   "truncatedReason": null,
+   "diffSize": ""
+  }
+ ]
+}

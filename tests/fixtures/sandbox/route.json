@@ -1,0 +1,1488 @@
+{
+ "meta": {
+  "title": "review-me: sandbox fixture PR by dangh · Pull Request #1 · dangh/pierre-sandbox"
+ },
+ "payload": {
+  "pullRequestsChangesRoute": {
+   "isSingleFileMode": false,
+   "bannersData": {
+    "banners": {
+     "dependabotAutomatedSecurityUpdates": {
+      "render": false
+     },
+     "pausedDependabotUpdate": {
+      "render": false
+     },
+     "hiddenCharacterWarning": {
+      "render": false
+     },
+     "reviewRequestBanner": {
+      "render": false
+     },
+     "canStackBanner": {
+      "render": false
+     }
+    }
+   },
+   "changeGroupGeneration": {
+    "canAccessChangeGroups": false,
+    "changeGroupFeedbackOptions": [
+     {
+      "label": "Groups contain changes that do not belong together",
+      "value": "NOT_RELEVANT"
+     },
+     {
+      "label": "Groups are harmful or unsafe",
+      "value": "OFFENSIVE_OR_DISCRIMINATORY"
+     },
+     {
+      "label": "Groups are poorly formatted",
+      "value": "POORLY_FORMATTED"
+     },
+     {
+      "label": "Groups are not helpful",
+      "value": "NOT_HELPFUL"
+     },
+     {
+      "label": "Groups miss changes that should be included",
+      "value": "MISSED_CONTENT"
+     },
+     {
+      "label": "Other",
+      "value": "OTHER"
+     }
+    ],
+    "changeGroups": [],
+    "unavailableReason": null,
+    "latestChangeGroupOrchestration": null
+   },
+   "codeowners": null,
+   "commits": [
+    {
+     "actorLogin": "dangh",
+     "createdAt": "2026-10-17T13:54:01+08:00",
+     "messageHeadline": "Modify modules, regenerate big file, update logo",
+     "oid": "cea92ff4bf65d273a06045ac7a1789bdc49ca83e",
+     "shortOid": "cea92ff"
+    },
+    {
+     "actorLogin": "dangh",
+     "createdAt": "2026-10-17T13:54:01+08:00",
+     "messageHeadline": "Add new files and awkward paths, delete obsolete module",
+     "oid": "13872817c0b4c329f9b4d02f7230dfd32ab6979d",
+     "shortOid": "1387281"
+    },
+    {
+     "actorLogin": "dangh",
+     "createdAt": "2026-10-17T13:54:01+08:00",
+     "messageHeadline": "Rename legacy files and reindent whitespace",
+     "oid": "324e2352e3e3db6a716b79fb84951521b0647cb7",
+     "shortOid": "324e235"
+    },
+    {
+     "actorLogin": "dangh",
+     "createdAt": "2026-10-17T14:26:39+08:00",
+     "messageHeadline": "Flip clamp guard comparison",
+     "oid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+     "shortOid": "72a3709"
+    }
+   ],
+   "comparison": {
+    "fullDiff": {
+     "baseOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+     "headOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58"
+    },
+    "selectedRange": null,
+    "viewing": "FULL"
+   },
+   "diffSummaries": [
+    {
+     "changeType": "ADDED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 0,
+     "linesChanged": 0,
+     "linesDeleted": 0,
+     "markedAsViewed": false,
+     "path": "assets/added.png",
+     "pathDigest": "f7a6cbf0a999c8facc8095aaa1ca4f22f1fc93a69eb7e4f9c99c7e8e226ac56b",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    },
+    {
+     "changeType": "MODIFIED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 0,
+     "linesChanged": 0,
+     "linesDeleted": 0,
+     "markedAsViewed": false,
+     "path": "assets/logo.png",
+     "pathDigest": "90580d12fbd0edace7745ba49a090bc882d32c9f7d6bfa1345df935f7a6816d3",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    },
+    {
+     "changeType": "MODIFIED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 3,
+     "linesChanged": 6,
+     "linesDeleted": 3,
+     "markedAsViewed": false,
+     "path": "config/settings.json",
+     "pathDigest": "980db14c03a9eed03f20baa57544d31f7131f368c35acc5c73f63713be77e81c",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    },
+    {
+     "changeType": "ADDED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 3,
+     "linesChanged": 3,
+     "linesDeleted": 0,
+     "markedAsViewed": false,
+     "path": "docs/changelog.md",
+     "pathDigest": "77f023b99d3d58008351d3e82fc06e6d06ba1bc2da9e41be6329b7fa4f419f05",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    },
+    {
+     "changeType": "MODIFIED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 4,
+     "linesChanged": 4,
+     "linesDeleted": 0,
+     "markedAsViewed": false,
+     "path": "docs/guide.md",
+     "pathDigest": "07fdd026b11c494c3b62c97f764f6939803c453389ebefd6b05e6f187d44859a",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    },
+    {
+     "changeType": "ADDED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 3,
+     "linesChanged": 3,
+     "linesDeleted": 0,
+     "markedAsViewed": false,
+     "path": "docs/with space.md",
+     "pathDigest": "18dd6a94f19504a2000702335ae31e0314fd15962cb44084afc4c8607cdb2fdb",
+     "highestAnnotationLevel": null,
+     "markersMap": {
+      "FILE": {
+       "threads": [
+        {
+         "id": 2910292428
+        }
+       ],
+       "annotations": []
+      }
+     },
+     "isSymlink": false
+    },
+    {
+     "changeType": "MODIFIED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 3000,
+     "linesChanged": 6000,
+     "linesDeleted": 3000,
+     "markedAsViewed": false,
+     "path": "generated/big.generated.ts",
+     "pathDigest": "06b5b0f9274111b82473a47d71b7aebc3ee1513d56b0a097f246a39c7d8987be",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    },
+    {
+     "changeType": "MODIFIED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 3,
+     "linesChanged": 4,
+     "linesDeleted": 1,
+     "markedAsViewed": false,
+     "path": "scripts/build.py",
+     "pathDigest": "c786cc346fc8fdc17f1c85f11bc187c153a3511ae549390185c7c39343d2c95d",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    },
+    {
+     "changeType": "ADDED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 2,
+     "linesChanged": 2,
+     "linesDeleted": 0,
+     "markedAsViewed": false,
+     "path": "scripts/extra.py",
+     "pathDigest": "f5aa1594e34143648a8a8bdca4f0573fd4d9aad2804ee112ba72d197ea955e0f",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    },
+    {
+     "changeType": "ADDED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 3,
+     "linesChanged": 3,
+     "linesDeleted": 0,
+     "markedAsViewed": false,
+     "path": "src/api/auth.ts",
+     "pathDigest": "4937285c2d1210b2f5924375f6eab1a4a2f084debdc5034adf1a15595632ae9c",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    },
+    {
+     "changeType": "MODIFIED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 3,
+     "linesChanged": 4,
+     "linesDeleted": 1,
+     "markedAsViewed": false,
+     "path": "src/components/Button.ts",
+     "pathDigest": "8a45107d4ada11a47e7a2043c725674696a721d8486474d52ae7f5db7c0967cd",
+     "highestAnnotationLevel": null,
+     "markersMap": {
+      "R9": {
+       "threads": [
+        {
+         "id": 2910292404,
+         "start": "R8"
+        }
+       ],
+       "annotations": [],
+       "ctx": [
+        5,
+        12
+       ]
+      }
+     },
+     "isSymlink": false
+    },
+    {
+     "changeType": "ADDED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 3,
+     "linesChanged": 3,
+     "linesDeleted": 0,
+     "markedAsViewed": false,
+     "path": "src/components/Tooltip.ts",
+     "pathDigest": "8b85db1ed64a19ef8d483af6d8af1430516237f7af6f3beb924ad399011049e4",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    },
+    {
+     "changeType": "RENAMED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 0,
+     "linesChanged": 0,
+     "linesDeleted": 0,
+     "markedAsViewed": false,
+     "path": "src/legacy/renamed-pure.ts",
+     "pathDigest": "c2aee3b575e054efbfc593bf66f024153b80076b4a18f9343c1fda0cc614a95e",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    },
+    {
+     "changeType": "RENAMED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 2,
+     "linesChanged": 4,
+     "linesDeleted": 2,
+     "markedAsViewed": false,
+     "path": "src/modern/helper-renamed.ts",
+     "pathDigest": "caaca0684115299248dc05e6935fc9704efedce8bd3dd2805f807fd9ae471038",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    },
+    {
+     "changeType": "MODIFIED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 7,
+     "linesChanged": 7,
+     "linesDeleted": 0,
+     "markedAsViewed": false,
+     "path": "src/util/math.ts",
+     "pathDigest": "36e12a9d7b7ff7c881e621047079153c0689eaee85697ed8f3267dcdc68fe9ce",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    },
+    {
+     "changeType": "ADDED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 1,
+     "linesChanged": 1,
+     "linesDeleted": 0,
+     "markedAsViewed": false,
+     "path": "src/ünï/cödé.ts",
+     "pathDigest": "66726140134a174a12b142a64114e96d21950adb32272decaa5f4df74c03934a",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    },
+    {
+     "changeType": "ADDED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 1,
+     "linesChanged": 1,
+     "linesDeleted": 0,
+     "markedAsViewed": false,
+     "path": "src/a,b.ts",
+     "pathDigest": "c27f9be39e50c1cb04b19cfa9b73649f526278aeca05e67a018ac7121d34ee6d",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    },
+    {
+     "changeType": "ADDED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 1,
+     "linesChanged": 1,
+     "linesDeleted": 0,
+     "markedAsViewed": false,
+     "path": "src/hash#pct%.ts",
+     "pathDigest": "5dba4050672fe376cda709ba0e61cd09be7250b7edde6e3d09b248164b4aa1a9",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    },
+    {
+     "changeType": "REMOVED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 0,
+     "linesChanged": 6,
+     "linesDeleted": 6,
+     "markedAsViewed": false,
+     "path": "src/obsolete.ts",
+     "pathDigest": "26cb77e2b1d2fb7497c683d4f02af1c1af54c47ecc62dfa180f471626b42895e",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    },
+    {
+     "changeType": "MODIFIED",
+     "isCodeowner": null,
+     "isManifestFile": false,
+     "isVendored": false,
+     "linesAdded": 6,
+     "linesChanged": 12,
+     "linesDeleted": 6,
+     "markedAsViewed": false,
+     "path": "src/whitespace.ts",
+     "pathDigest": "5efef5381cb99c0a491a4e0249b2a428e8c28dcb8dbb504eb122e060d40cde86",
+     "highestAnnotationLevel": null,
+     "markersMap": {},
+     "isSymlink": false
+    }
+   ],
+   "diffContents": [
+    {
+     "isBinary": true,
+     "isSubmodule": false,
+     "isTooBig": false,
+     "diffLines": [],
+     "linesAdded": 0,
+     "linesChanged": 0,
+     "linesDeleted": 0,
+     "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+     "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+     "oldTreeEntry": null,
+     "newTreeEntry": {
+      "mode": 100644,
+      "path": "assets/added.png",
+      "lineCount": 28,
+      "isGenerated": false
+     },
+     "path": "assets/added.png",
+     "pathDigest": "f7a6cbf0a999c8facc8095aaa1ca4f22f1fc93a69eb7e4f9c99c7e8e226ac56b",
+     "richDiff": {
+      "canToggleRichDiff": false,
+      "defaultToRichDiff": true,
+      "proseDiffHtml": null,
+      "dependencyDiffPath": null
+     },
+     "submodule": null,
+     "status": "ADDED",
+     "truncatedReason": null,
+     "diffSize": "2.86 KB"
+    },
+    {
+     "isBinary": true,
+     "isSubmodule": false,
+     "isTooBig": false,
+     "diffLines": [],
+     "linesAdded": 0,
+     "linesChanged": 0,
+     "linesDeleted": 0,
+     "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+     "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+     "oldTreeEntry": {
+      "mode": 100644,
+      "path": "assets/logo.png",
+      "lineCount": 54
+     },
+     "newTreeEntry": {
+      "mode": 100644,
+      "path": "assets/logo.png",
+      "lineCount": 55,
+      "isGenerated": false
+     },
+     "path": "assets/logo.png",
+     "pathDigest": "90580d12fbd0edace7745ba49a090bc882d32c9f7d6bfa1345df935f7a6816d3",
+     "richDiff": {
+      "canToggleRichDiff": false,
+      "defaultToRichDiff": true,
+      "proseDiffHtml": null,
+      "dependencyDiffPath": null
+     },
+     "submodule": null,
+     "status": "MODIFIED",
+     "truncatedReason": null,
+     "diffSize": "-6 Bytes"
+    },
+    {
+     "isBinary": false,
+     "isSubmodule": false,
+     "isTooBig": false,
+     "diffLines": [
+      {
+       "type": "HUNK",
+       "blobLineNumber": 0,
+       "position": 0,
+       "displayNoNewLineWarning": false,
+       "text": "@@ -1,6 +1,6 @@",
+       "html": "@@ -1,6 +1,6 @@",
+       "left": 0,
+       "right": 0,
+       "problems": []
+      },
+      {
+       "type": "CONTEXT",
+       "blobLineNumber": 1,
+       "position": 1,
+       "displayNoNewLineWarning": false,
+       "text": " {",
+       "html": " {",
+       "left": 1,
+       "right": 1,
+       "problems": []
+      },
+      {
+       "type": "CONTEXT",
+       "blobLineNumber": 2,
+       "position": 2,
+       "displayNoNewLineWarning": false,
+       "text": "   \"mode\": \"sandbox\",",
+       "html": "   <span class=\"pl-ent\">&quot;mode&quot;</span>: <span class=\"pl-s\"><span class=\"pl-pds\">&quot;</span>sandbox<span class=\"pl-pds\">&quot;</span></span>,",
+       "left": 2,
+       "right": 2,
+       "problems": []
+      },
+      {
+       "type": "DELETION",
+       "blobLineNumber": 3,
+       "position": 3,
+       "displayNoNewLineWarning": false,
+       "text": "-  \"retries\": 3,",
+       "html": "-  <span class=\"pl-ent\">\"retries\"</span>: <span class=\"pl-c1 x x-first x-last\">3</span>,",
+       "left": 3,
+       "right": 2,
+       "problems": []
+      },
+      {
+       "type": "DELETION",
+       "blobLineNumber": 4,
+       "position": 4,
+       "displayNoNewLineWarning": false,
+       "text": "-  \"timeoutMs\": 5000,",
+       "html": "-  <span class=\"pl-ent\">\"timeoutMs\"</span>: <span class=\"pl-c1 x x-first x-last\">5000</span>,",
+       "left": 4,
+       "right": 2,
+       "problems": []
+      },
+      {
+       "type": "DELETION",
+       "blobLineNumber": 5,
+       "position": 5,
+       "displayNoNewLineWarning": false,
+       "text": "-  \"features\": [\"alpha\", \"beta\"]",
+       "html": "-  <span class=\"pl-ent\">\"features\"</span>: [<span class=\"pl-s\"><span class=\"pl-pds\">\"</span>alpha<span class=\"pl-pds\">\"</span></span>, <span class=\"pl-s\"><span class=\"pl-pds\">\"</span>beta<span class=\"pl-pds\">\"</span></span>]",
+       "left": 5,
+       "right": 2,
+       "problems": []
+      },
+      {
+       "type": "ADDITION",
+       "blobLineNumber": 3,
+       "position": 6,
+       "displayNoNewLineWarning": false,
+       "text": "+  \"retries\": 5,",
+       "html": "+  <span class=\"pl-ent\">\"retries\"</span>: <span class=\"pl-c1 x x-first x-last\">5</span>,",
+       "left": 5,
+       "right": 3,
+       "problems": []
+      },
+      {
+       "type": "ADDITION",
+       "blobLineNumber": 4,
+       "position": 7,
+       "displayNoNewLineWarning": false,
+       "text": "+  \"timeoutMs\": 8000,",
+       "html": "+  <span class=\"pl-ent\">\"timeoutMs\"</span>: <span class=\"pl-c1 x x-first x-last\">8000</span>,",
+       "left": 5,
+       "right": 4,
+       "problems": []
+      },
+      {
+       "type": "ADDITION",
+       "blobLineNumber": 5,
+       "position": 8,
+       "displayNoNewLineWarning": false,
+       "text": "+  \"features\": [\"alpha\", \"beta\", \"gamma\"]",
+       "html": "+  <span class=\"pl-ent\">\"features\"</span>: [<span class=\"pl-s\"><span class=\"pl-pds\">\"</span>alpha<span class=\"pl-pds\">\"</span></span>, <span class=\"pl-s\"><span class=\"pl-pds\">\"</span>beta<span class=\"pl-pds\">\"</span></span><span class=\"x x-first\">, </span><span class=\"pl-s\"><span class=\"pl-pds x\">\"</span><span class=\"x\">gamma</span><span class=\"pl-pds x x-last\">\"</span></span>]",
+       "left": 5,
+       "right": 5,
+       "problems": []
+      },
+      {
+       "type": "CONTEXT",
+       "blobLineNumber": 6,
+       "position": 9,
+       "displayNoNewLineWarning": false,
+       "text": " }",
+       "html": " }",
+       "left": 6,
+       "right": 6,
+       "problems": []
+      }
+     ],
+     "linesAdded": 3,
+     "linesChanged": 6,
+     "linesDeleted": 3,
+     "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+     "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+     "oldTreeEntry": {
+      "mode": 100644,
+      "path": "config/settings.json",
+      "lineCount": 6
+     },
+     "newTreeEntry": {
+      "mode": 100644,
+      "path": "config/settings.json",
+      "lineCount": 6,
+      "isGenerated": false
+     },
+     "path": "config/settings.json",
+     "pathDigest": "980db14c03a9eed03f20baa57544d31f7131f368c35acc5c73f63713be77e81c",
+     "richDiff": null,
+     "submodule": null,
+     "status": "MODIFIED",
+     "truncatedReason": null,
+     "diffSize": ""
+    },
+    {
+     "isBinary": false,
+     "isSubmodule": false,
+     "isTooBig": false,
+     "diffLines": [
+      {
+       "type": "HUNK",
+       "blobLineNumber": 0,
+       "position": 0,
+       "displayNoNewLineWarning": false,
+       "text": "@@ -0,0 +1,3 @@",
+       "html": "@@ -0,0 +1,3 @@",
+       "left": null,
+       "right": 0,
+       "problems": []
+      },
+      {
+       "type": "ADDITION",
+       "blobLineNumber": 1,
+       "position": 1,
+       "displayNoNewLineWarning": false,
+       "text": "+# Changelog",
+       "html": "+<span class=\"pl-mh\"># <span class=\"pl-en\">Changelog</span></span>",
+       "left": null,
+       "right": 1,
+       "problems": []
+      },
+      {
+       "type": "ADDITION",
+       "blobLineNumber": 2,
+       "position": 2,
+       "displayNoNewLineWarning": false,
+       "text": "+",
+       "html": "+",
+       "left": null,
+       "right": 2,
+       "problems": []
+      },
+      {
+       "type": "ADDITION",
+       "blobLineNumber": 3,
+       "position": 3,
+       "displayNoNewLineWarning": false,
+       "text": "+- Added auth, tooltip, extra script.",
+       "html": "+<span class=\"pl-v\">-</span> Added auth, tooltip, extra script.",
+       "left": null,
+       "right": 3,
+       "problems": []
+      }
+     ],
+     "linesAdded": 3,
+     "linesChanged": 3,
+     "linesDeleted": 0,
+     "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+     "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+     "oldTreeEntry": null,
+     "newTreeEntry": {
+      "mode": 100644,
+      "path": "docs/changelog.md",
+      "lineCount": 3,
+      "isGenerated": false
+     },
+     "path": "docs/changelog.md",
+     "pathDigest": "77f023b99d3d58008351d3e82fc06e6d06ba1bc2da9e41be6329b7fa4f419f05",
+     "richDiff": {
+      "canToggleRichDiff": true,
+      "defaultToRichDiff": false,
+      "proseDiffHtml": null,
+      "dependencyDiffPath": null
+     },
+     "submodule": null,
+     "status": "ADDED",
+     "truncatedReason": null,
+     "diffSize": ""
+    },
+    {
+     "isBinary": false,
+     "isSubmodule": false,
+     "isTooBig": false,
+     "diffLines": [
+      {
+       "type": "HUNK",
+       "blobLineNumber": 6,
+       "position": 0,
+       "displayNoNewLineWarning": false,
+       "text": "@@ -7,3 +7,7 @@ Run the build script.",
+       "html": "@@ -7,3 +7,7 @@ Run the build script.",
+       "left": 6,
+       "right": 6,
+       "problems": []
+      },
+      {
+       "type": "CONTEXT",
+       "blobLineNumber": 7,
+       "position": 1,
+       "displayNoNewLineWarning": false,
+       "text": " ## Usage",
+       "html": " <span class=\"pl-mh\">## <span class=\"pl-en\">Usage</span></span>",
+       "left": 7,
+       "right": 7,
+       "problems": []
+      },
+      {
+       "type": "CONTEXT",
+       "blobLineNumber": 8,
+       "position": 2,
+       "displayNoNewLineWarning": false,
+       "text": " ",
+       "html": "<br>",
+       "left": 8,
+       "right": 8,
+       "problems": []
+      },
+      {
+       "type": "CONTEXT",
+       "blobLineNumber": 9,
+       "position": 3,
+       "displayNoNewLineWarning": false,
+       "text": " Call `main()` and inspect the output.",
+       "html": " Call <span class=\"pl-s\">`</span><span class=\"pl-c1\">main()</span><span class=\"pl-s\">`</span> and inspect the output.",
+       "left": 9,
+       "right": 9,
+       "problems": []
+      },
+      {
+       "type": "ADDITION",
+       "blobLineNumber": 10,
+       "position": 4,
+       "displayNoNewLineWarning": false,
+       "text": "+",
+       "html": "+",
+       "left": 9,
+       "right": 10,
+       "problems": []
+      },
+      {
+       "type": "ADDITION",
+       "blobLineNumber": 11,
+       "position": 5,
+       "displayNoNewLineWarning": false,
+       "text": "+## Troubleshooting",
+       "html": "+<span class=\"pl-mh\">## <span class=\"pl-en\">Troubleshooting</span></span>",
+       "left": 9,
+       "right": 11,
+       "problems": []
+      },
+      {
+       "type": "ADDITION",
+       "blobLineNumber": 12,
+       "position": 6,
+       "displayNoNewLineWarning": false,
+       "text": "+",
+       "html": "+",
+       "left": 9,
+       "right": 12,
+       "problems": []
+      },
+      {
+       "type": "ADDITION",
+       "blobLineNumber": 13,
+       "position": 7,
+       "displayNoNewLineWarning": false,
+       "text": "+If the build fails, check `config/settings.json`.",
+       "html": "+If the build fails, check <span class=\"pl-s\">`</span><span class=\"pl-c1\">config/settings.json</span><span class=\"pl-s\">`</span>.",
+       "left": 9,
+       "right": 13,
+       "problems": []
+      }
+     ],
+     "linesAdded": 4,
+     "linesChanged": 4,
+     "linesDeleted": 0,
+     "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+     "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+     "oldTreeEntry": {
+      "mode": 100644,
+      "path": "docs/guide.md",
+      "lineCount": 9
+     },
+     "newTreeEntry": {
+      "mode": 100644,
+      "path": "docs/guide.md",
+      "lineCount": 13,
+      "isGenerated": false
+     },
+     "path": "docs/guide.md",
+     "pathDigest": "07fdd026b11c494c3b62c97f764f6939803c453389ebefd6b05e6f187d44859a",
+     "richDiff": {
+      "canToggleRichDiff": true,
+      "defaultToRichDiff": false,
+      "proseDiffHtml": null,
+      "dependencyDiffPath": null
+     },
+     "submodule": null,
+     "status": "MODIFIED",
+     "truncatedReason": null,
+     "diffSize": ""
+    },
+    {
+     "isBinary": false,
+     "isSubmodule": false,
+     "isTooBig": false,
+     "diffLines": [
+      {
+       "type": "HUNK",
+       "blobLineNumber": 0,
+       "position": 0,
+       "displayNoNewLineWarning": false,
+       "text": "@@ -0,0 +1,3 @@",
+       "html": "@@ -0,0 +1,3 @@",
+       "left": null,
+       "right": 0,
+       "problems": []
+      },
+      {
+       "type": "ADDITION",
+       "blobLineNumber": 1,
+       "position": 1,
+       "displayNoNewLineWarning": false,
+       "text": "+# With space",
+       "html": "+<span class=\"pl-mh\"># <span class=\"pl-en\">With space</span></span>",
+       "left": null,
+       "right": 1,
+       "problems": []
+      },
+      {
+       "type": "ADDITION",
+       "blobLineNumber": 2,
+       "position": 2,
+       "displayNoNewLineWarning": false,
+       "text": "+",
+       "html": "+",
+       "left": null,
+       "right": 2,
+       "problems": []
+      },
+      {
+       "type": "ADDITION",
+       "blobLineNumber": 3,
+       "position": 3,
+       "displayNoNewLineWarning": false,
+       "text": "+This path contains a space.",
+       "html": "+This path contains a space.",
+       "left": null,
+       "right": 3,
+       "problems": []
+      }
+     ],
+     "linesAdded": 3,
+     "linesChanged": 3,
+     "linesDeleted": 0,
+     "oldCommitOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+     "newCommitOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+     "oldTreeEntry": null,
+     "newTreeEntry": {
+      "mode": 100644,
+      "path": "docs/with space.md",
+      "lineCount": 3,
+      "isGenerated": false
+     },
+     "path": "docs/with space.md",
+     "pathDigest": "18dd6a94f19504a2000702335ae31e0314fd15962cb44084afc4c8607cdb2fdb",
+     "richDiff": {
+      "canToggleRichDiff": true,
+      "defaultToRichDiff": false,
+      "proseDiffHtml": null,
+      "dependencyDiffPath": null
+     },
+     "submodule": null,
+     "status": "ADDED",
+     "truncatedReason": null,
+     "diffSize": ""
+    }
+   ],
+   "fileFilter": {
+    "initialState": {
+     "fileExtensions": {
+      ".png": 2,
+      ".json": 1,
+      ".md": 3,
+      ".ts": 12,
+      ".py": 2
+     },
+     "filterText": "",
+     "showDeletedFiles": true,
+     "showOnlyManifestFiles": false,
+     "showOnlyOwnedFiles": false,
+     "showVendoredFiles": true,
+     "showViewedFiles": true,
+     "unselectedFileExtensions": []
+    },
+    "menuOptions": {
+     "canSeeCodeownersFilter": false,
+     "canSeeDeletedFilesFilter": true,
+     "canSeeOnlyManifestFilesFilter": false,
+     "canSeeVendorFilesFilter": false
+    }
+   },
+   "pullRequest": {
+    "attributedUser": null,
+    "viaApp": null,
+    "author": {
+     "isAgent": false,
+     "slug": null,
+     "login": "dangh",
+     "displayName": "Dang",
+     "avatarUrl": "https://avatars.githubusercontent.com/u/1020347?v=4"
+    },
+    "baseBranch": "main",
+    "commitsCount": 4,
+    "comparison": {
+     "baseOid": "ee4dde35e40e799df05f150ff455e017b69b544e",
+     "headOid": "72a3709f3549f9f88d5291e6dbdaa825f7718e58"
+    },
+    "globalRelayId": "PR_kwDOVNFBhM8AAAABI-2HGg",
+    "headBranch": "review-me",
+    "headRepositoryName": "pierre-sandbox",
+    "headRepositoryOwnerLogin": "dangh",
+    "issueCommentsCount": 0,
+    "id": 4897736474,
+    "isInAdvisoryRepo": false,
+    "mergedBy": null,
+    "mergedTime": null,
+    "number": 1,
+    "pathName": "/dangh/pierre-sandbox/pull/1",
+    "state": "OPEN",
+    "title": "review-me: sandbox fixture PR",
+    "titleHtml": "review-me: sandbox fixture PR",
+    "viewerAllowedNonCommentReviewTypes": [],
+    "viewerHasViolatedPushPolicy": false,
+    "viewerIsCopilotAttributed": false
+   },
+   "pullRequestUrl": "https://github.com/dangh/pierre-sandbox/pull/1",
+   "repository": {
+    "codespacesEnabled": true,
+    "editorEnabled": false,
+    "defaultBranch": "main",
+    "id": 1422999940,
+    "isEnterprise": false,
+    "name": "pierre-sandbox",
+    "ownerLogin": "dangh",
+    "viewerPermission": "admin"
+   },
+   "shouldLoadCodeowners": false,
+   "urls": {
+    "images": {
+     "mona-hifive": "/images/mona-hifive.gif"
+    },
+    "artifacts": "/dangh/pierre-sandbox/pull/1/artifacts",
+    "changes": "/dangh/pierre-sandbox/pull/1/changes",
+    "checks": "/dangh/pierre-sandbox/pull/1/checks",
+    "commits": "/dangh/pierre-sandbox/pull/1/commits",
+    "conversation": "/dangh/pierre-sandbox/pull/1",
+    "files": "/dangh/pierre-sandbox/pull/1/files",
+    "findings": "/dangh/pierre-sandbox/pull/1/findings",
+    "overview": "/dangh/pierre-sandbox/pull/1/overview",
+    "walkthrough": "/dangh/pierre-sandbox/pull/1/walkthrough"
+   },
+   "user": {
+    "canChangeBase": true,
+    "canComment": true,
+    "currentUserAvatarUrl": "https://avatars.githubusercontent.com/u/1020347?v=4",
+    "currentUserLogin": "dangh",
+    "canEditTitle": true,
+    "fileTreeWidth": null,
+    "hasCopilotAccess": true,
+    "canFixWithCopilot": false,
+    "canApplySuggestion": true,
+    "isFileTreeExpanded": true,
+    "lastReviewOid": "324e2352e3e3db6a716b79fb84951521b0647cb7",
+    "shouldShowViewedFilesCount": true,
+    "tabSize": 4,
+    "viewedFilesCount": 0,
+    "viewSettings": {
+     "hideWhitespace": false,
+     "lineSpacing": "compact",
+     "showChangeGroups": true,
+     "splitPreference": "split",
+     "commentsPreference": "collapsed",
+     "whitespacePreference": "always_show",
+     "whitespacePreferenceSource": "product_default"
+    }
+   },
+   "userNotices": [
+    {
+     "name": "compact_diff_lines",
+     "dismissed": true
+    },
+    {
+     "name": "single_file_mode",
+     "dismissed": true
+    },
+    {
+     "name": "overview_comments_sort",
+     "dismissed": false
+    }
+   ],
+   "viewerPendingReview": {
+    "id": null,
+    "comments": []
+   },
+   "markers": {
+    "threads": {
+     "2910292349": {
+      "id": "2910292349",
+      "subjectType": "LINE",
+      "isResolved": false,
+      "resolvedBy": null,
+      "resolutionReason": null,
+      "viewerCanReply": true,
+      "commentsData": {
+       "__id": "2910292349",
+       "comments": [
+        {
+         "author": {
+          "login": "dangh",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/1020347?v=4",
+          "isAgent": false,
+          "slug": null,
+          "userType": "human"
+         },
+         "authorAssociation": "OWNER",
+         "automatedComment": null,
+         "body": "Single-line thread: guard clause should mention the values.",
+         "bodyHTML": "<p dir=\"auto\">Single-line thread: guard clause should mention the values.</p>",
+         "bodyVersion": "9023471958ceb61107f7fa0fadca848a04b3c1b08946cb9cac90691461471ef3",
+         "createdAt": "2026-10-17T14:26:18+08:00",
+         "currentDiffResourcePath": null,
+         "databaseId": 4301727038,
+         "footnoteTextHTML": null,
+         "id": "PRRC_kwDOVNFBhM8AAAABAGclPg",
+         "relayId": "PRRC_kwDOVNFBhM8AAAABAGclPg",
+         "isHidden": false,
+         "lastUserContentEdit": null,
+         "minimizedReason": null,
+         "publishedAt": "2026-10-17T14:26:17+08:00",
+         "reactionGroups": [
+          {
+           "reaction": {
+            "content": "THUMBS_UP",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "THUMBS_DOWN",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "LAUGH",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "HOORAY",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "CONFUSED",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "HEART",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "ROCKET",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "EYES",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          }
+         ],
+         "reference": {
+          "number": 1,
+          "text": null,
+          "author": {
+           "login": "dangh"
+          }
+         },
+         "repository": {
+          "id": "1422999940",
+          "isPrivate": true,
+          "name": "pierre-sandbox",
+          "owner": {
+           "id": "1020347",
+           "login": "dangh",
+           "url": "/dangh"
+          }
+         },
+         "reviewId": 5556630740,
+         "stafftoolsUrl": null,
+         "state": "submitted",
+         "subjectType": "line",
+         "url": "https://github.com/dangh/pierre-sandbox/pull/1#discussion_r4301727038",
+         "viewerCanBlockFromOrg": false,
+         "viewerCanBlockPersonally": false,
+         "viewerCanDelete": true,
+         "viewerCanMinimize": true,
+         "viewerCanSeeMinimizeButton": true,
+         "viewerCanSeeUnminimizeButton": false,
+         "viewerCanReact": true,
+         "viewerCanReport": false,
+         "viewerCanReportToMaintainer": false,
+         "viewerCanUnblockFromOrg": false,
+         "viewerCanUnblockPersonally": false,
+         "viewerCanUpdate": true,
+         "viewerDidAuthor": true,
+         "viewerRelationship": "OWNER",
+         "reviewVariantType": "vanilla"
+        }
+       ]
+      },
+      "reviewCommentsLimit": 20,
+      "reviewCommentsLimitExceeded": false,
+      "pullRequestReviewId": 5556630740
+     },
+     "2910292404": {
+      "id": "2910292404",
+      "subjectType": "LINE",
+      "isResolved": false,
+      "resolvedBy": null,
+      "resolutionReason": null,
+      "viewerCanReply": true,
+      "commentsData": {
+       "__id": "2910292404",
+       "comments": [
+        {
+         "author": {
+          "login": "dangh",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/1020347?v=4",
+          "isAgent": false,
+          "slug": null,
+          "userType": "human"
+         },
+         "authorAssociation": "OWNER",
+         "automatedComment": null,
+         "body": "Multi-line thread: consider extracting the attribute builder.",
+         "bodyHTML": "<p dir=\"auto\">Multi-line thread: consider extracting the attribute builder.</p>",
+         "bodyVersion": "2e83f1cb95008ad7e42019c4c156e337e087c3786399a07550290d0d335a5f0f",
+         "createdAt": "2026-10-17T14:26:19+08:00",
+         "currentDiffResourcePath": "/dangh/pierre-sandbox/pull/1/files#r4301727109",
+         "databaseId": 4301727109,
+         "footnoteTextHTML": null,
+         "id": "PRRC_kwDOVNFBhM8AAAABAGclhQ",
+         "relayId": "PRRC_kwDOVNFBhM8AAAABAGclhQ",
+         "isHidden": false,
+         "lastUserContentEdit": null,
+         "minimizedReason": null,
+         "publishedAt": "2026-10-17T14:26:19+08:00",
+         "reactionGroups": [
+          {
+           "reaction": {
+            "content": "THUMBS_UP",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "THUMBS_DOWN",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "LAUGH",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "HOORAY",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "CONFUSED",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "HEART",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "ROCKET",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "EYES",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          }
+         ],
+         "reference": {
+          "number": 1,
+          "text": null,
+          "author": {
+           "login": "dangh"
+          }
+         },
+         "repository": {
+          "id": "1422999940",
+          "isPrivate": true,
+          "name": "pierre-sandbox",
+          "owner": {
+           "id": "1020347",
+           "login": "dangh",
+           "url": "/dangh"
+          }
+         },
+         "reviewId": 5556630853,
+         "stafftoolsUrl": null,
+         "state": "submitted",
+         "subjectType": "line",
+         "url": "https://github.com/dangh/pierre-sandbox/pull/1#discussion_r4301727109",
+         "viewerCanBlockFromOrg": false,
+         "viewerCanBlockPersonally": false,
+         "viewerCanDelete": true,
+         "viewerCanMinimize": true,
+         "viewerCanSeeMinimizeButton": true,
+         "viewerCanSeeUnminimizeButton": false,
+         "viewerCanReact": true,
+         "viewerCanReport": false,
+         "viewerCanReportToMaintainer": false,
+         "viewerCanUnblockFromOrg": false,
+         "viewerCanUnblockPersonally": false,
+         "viewerCanUpdate": true,
+         "viewerDidAuthor": true,
+         "viewerRelationship": "OWNER",
+         "reviewVariantType": "vanilla"
+        }
+       ]
+      },
+      "reviewCommentsLimit": 20,
+      "reviewCommentsLimitExceeded": false,
+      "pullRequestReviewId": 5556630853
+     },
+     "2910292428": {
+      "id": "2910292428",
+      "subjectType": "FILE",
+      "isResolved": true,
+      "resolvedBy": "dangh",
+      "resolutionReason": null,
+      "viewerCanReply": true,
+      "commentsData": {
+       "__id": "2910292428",
+       "comments": [
+        {
+         "author": {
+          "login": "dangh",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/1020347?v=4",
+          "isAgent": false,
+          "slug": null,
+          "userType": "human"
+         },
+         "authorAssociation": "OWNER",
+         "automatedComment": null,
+         "body": "File-level thread: this doc needs a title.",
+         "bodyHTML": "<p dir=\"auto\">File-level thread: this doc needs a title.</p>",
+         "bodyVersion": "b3e19ce922b48e953193a64efab817aedb8259e92288f5334ee4aafc726ddd96",
+         "createdAt": "2026-10-17T14:26:20+08:00",
+         "currentDiffResourcePath": "/dangh/pierre-sandbox/pull/1/files#r4301727152",
+         "databaseId": 4301727152,
+         "footnoteTextHTML": null,
+         "id": "PRRC_kwDOVNFBhM8AAAABAGclsA",
+         "relayId": "PRRC_kwDOVNFBhM8AAAABAGclsA",
+         "isHidden": false,
+         "lastUserContentEdit": null,
+         "minimizedReason": null,
+         "publishedAt": "2026-10-17T14:26:20+08:00",
+         "reactionGroups": [
+          {
+           "reaction": {
+            "content": "THUMBS_UP",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "THUMBS_DOWN",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "LAUGH",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "HOORAY",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "CONFUSED",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "HEART",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "ROCKET",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          },
+          {
+           "reaction": {
+            "content": "EYES",
+            "viewerHasReacted": false
+           },
+           "reactors": [],
+           "totalCount": 0
+          }
+         ],
+         "reference": {
+          "number": 1,
+          "text": null,
+          "author": {
+           "login": "dangh"
+          }
+         },
+         "repository": {
+          "id": "1422999940",
+          "isPrivate": true,
+          "name": "pierre-sandbox",
+          "owner": {
+           "id": "1020347",
+           "login": "dangh",
+           "url": "/dangh"
+          }
+         },
+         "reviewId": 5556630930,
+         "stafftoolsUrl": null,
+         "state": "submitted",
+         "subjectType": "file",
+         "url": "https://github.com/dangh/pierre-sandbox/pull/1#discussion_r4301727152",
+         "viewerCanBlockFromOrg": false,
+         "viewerCanBlockPersonally": false,
+         "viewerCanDelete": true,
+         "viewerCanMinimize": true,
+         "viewerCanSeeMinimizeButton": true,
+         "viewerCanSeeUnminimizeButton": false,
+         "viewerCanReact": true,
+         "viewerCanReport": false,
+         "viewerCanReportToMaintainer": false,
+         "viewerCanUnblockFromOrg": false,
+         "viewerCanUnblockPersonally": false,
+         "viewerCanUpdate": true,
+         "viewerDidAuthor": true,
+         "viewerRelationship": "OWNER",
+         "reviewVariantType": "vanilla"
+        }
+       ]
+      },
+      "reviewCommentsLimit": 20,
+      "reviewCommentsLimitExceeded": false,
+      "pullRequestReviewId": 5556630930
+     }
+    },
+    "threadsPageInfo": {
+     "hasNextPage": false,
+     "cursor": "2910292349"
+    },
+    "annotations": {},
+    "annotationsPageInfo": {
+     "hasNextPage": false,
+     "cursor": null
+    }
+   },
+   "pageLimits": {
+    "annotationsPaginatedLimit": 350,
+    "annotationsPaginatedLimitExceeded": false,
+    "filesLimit": 3000,
+    "filesLimitExceeded": false,
+    "linesChangedLimit": 10000,
+    "linesChangedLimitExceeded": false,
+    "reviewCommentsPerThreadLimit": 20,
+    "reviewThreadsLimit": 40,
+    "reviewThreadsLimitExceeded": false,
+    "reviewThreadsPaginatedLimit": 350,
+    "reviewThreadsPaginatedLimitExceeded": false
+   },
+   "commit": null,
+   "virtualizeDiffEntries": false
+  }
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "note": "diff_entries URLs (path + query) requested by GitHub's own client while loading the PR page.",
+ "diffEntries": [
+  "/dangh/pierre-sandbox/pull/1/page_data/diff_entries?paths=generated%252Fbig.generated.ts%2Cscripts%252Fbuild.py%2Cscripts%252Fextra.py%2Csrc%252Fapi%252Fauth.ts&ctx=%3A%3A%3A&w=0&range=72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+  "/dangh/pierre-sandbox/pull/1/page_data/diff_entries?paths=src%252Fwhitespace.ts&ctx=&w=0&range=72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+  "/dangh/pierre-sandbox/pull/1/page_data/diff_entries?paths=src%252Fcomponents%252FButton.ts%2Csrc%252Fcomponents%252FTooltip.ts%2Csrc%252Flegacy%252Frenamed-pure.ts%2Csrc%252Fmodern%252Fhelper-renamed.ts&ctx=5-12%3A%3A%3A&w=0&range=72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+  "/dangh/pierre-sandbox/pull/1/page_data/diff_entries?paths=src%252Futil%252Fmath.ts%2Csrc%252F%25C3%25BCn%25C3%25AF%252Fc%25C3%25B6d%25C3%25A9.ts%2Csrc%252Fa%252Cb.ts%2Csrc%252Fhash%2523pct%2525.ts&ctx=%3A%3A%3A&w=0&range=72a3709f3549f9f88d5291e6dbdaa825f7718e58",
+  "/dangh/pierre-sandbox/pull/1/page_data/diff_entries?paths=src%252Fobsolete.ts&ctx=&w=0&range=72a3709f3549f9f88d5291e6dbdaa825f7718e58"
+ ]
+}

@@ -1,0 +1,86 @@
+{
+ "path": "src/obsolete.ts",
+ "query": "path=src%2Fobsolete.ts&w=0",
+ "link": null,
+ "data": {
+  "diffEntryLines": [
+   {
+    "type": "HUNK",
+    "blobLineNumber": -1,
+    "position": 0,
+    "displayNoNewLineWarning": false,
+    "text": "@@ -1,6 +0,0 @@",
+    "html": "@@ -1,6 +0,0 @@",
+    "left": 0,
+    "right": null,
+    "problems": []
+   },
+   {
+    "type": "DELETION",
+    "blobLineNumber": 1,
+    "position": 1,
+    "displayNoNewLineWarning": false,
+    "text": "-// This file is removed on the review branch.",
+    "html": "-<span class=pl-c>// This file is removed on the review branch.</span>",
+    "left": 1,
+    "right": null,
+    "problems": []
+   },
+   {
+    "type": "DELETION",
+    "blobLineNumber": 2,
+    "position": 2,
+    "displayNoNewLineWarning": false,
+    "text": "-export const obsolete = true;",
+    "html": "-<span class=pl-k>export</span> <span class=pl-k>const</span> <span class=pl-s1>obsolete</span> <span class=pl-c1>=</span> <span class=pl-c1>true</span><span class=pl-kos>;</span>",
+    "left": 2,
+    "right": null,
+    "problems": []
+   },
+   {
+    "type": "DELETION",
+    "blobLineNumber": 3,
+    "position": 3,
+    "displayNoNewLineWarning": false,
+    "text": "-",
+    "html": "-",
+    "left": 3,
+    "right": null,
+    "problems": []
+   },
+   {
+    "type": "DELETION",
+    "blobLineNumber": 4,
+    "position": 4,
+    "displayNoNewLineWarning": false,
+    "text": "-export function oldBehavior(): string {",
+    "html": "-<span class=pl-k>export</span> <span class=pl-k>function</span> <span class=pl-en>oldBehavior</span><span class=pl-kos>(</span><span class=pl-kos>)</span>: <span class=pl-smi>string</span> <span class=pl-kos>{</span>",
+    "left": 4,
+    "right": null,
+    "problems": []
+   },
+   {
+    "type": "DELETION",
+    "blobLineNumber": 5,
+    "position": 5,
+    "displayNoNewLineWarning": false,
+    "text": "-  return \"old\";",
+    "html": "-  <span class=pl-k>return</span> <span class=pl-s>&quot;old&quot;</span><span class=pl-kos>;</span>",
+    "left": 5,
+    "right": null,
+    "problems": []
+   },
+   {
+    "type": "DELETION",
+    "blobLineNumber": 6,
+    "position": 6,
+    "displayNoNewLineWarning": false,
+    "text": "-}",
+    "html": "-<span class=pl-kos>}</span>",
+    "left": 6,
+    "right": null,
+    "problems": []
+   }
+  ]
+ }
+}

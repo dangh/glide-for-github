@@ -1,0 +1,521 @@
+{
+ "query": "",
+ "link": null,
+ "data": [
+  {
+   "id": "2910292428",
+   "isOutdated": false,
+   "path": "docs/with space.md",
+   "subject": {
+    "diffLines": [],
+    "endLine": null,
+    "endDiffSide": "RIGHT",
+    "originalEndLine": null,
+    "originalStartLine": null,
+    "pullRequestCommit": {
+     "commit": {
+      "abbreviatedOid": "324e2352e3e3db6a716b79fb84951521b0647cb7"
+     }
+    },
+    "startDiffSide": "RIGHT",
+    "startLine": null
+   },
+   "originalDiffPathUri": null,
+   "diffSide": "RIGHT",
+   "subjectType": "FILE",
+   "line": null,
+   "startLine": null,
+   "startDiffSide": "RIGHT",
+   "commentsData": {
+    "comments": [
+     {
+      "author": {
+       "login": "dangh",
+       "avatarUrl": "https://avatars.githubusercontent.com/u/1020347?v=4",
+       "isAgent": false,
+       "slug": null,
+       "userType": "human"
+      },
+      "authorAssociation": "OWNER",
+      "automatedComment": null,
+      "body": "File-level thread: this doc needs a title.",
+      "bodyHTML": "<p dir=\"auto\">File-level thread: this doc needs a title.</p>",
+      "bodyVersion": "b3e19ce922b48e953193a64efab817aedb8259e92288f5334ee4aafc726ddd96",
+      "createdAt": "2026-10-17T14:26:20+08:00",
+      "currentDiffResourcePath": "/dangh/pierre-sandbox/pull/1/files#r4301727152",
+      "databaseId": 4301727152,
+      "footnoteTextHTML": null,
+      "id": "PRRC_kwDOVNFBhM8AAAABAGclsA",
+      "relayId": "PRRC_kwDOVNFBhM8AAAABAGclsA",
+      "isHidden": false,
+      "lastUserContentEdit": null,
+      "minimizedReason": null,
+      "publishedAt": "2026-10-17T14:26:20+08:00",
+      "reactionGroups": [
+       {
+        "reaction": {
+         "content": "THUMBS_UP",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "THUMBS_DOWN",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "LAUGH",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "HOORAY",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "CONFUSED",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "HEART",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "ROCKET",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "EYES",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       }
+      ],
+      "reference": {
+       "number": 1,
+       "text": null,
+       "author": {
+        "login": "dangh"
+       }
+      },
+      "repository": {
+       "id": "1422999940",
+       "isPrivate": true,
+       "name": "pierre-sandbox",
+       "owner": {
+        "id": "1020347",
+        "login": "dangh",
+        "url": "/dangh"
+       }
+      },
+      "reviewId": 5556630930,
+      "stafftoolsUrl": null,
+      "state": "submitted",
+      "subjectType": "file",
+      "url": "https://github.com/dangh/pierre-sandbox/pull/1#discussion_r4301727152",
+      "viewerCanBlockFromOrg": false,
+      "viewerCanBlockPersonally": false,
+      "viewerCanDelete": false,
+      "viewerCanMinimize": false,
+      "viewerCanSeeMinimizeButton": false,
+      "viewerCanSeeUnminimizeButton": false,
+      "viewerCanReact": true,
+      "viewerCanReport": false,
+      "viewerCanReportToMaintainer": false,
+      "viewerCanUnblockFromOrg": false,
+      "viewerCanUnblockPersonally": false,
+      "viewerCanUpdate": false,
+      "viewerDidAuthor": true,
+      "viewerRelationship": "OWNER",
+      "reviewVariantType": "vanilla"
+     }
+    ]
+   },
+   "commentCount": 0
+  },
+  {
+   "id": "2910292404",
+   "isOutdated": false,
+   "path": "src/components/Button.ts",
+   "subject": {
+    "diffLines": [
+     {
+      "html": "  <span class=pl-k>const</span> <span class=pl-s1>attr</span> <span class=pl-c1>=</span> <span class=pl-s1>p</span><span class=pl-kos>.</span><span class=pl-c1>disabled</span> ? <span class=pl-s>&quot; disabled&quot;</span> : <span class=pl-s>&quot;&quot;</span><span class=pl-kos>;</span>",
+      "left": 7,
+      "right": 8,
+      "text": "+  const attr = p.disabled ? \" disabled\" : \"\";",
+      "type": "ADDITION"
+     },
+     {
+      "html": "  <span class=pl-k>return</span> <span class=pl-s>`&lt;button id=&quot;<span class=pl-s1><span class=pl-kos>${</span><span class=pl-s1>p</span><span class=pl-kos>.</span><span class=pl-c1>id</span><span class=pl-kos>}</span></span>&quot;<span class=pl-s1><span class=pl-kos>${</span><span class=pl-s1>attr</span><span class=pl-kos>}</span></span>&gt;<span class=pl-s1><span class=pl-kos>${</span><span class=pl-s1>p</span><span class=pl-kos>.</span><span class=pl-c1>label</span><span class=pl-kos>}</span></span>&lt;/button&gt;`</span><span class=pl-kos>;</span>",
+      "left": 7,
+      "right": 9,
+      "text": "+  return `<button id=\"${p.id}\"${attr}>${p.label}</button>`;",
+      "type": "ADDITION"
+     }
+    ],
+    "endLine": 9,
+    "endDiffSide": "RIGHT",
+    "originalEndLine": 9,
+    "originalStartLine": 8,
+    "pullRequestCommit": {
+     "commit": {
+      "abbreviatedOid": "324e2352e3e3db6a716b79fb84951521b0647cb7"
+     }
+    },
+    "startDiffSide": "RIGHT",
+    "startLine": 8
+   },
+   "originalDiffPathUri": null,
+   "diffSide": "RIGHT",
+   "subjectType": "LINE",
+   "line": 9,
+   "startLine": 8,
+   "startDiffSide": "RIGHT",
+   "commentsData": {
+    "comments": [
+     {
+      "author": {
+       "login": "dangh",
+       "avatarUrl": "https://avatars.githubusercontent.com/u/1020347?v=4",
+       "isAgent": false,
+       "slug": null,
+       "userType": "human"
+      },
+      "authorAssociation": "OWNER",
+      "automatedComment": null,
+      "body": "Multi-line thread: consider extracting the attribute builder.",
+      "bodyHTML": "<p dir=\"auto\">Multi-line thread: consider extracting the attribute builder.</p>",
+      "bodyVersion": "2e83f1cb95008ad7e42019c4c156e337e087c3786399a07550290d0d335a5f0f",
+      "createdAt": "2026-10-17T14:26:19+08:00",
+      "currentDiffResourcePath": "/dangh/pierre-sandbox/pull/1/files#r4301727109",
+      "databaseId": 4301727109,
+      "footnoteTextHTML": null,
+      "id": "PRRC_kwDOVNFBhM8AAAABAGclhQ",
+      "relayId": "PRRC_kwDOVNFBhM8AAAABAGclhQ",
+      "isHidden": false,
+      "lastUserContentEdit": null,
+      "minimizedReason": null,
+      "publishedAt": "2026-10-17T14:26:19+08:00",
+      "reactionGroups": [
+       {
+        "reaction": {
+         "content": "THUMBS_UP",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "THUMBS_DOWN",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "LAUGH",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "HOORAY",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "CONFUSED",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "HEART",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "ROCKET",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "EYES",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       }
+      ],
+      "reference": {
+       "number": 1,
+       "text": null,
+       "author": {
+        "login": "dangh"
+       }
+      },
+      "repository": {
+       "id": "1422999940",
+       "isPrivate": true,
+       "name": "pierre-sandbox",
+       "owner": {
+        "id": "1020347",
+        "login": "dangh",
+        "url": "/dangh"
+       }
+      },
+      "reviewId": 5556630853,
+      "stafftoolsUrl": null,
+      "state": "submitted",
+      "subjectType": "line",
+      "url": "https://github.com/dangh/pierre-sandbox/pull/1#discussion_r4301727109",
+      "viewerCanBlockFromOrg": false,
+      "viewerCanBlockPersonally": false,
+      "viewerCanDelete": false,
+      "viewerCanMinimize": false,
+      "viewerCanSeeMinimizeButton": false,
+      "viewerCanSeeUnminimizeButton": false,
+      "viewerCanReact": true,
+      "viewerCanReport": false,
+      "viewerCanReportToMaintainer": false,
+      "viewerCanUnblockFromOrg": false,
+      "viewerCanUnblockPersonally": false,
+      "viewerCanUpdate": false,
+      "viewerDidAuthor": true,
+      "viewerRelationship": "OWNER",
+      "reviewVariantType": "vanilla"
+     }
+    ]
+   },
+   "commentCount": 0
+  },
+  {
+   "id": "2910292349",
+   "isOutdated": true,
+   "path": "src/util/math.ts",
+   "subject": {
+    "diffLines": [
+     {
+      "html": "<span class=pl-kos>}</span>",
+      "left": 7,
+      "right": 7,
+      "text": " }",
+      "type": "CONTEXT"
+     },
+     {
+      "html": "<br>",
+      "left": 8,
+      "right": 8,
+      "text": " ",
+      "type": "CONTEXT"
+     },
+     {
+      "html": "<span class=pl-k>export</span> <span class=pl-k>function</span> <span class=pl-en>clamp</span><span class=pl-kos>(</span><span class=pl-s1>v</span>: <span class=pl-smi>number</span><span class=pl-kos>,</span> <span class=pl-s1>lo</span>: <span class=pl-smi>number</span><span class=pl-kos>,</span> <span class=pl-s1>hi</span>: <span class=pl-smi>number</span><span class=pl-kos>)</span>: <span class=pl-smi>number</span> <span class=pl-kos>{</span>",
+      "left": 9,
+      "right": 9,
+      "text": " export function clamp(v: number, lo: number, hi: number): number {",
+      "type": "CONTEXT"
+     },
+     {
+      "html": "  <span class=pl-k>if</span> <span class=pl-kos>(</span><span class=pl-s1>lo</span> <span class=pl-c1>&gt;</span> <span class=pl-s1>hi</span><span class=pl-kos>)</span> <span class=pl-kos>{</span>",
+      "left": 9,
+      "right": 10,
+      "text": "+  if (lo > hi) {",
+      "type": "ADDITION"
+     }
+    ],
+    "endLine": 10,
+    "endDiffSide": "RIGHT",
+    "originalEndLine": 10,
+    "originalStartLine": 10,
+    "pullRequestCommit": {
+     "commit": {
+      "abbreviatedOid": "324e2352e3e3db6a716b79fb84951521b0647cb7"
+     }
+    },
+    "startDiffSide": "RIGHT",
+    "startLine": 10
+   },
+   "originalDiffPathUri": "https://github.com/dangh/pierre-sandbox/pull/1/files/324e2352e3e3db6a716b79fb84951521b0647cb7#r4301727038",
+   "diffSide": "RIGHT",
+   "subjectType": "LINE",
+   "line": 10,
+   "startLine": 10,
+   "startDiffSide": "RIGHT",
+   "commentsData": {
+    "comments": [
+     {
+      "author": {
+       "login": "dangh",
+       "avatarUrl": "https://avatars.githubusercontent.com/u/1020347?v=4",
+       "isAgent": false,
+       "slug": null,
+       "userType": "human"
+      },
+      "authorAssociation": "OWNER",
+      "automatedComment": null,
+      "body": "Single-line thread: guard clause should mention the values.",
+      "bodyHTML": "<p dir=\"auto\">Single-line thread: guard clause should mention the values.</p>",
+      "bodyVersion": "9023471958ceb61107f7fa0fadca848a04b3c1b08946cb9cac90691461471ef3",
+      "createdAt": "2026-10-17T14:26:18+08:00",
+      "currentDiffResourcePath": null,
+      "databaseId": 4301727038,
+      "footnoteTextHTML": null,
+      "id": "PRRC_kwDOVNFBhM8AAAABAGclPg",
+      "relayId": "PRRC_kwDOVNFBhM8AAAABAGclPg",
+      "isHidden": false,
+      "lastUserContentEdit": null,
+      "minimizedReason": null,
+      "publishedAt": "2026-10-17T14:26:17+08:00",
+      "reactionGroups": [
+       {
+        "reaction": {
+         "content": "THUMBS_UP",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "THUMBS_DOWN",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "LAUGH",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "HOORAY",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "CONFUSED",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "HEART",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "ROCKET",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       },
+       {
+        "reaction": {
+         "content": "EYES",
+         "viewerHasReacted": false
+        },
+        "reactors": [],
+        "totalCount": 0
+       }
+      ],
+      "reference": {
+       "number": 1,
+       "text": null,
+       "author": {
+        "login": "dangh"
+       }
+      },
+      "repository": {
+       "id": "1422999940",
+       "isPrivate": true,
+       "name": "pierre-sandbox",
+       "owner": {
+        "id": "1020347",
+        "login": "dangh",
+        "url": "/dangh"
+       }
+      },
+      "reviewId": 5556630740,
+      "stafftoolsUrl": null,
+      "state": "submitted",
+      "subjectType": "line",
+      "url": "https://github.com/dangh/pierre-sandbox/pull/1#discussion_r4301727038",
+      "viewerCanBlockFromOrg": false,
+      "viewerCanBlockPersonally": false,
+      "viewerCanDelete": false,
+      "viewerCanMinimize": false,
+      "viewerCanSeeMinimizeButton": false,
+      "viewerCanSeeUnminimizeButton": false,
+      "viewerCanReact": true,
+      "viewerCanReport": false,
+      "viewerCanReportToMaintainer": false,
+      "viewerCanUnblockFromOrg": false,
+      "viewerCanUnblockPersonally": false,
+      "viewerCanUpdate": false,
+      "viewerDidAuthor": true,
+      "viewerRelationship": "OWNER",
+      "reviewVariantType": "vanilla"
+     }
+    ]
+   },
+   "commentCount": 0
+  }
+ ]
+}
