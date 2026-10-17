@@ -378,11 +378,26 @@ const rangeOf = (opts: DiffOptions) => opts.range || opts.headOid;
 // ---------------------------------------------------------------------------------------------------------
 // Reading
 
+/** A commit id as the head check compares it (only for equality with `PrData.headOid`). */
+const HEAD_ID = /^\w{1,64}$/;
+
 /**
- * The PR's current head commit: the freshness poll's request (Task 11). The same single route request as
- * `fetchPrData` (the cheapest source of the head), but nothing is built from it and no diff loading is triggered.
+ * The PR's current head commit: the freshness poll's request (Task 11, Task 12). `GET page_data/header` (the PR
+ * header and merge box data, ~5 KB) carries it as `pullRequest.headSha` (also `mergeStatusButtonData.headSha`):
+ * verified 2026-10-17 to equal the route's `comparison.fullDiff.headOid` on react/react#37778 and
+ * microsoft/vscode#151512, where the route JSON is ~0.5 MB uncompressed on a 900-file PR. When the header has no
+ * usable sha (GitHub changed it), the route is read as before.
  */
 export async function fetchHeadOid(rpc: Rpc, ref: PrRef): Promise<string> {
+  let header: unknown;
+  try {
+    header = (await rpc.call('get', `${prPath(ref)}/page_data/header`)).data;
+  } catch {
+    header = undefined;
+  }
+  const h = header as { pullRequest?: { headSha?: unknown }; mergeStatusButtonData?: { headSha?: unknown } } | null | undefined;
+  const sha = h?.pullRequest?.headSha ?? h?.mergeStatusButtonData?.headSha;
+  if (typeof sha === 'string' && HEAD_ID.test(sha)) return sha;
   const route = await fetchRoute(rpc, ref);
   const full = route.comparison?.fullDiff ?? route.pullRequest.comparison;
   if (!full) throw badPayload('route comparison');

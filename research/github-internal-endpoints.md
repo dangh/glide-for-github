@@ -161,6 +161,7 @@ How the UI uses it:
 | Endpoint | Response |
 |---|---|
 | `GET page_data/file_tree` | Proto-JSON (response header `X-Proto-JSON: true`): `{baseRefOid, commits[], diffs[{changeType:"CHANGE_TYPE_MODIFIED"…, path, pathDigest, linesAdded, linesDeleted, linesChanged, isVendored, isManifestFile}], ownerLogin, repositoryName, pullRequestId, pullRequestNumber, pathName}`. Lighter file list (no viewed state). |
+| `GET page_data/header` | VERIFIED-LIVE-GET (2026-10-17, Task 12): ~5 KB JSON `{pullRequest{headSha, mergeCommitSha, number, state, title, …}, mergeStatusButtonData{headSha, …}, aliveChannel(s), bannersData, featureStates, repository, urls, user, viewerPendingReview, viewSettings, …}`. `pullRequest.headSha` equals the route's `comparison.fullDiff.headOid` (react/react#37778, microsoft/vscode#151512); used by the freshness poll. On vscode#151512: 5,232 chars in ~0.65 s vs the route's 508,747 chars in ~2.3 s; `file_tree` (211,732 chars) and `base_comparison_info` (≈ the route) also carry the head oid in `commits[]` but are not lighter enough. |
 | `GET page_data/diffstat` | `{diffstat:{linesAdded, linesDeleted, linesChanged}}` |
 | `GET page_data/annotations?end_commit_oid=<sha>` | Check-run annotations `[]` (paginated, limit 350) |
 | `GET page_data/rich_diff?path=…&range=…` | Rich (prose/render) diff, or `null` |

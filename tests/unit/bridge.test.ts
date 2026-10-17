@@ -77,6 +77,7 @@ describe('bridge get: allowlist', () => {
     '/dangh/pierre-sandbox/pull/1/page_data/thread_previews',
     '/dangh/pierre-sandbox/pull/1/page_data/thread_preview_positioning',
     '/dangh/pierre-sandbox/pull/1/page_data/review_menu',
+    '/dangh/pierre-sandbox/pull/1/page_data/header',
   ];
   it.each(allowed)('accepts %s', async (path) => {
     const { fn, calls } = fakeFetch();

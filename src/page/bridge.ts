@@ -25,7 +25,7 @@ import {
 
 const NAME = '[A-Za-z0-9_.-]+';
 const GET_PATH = new RegExp(
-  `^/(${NAME})/(${NAME})/pull/\\d+(/changes|/page_data/(diff_entries|diff_entry_lines|threads|thread_previews|thread_preview_positioning|review_menu))?$`,
+  `^/(${NAME})/(${NAME})/pull/\\d+(/changes|/page_data/(diff_entries|diff_entry_lines|threads|thread_previews|thread_preview_positioning|review_menu|header))?$`,
 );
 const RAW_PATH = new RegExp(`^/(${NAME})/(${NAME})/raw/[0-9a-f]{7,64}/.*[^/]$`);
 const NAME_ONLY = new RegExp(`^${NAME}$`);

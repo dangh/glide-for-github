@@ -46,12 +46,15 @@ const route = (headOid: string) => ({
   link: null,
 });
 
+/** The `page_data/header` payload `fetchHeadOid` reads (abridged), with the given head. */
+const header = (headSha: string) => ({ data: { pullRequest: { headSha, number: 7 }, mergeStatusButtonData: { headSha } }, link: null });
+
 function fakeRpc(heads: () => string) {
   const calls: unknown[][] = [];
   const rpc = {
     call: vi.fn(async (...args: unknown[]) => {
       calls.push(args);
-      return route(heads());
+      return String(args[1]).endsWith('/page_data/header') ? header(heads()) : route(heads());
     }),
   } as unknown as Rpc;
   return { rpc, calls };
@@ -79,12 +82,29 @@ const flush = async () => {
 };
 
 describe('fetchHeadOid', () => {
-  it('reads the head from the route JSON with one request and no diff loading', async () => {
+  it('reads the head from page_data/header (one small request, no route JSON, no diff loading)', async () => {
     const { rpc, calls } = fakeRpc(() => 'abc');
     await expect(fetchHeadOid(rpc, pr.ref)).resolves.toBe('abc');
     expect(calls).toHaveLength(1);
-    expect(String(calls[0]![1])).toMatch(/\/pull\/7\/changes$/);
-    expect(calls[0]![3]).toEqual({ dataRouter: true });
+    expect(String(calls[0]![1])).toMatch(/\/pull\/7\/page_data\/header$/);
+  });
+
+  it('falls back to the route JSON when the header has no head sha or fails', async () => {
+    for (const answer of [{ data: { pullRequest: {} }, link: null }, { data: null, link: null }, new Error('boom')]) {
+      const calls: unknown[][] = [];
+      const rpc = {
+        call: vi.fn(async (...args: unknown[]) => {
+          calls.push(args);
+          if (!String(args[1]).endsWith('/page_data/header')) return route('fromroute');
+          if (answer instanceof Error) throw answer;
+          return answer;
+        }),
+      } as unknown as Rpc;
+      await expect(fetchHeadOid(rpc, pr.ref)).resolves.toBe('fromroute');
+      expect(calls).toHaveLength(2);
+      expect(String(calls[1]![1])).toMatch(/\/pull\/7\/changes$/);
+      expect(calls[1]![3]).toEqual({ dataRouter: true });
+    }
   });
 });
 
@@ -117,7 +137,7 @@ describe('freshness polling', () => {
     await f.check();
     expect(usePr.getState().headMoved).toBe(true);
     expect(usePr.getState().pr).toBe(shownPr); // no auto reload: the PR data is untouched
-    expect(calls.every((c) => String(c[1]).endsWith('/changes'))).toBe(true); // route only, no diff_entries
+    expect(calls.every((c) => String(c[1]).endsWith('/page_data/header'))).toBe(true); // header only: no route, no diff_entries
   });
 
   it('keeps drafts when the head moves', async () => {
@@ -176,7 +196,7 @@ describe('freshness polling', () => {
       call: vi.fn(async (...args: unknown[]) => {
         calls.push(args);
         await gate;
-        return route(head);
+        return header(head);
       }),
     } as unknown as Rpc;
     const f = createFreshness({ rpc: () => rpc, doc: fakeDoc().doc });
@@ -232,7 +252,7 @@ describe('freshness polling', () => {
           peak = Math.max(peak, ++active);
           await gate;
           active--;
-          return route(head);
+          return header(head);
         }),
       } as unknown as Rpc;
       const f = createFreshness({ rpc: () => rpc, doc: fakeDoc().doc });
@@ -270,7 +290,7 @@ describe('freshness polling', () => {
   it('drops a result that arrives after the PR was reloaded, and survives request errors', async () => {
     let release!: (heads: string) => void;
     const rpc = {
-      call: vi.fn(() => new Promise((resolve) => (release = (h) => resolve(route(h))))),
+      call: vi.fn(() => new Promise((resolve) => (release = (h) => resolve(header(h))))),
     } as unknown as Rpc;
     const f = createFreshness({ rpc: () => rpc, doc: fakeDoc().doc });
     const pending = f.check();
@@ -304,11 +324,17 @@ describe('freshness polling', () => {
 
   describe('which writes trigger a check', () => {
     let routeCalls = 0;
+    let headChecks = 0;
     const installRpc = () => {
       routeCalls = 0;
+      headChecks = 0;
       return {
         call: vi.fn(async (method: string, path: string) => {
           if (method === 'applySuggestions') return {};
+          if (method === 'get' && String(path).endsWith('/page_data/header')) {
+            headChecks++;
+            return header(head);
+          }
           if (method === 'get' && String(path).endsWith('/changes')) routeCalls++;
           return route(head);
         }),
@@ -329,12 +355,12 @@ describe('freshness polling', () => {
       const ref = { commentId: 7, suggestionIndex: 0, path: 'a.ts', url: 'https://github.com/o/r/pull/7#discussion_r7' };
       usePr.getState().addToBatch(ref);
       await commitSuggestions([ref], 'm');
-      const afterCommit = routeCalls; // the commit's own PR reload
-      expect(afterCommit).toBeGreaterThan(0);
+      expect(routeCalls).toBeGreaterThan(0); // the commit's own PR reload
+      expect(headChecks).toBe(0);
       await vi.advanceTimersByTimeAsync(2999);
-      expect(routeCalls).toBe(afterCommit);
+      expect(headChecks).toBe(0);
       await vi.advanceTimersByTimeAsync(1);
-      expect(routeCalls).toBe(afterCommit + 1);
+      expect(headChecks).toBe(1);
       stop();
     });
 
@@ -344,7 +370,7 @@ describe('freshness polling', () => {
       const stop = startFreshness({ rpc: () => rpc, doc: fakeDoc().doc });
       scheduleRefresh(0);
       await vi.advanceTimersByTimeAsync(30_000);
-      expect(routeCalls).toBe(0);
+      expect(routeCalls + headChecks).toBe(0);
       stop();
     });
   });

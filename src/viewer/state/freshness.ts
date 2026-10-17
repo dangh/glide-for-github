@@ -1,7 +1,7 @@
 /**
  * Freshness: tells the user when the PR changed under them (a push), without ever reloading by itself.
  *
- * - The PR's head oid is read (`fetchHeadOid`: one route request, no diff loading) every 60 s while the viewer's
+ * - The PR's head oid is read (`fetchHeadOid`: one `page_data/header` request, ~5 KB, no diff loading) every 60 s while the viewer's
  *   document is visible, and after a write that can move the head (`noteWrite`: apply suggestions only; viewed,
  *   reactions, resolves and comments cannot, and the route is large on big PRs). Polling pauses while the tab is
  *   hidden and checks once, immediately, when it becomes visible again.
