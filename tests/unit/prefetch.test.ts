@@ -151,6 +151,40 @@ describe('createRoutePrefetch', () => {
   });
 });
 
+describe('diff_entries sharing during the page load (remounted viewer)', () => {
+  const DIFFS = '/react/react/pull/37778/page_data/diff_entries';
+  const q = (paths: string) => ({ raw: `paths=${paths}&w=0&range=${'a'.repeat(40)}` });
+
+  it('an identical request in flight or just answered is shared; another chunk is not', async () => {
+    const { calls, prefetch, respond, tick } = setup();
+    const first = prefetch.impl.get(DIFFS, q('a.ts'));
+    const again = prefetch.impl.get(DIFFS, q('a.ts')); // the remounted viewer's same first chunk
+    void prefetch.impl.get(DIFFS, q('b.ts'));
+    expect(calls).toHaveLength(2);
+    respond(0, [{ path: 'a.ts' }]);
+    await expect(first).resolves.toEqual({ data: [{ path: 'a.ts' }], link: null });
+    await expect(again).resolves.toEqual({ data: [{ path: 'a.ts' }], link: null });
+    tick(5_000);
+    void prefetch.impl.get(DIFFS, q('a.ts'));
+    expect(calls).toHaveLength(2);
+    tick(5_001); // past the TTL: a new request
+    void prefetch.impl.get(DIFFS, q('a.ts'));
+    expect(calls).toHaveLength(3);
+  });
+
+  it('a failed request is not shared afterwards, and requests without a pinned range are never shared', async () => {
+    const { calls, prefetch, respond } = setup();
+    const failing = prefetch.impl.get(DIFFS, q('a.ts'));
+    respond(0, { error: 'boom' }, 500);
+    await expect(failing).rejects.toMatchObject({ status: 500 });
+    void prefetch.impl.get(DIFFS, q('a.ts'));
+    expect(calls).toHaveLength(2);
+    void prefetch.impl.get(DIFFS, { raw: 'paths=a.ts&w=0' });
+    void prefetch.impl.get(DIFFS, { raw: 'paths=a.ts&w=0' });
+    expect(calls).toHaveLength(4);
+  });
+});
+
 describe('startWhenHeadReady', () => {
   it('starts at once when the head is parsed', () => {
     const start = vi.fn();

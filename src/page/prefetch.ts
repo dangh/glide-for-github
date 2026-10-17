@@ -13,6 +13,12 @@
  *   answered with the pre-write route;
  * - a failed prefetch is never served (the caller makes its own request, with its own error handling);
  * - any write through the bridge drops it, so nothing after a write can see the older route.
+ *
+ * Diff requests are shared the same way during the page load: GitHub replaces its layout ~0.5 s after the load
+ * event, which remounts the viewer while the first viewer's first `diff_entries` requests are in flight, and the
+ * second viewer asks for the same chunks again. Identical `page_data/diff_entries` requests (same path and query;
+ * the query pins `range` to commit oids, so the answer cannot change) share one request while in flight and for
+ * `ttlMs` after it succeeded. Failures are not shared.
  */
 import { isPierreActive, parsePrUrl } from '../shared/pr-url';
 import type { BridgeMethods, RpcImpl } from '../shared/rpc';
@@ -64,7 +70,30 @@ export function createRoutePrefetch(
       return method(...args);
     };
   }
+  /** In-flight and recent `diff_entries` requests by path + raw query. */
+  const diffs = new Map<string, { promise: Promise<GetResult>; settledAt?: number }>();
+  const shareDiffs = (p: string, query: unknown, o: unknown): Promise<GetResult> | undefined => {
+    const raw = (query as { raw?: unknown } | null | undefined)?.raw;
+    if (!p.endsWith('/page_data/diff_entries') || typeof raw !== 'string' || !/(^|&)range=[0-9a-f.]+(&|$)/.test(raw) || o !== undefined) {
+      return undefined;
+    }
+    const key = `${p}?${raw}`;
+    const hit = diffs.get(key);
+    if (hit && (hit.settledAt === undefined || now() - hit.settledAt <= ttlMs)) return hit.promise;
+    const entry: { promise: Promise<GetResult>; settledAt?: number } = { promise: Promise.resolve(base.get(p, query as Parameters<BridgeMethods['get']>[1])) };
+    diffs.set(key, entry);
+    entry.promise.then(
+      () => (entry.settledAt = now()),
+      () => {
+        if (diffs.get(key) === entry) diffs.delete(key);
+      },
+    );
+    return entry.promise;
+  };
+
   impl.get = (p, query, o) => {
+    const sharedDiff = shareDiffs(p, query, o);
+    if (sharedDiff) return sharedDiff;
     const opts = o as { dataRouter?: unknown; prefetched?: unknown } | undefined;
     const served = p === path && isEmptyQuery(query) && opts?.dataRouter === true && opts.prefetched === true;
     // The network request never carries `prefetched` (it only selects this cache).
