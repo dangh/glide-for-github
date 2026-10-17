@@ -51,8 +51,9 @@ describe('toThreadModels on the sandbox PR', () => {
     expect(c.reactions).toHaveLength(8);
     expect(c.reactions[0]).toEqual({ content: 'THUMBS_UP', count: 0, viewerHasReacted: false });
     expect(Object.keys(c).sort()).toEqual(
-      ['author', 'body', 'bodyHTML', 'bodyVersion', 'createdAt', 'databaseId', 'nodeId', 'reactions', 'state', 'viewerCanDelete', 'viewerCanUpdate'],
+      ['author', 'body', 'bodyHTML', 'bodyVersion', 'createdAt', 'databaseId', 'nodeId', 'reactions', 'state', 'url', 'viewerCanDelete', 'viewerCanUpdate'],
     );
+    expect(c.url).toBe('https://github.com/dangh/pierre-sandbox/pull/1#discussion_r4301727038');
   });
 });
 

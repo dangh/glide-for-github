@@ -10,7 +10,7 @@
  */
 import { requireToken, type RequireTokenOptions } from '../auth/requireToken';
 import { getToken } from '../auth/tokens';
-import { GithubApi, type ReactionContent } from '../github/api';
+import { GithubApi, type ReactionContent, type ReviewEvent } from '../github/api';
 import { isAuthError, WriteError } from '../github/errors';
 import { fetchThreads, type PrData } from '../github/private';
 import { toThreadModels, type CommentModel, type ThreadModel } from '../github/threads';
@@ -434,6 +434,99 @@ export async function setResolved(key: string, resolved: boolean): Promise<void>
   } catch (err) {
     apply(!resolved);
     throw err;
+  }
+}
+
+// ---- review submission (Task 10) --------------------------------------------------------------------
+
+/** Marks the viewer's pending comments as submitted (until the refetch brings GitHub's copy). */
+function markPendingSubmitted() {
+  const s = usePr.getState();
+  if (!s.threads.some((t) => t.comments.some((c) => c.state === 'pending'))) return;
+  s.setThreads(
+    s.threads.map((t) =>
+      t.comments.some((c) => c.state === 'pending') ? { ...t, comments: t.comments.map((c) => (c.state === 'pending' ? { ...c, state: 'submitted' as const } : c)) } : t,
+    ),
+  );
+}
+
+/** Drops the viewer's pending comments (and threads left empty) after the pending review was discarded. */
+function dropPendingComments() {
+  const s = usePr.getState();
+  if (!s.threads.some((t) => t.comments.some((c) => c.state === 'pending'))) return;
+  const threads: ThreadModel[] = [];
+  for (const t of s.threads) {
+    const comments = t.comments.filter((c) => c.state !== 'pending');
+    if (comments.length === t.comments.length) threads.push(t);
+    else if (comments.length > 0) threads.push({ ...t, comments });
+    else for (const c of t.comments) deleted.add(c.databaseId);
+  }
+  s.setThreads(threads);
+}
+
+/**
+ * Submits the viewer's review as Comment / Approve / Request changes with an optional summary (GraphQL
+ * `submitPullRequestReview`). With no pending review, an empty one is started first (at the shown head), as GitHub
+ * does for a review without inline comments. On success the pending count goes away, pending comments become
+ * submitted and the summary draft is cleared; on failure everything is kept.
+ */
+export async function submitReview(event: ReviewEvent, body: string): Promise<void> {
+  await withApi('submit a review', async (api) => api.submitReview(await reviewNodeId(api, true), event, body));
+  const s = usePr.getState();
+  s.setPendingReview(null);
+  s.clearDraft(draftKey.reviewSummary);
+  markPendingSubmitted();
+  scheduleRefresh();
+}
+
+/** Discards the viewer's pending review and its comments (GraphQL `deletePullRequestReview`). */
+export async function discardReview(): Promise<void> {
+  await withApi('discard a review', async (api) => {
+    const known = usePr.getState().pendingReview?.nodeId || (await api.pendingReview())?.nodeId;
+    if (known) await api.deleteReview(known); // none on GitHub: already gone, just clear it here
+  });
+  usePr.getState().setPendingReview(null);
+  dropPendingComments();
+  scheduleRefresh();
+}
+
+// ---- viewed (Task 10, Ruling 13: token first, GitHub session second) --------------------------------
+
+/** Latest viewed toggle per path: an older toggle that fails must not revert a newer one. */
+const viewedOps = new Map<string, number>();
+let viewedSeq = 0;
+
+/**
+ * Marks a file viewed / not viewed: optimistic (the file collapses or expands at once), then GraphQL
+ * `markFileAsViewed` / `unmarkFileAsViewed` with a stored token, else (no token, or GitHub refuses the token) GitHub's
+ * own `file_review` endpoint with the user's session through the bridge (no token prompt when that works). Reverted
+ * and rethrown on failure.
+ */
+export async function setFileViewed(path: string, viewed: boolean): Promise<void> {
+  const pr = currentPr();
+  if (usePr.getState().viewed.has(path) === viewed) return;
+  const op = ++viewedSeq;
+  viewedOps.set(path, op);
+  usePr.getState().setViewedLocal(path, viewed);
+  const { owner, repo, number } = pr.ref;
+  try {
+    await withSessionFallback(
+      viewed ? 'mark files as viewed' : 'unmark files as viewed',
+      async (api) => {
+        const id = await prNodeId(api);
+        await (viewed ? api.markViewed(id, path) : api.unmarkViewed(id, path));
+      },
+      async () => {
+        const rpc = session.rpc;
+        if (!rpc) throw new WriteError('network', 'Not connected to the GitHub page.', { owner });
+        await rpc.call(viewed ? 'markViewed' : 'unmarkViewed', owner, repo, number, path);
+      },
+    );
+  } catch (err) {
+    if (viewedOps.get(path) === op && usePr.getState().pr === pr) usePr.getState().setViewedLocal(path, !viewed);
+    throw err;
+  } finally {
+    if (viewedOps.get(path) === op) viewedOps.delete(path);
   }
 }
 

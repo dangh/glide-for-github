@@ -6,9 +6,10 @@
  * for it and does not measure headers.
  */
 import { memo, useCallback } from 'react';
-import { isNoTokenError, requireToken } from '../auth/requireToken';
+import { isNoTokenError } from '../auth/requireToken';
 import type { FileSummary } from '../github/private';
 import { fileTarget } from '../state/compose';
+import { errorMessage, setFileViewed } from '../state/review';
 import { session } from '../state/session';
 import { commentCount, isCollapsed, threadsByPath, usePr, type FileLoadState } from '../state/store';
 import { filesChangedUrl, HEADER_HEIGHT } from '../state/view';
@@ -99,24 +100,22 @@ export const FileHeader = memo(function FileHeader({ path }: { path: string }) {
   const viewed = usePr((s) => s.viewed.has(path));
   const collapsed = usePr((s) => isCollapsed(s, path));
   const comments = usePr((s) => commentCount(threadsByPath(s.threads).get(path)));
-  const owner = usePr((s) => s.pr?.ref.owner ?? '');
 
   const toggleCollapsed = useCallback(() => {
     const s = usePr.getState();
     s.setCollapsed(path, !isCollapsed(s, path));
   }, [path]);
 
+  // Optimistic (checks and collapses at once), reverted with an error toast if GitHub refuses (see setFileViewed).
   const onViewed = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
-      // Token-gated (Task 10 adds the optimistic toggle and the GraphQL mutation); keep the current state.
-      // Until then, saving a token here only stores it; cancelling leaves everything unchanged.
-      event.preventDefault();
-      requireToken(owner, 'mark files as viewed').catch((err: unknown) => {
-        if (isNoTokenError(err)) return; // cancelled: nothing to report
-        usePr.getState().setNotice({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+      const next = event.currentTarget.checked;
+      setFileViewed(path, next).catch((err: unknown) => {
+        if (isNoTokenError(err)) return; // token prompt cancelled: reverted, nothing to report
+        usePr.getState().setNotice({ kind: 'error', message: `Could not ${next ? 'mark' : 'unmark'} ${path} as viewed. ${errorMessage(err)}` });
       });
     },
-    [owner],
+    [path],
   );
 
   if (!summary) return null;

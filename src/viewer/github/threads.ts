@@ -17,6 +17,8 @@ export interface CommentModel {
   reactions: { content: string; count: number; viewerHasReacted: boolean }[];
   viewerCanUpdate: boolean;
   viewerCanDelete: boolean;
+  /** The comment on GitHub (`…/pull/<n>#discussion_r<databaseId>`), when GitHub sent it. */
+  url?: string;
   /** Added locally after a write, not yet confirmed by a thread refetch (body is plain text, no `bodyHTML`). */
   provisional?: boolean;
 }
@@ -68,6 +70,7 @@ function toComment(c: GithubComment): CommentModel {
     })),
     viewerCanUpdate: c.viewerCanUpdate === true,
     viewerCanDelete: c.viewerCanDelete === true,
+    ...(typeof c.url === 'string' && c.url.startsWith('https://github.com/') ? { url: c.url } : {}),
   };
 }
 

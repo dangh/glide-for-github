@@ -1,17 +1,25 @@
 /**
- * Threads and the inline composer, end to end on the sandbox PR ONLY (tests/sandbox.json, dangh/pierre-sandbox#1).
+ * Threads, the inline composer and the review workflow, end to end on the sandbox PR ONLY (tests/sandbox.json,
+ * dangh/pierre-sandbox#1).
  *
  * - "typing keeps focus…" is read-only (a composer is opened and typed in, never posted).
- * - "writes…" posts with the token saved once in .e2e-profile's extension storage (`npm run e2e:token`); it is
- *   skipped when no token is stored. Every comment it creates carries a unique marker and is deleted at the end
- *   (also on failure), and a pending review it starts is discarded. Results are checked against GitHub's own
- *   data (`page_data/threads` + `thread_previews`, the endpoints GitHub's Files changed page reads) in a fresh
- *   github.com tab, and the first comment visually on GitHub's Files changed page.
- * The token is used only inside the extension (Pierre's own code); the test never reads its value. Resolve runs twice:
- * with the active (classic) token through the API, and with the fine-grained entries the setup saved in
- * `pierre.e2e.fineGrainedTokens` swapped in (GitHub refuses those, so Pierre falls back to the GitHub session).
+ * - The write tests use the token saved once in .e2e-profile's extension storage (`npm run e2e:token`; the user's
+ *   fine-grained token); they skip when no token is stored. Every comment they create carries a `pierre-e2e-` marker
+ *   and is deleted at the end (also on failure), and a pending review they start is discarded. Results are checked
+ *   against GitHub's own data (`page_data/threads` + `thread_previews`, the route's embedded data, `gh api`).
+ * - Resolve runs with the active fine-grained token (GitHub refuses it, Pierre falls back to the GitHub session); the
+ *   classic-token API path needs `pierre.e2e.classicToken` and skips without it (key presence only).
+ * - Task 10: review submission (Comment with two comments, discard; Approve / Request changes are checked by their
+ *   request payload only, as the viewer authored the sandbox PR), Viewed both ways (token, then the session fallback;
+ *   every file's viewed state is restored), and apply suggestion (real commits on `review-me`; the branch is then
+ *   force-pushed back to its pre-test head from a /tmp clone).
+ * The token is used only inside the extension (Pierre's own code); the tests never read its value.
  */
-import type { Frame, Locator, Page, Request } from '@playwright/test';
+import type { Frame, Locator, Page, Request, Route } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { expect, openPierre, prUrl, SANDBOX, test, type Viewer } from './fixtures';
 
 const FILE = 'src/util/math.ts';
@@ -551,3 +559,412 @@ async function cleanup(page: Page, frame: Frame) {
   const left = (await githubThreads(page)).flatMap((t) => t.comments).filter((c) => c.body.startsWith(PREFIX));
   expect(left, 'e2e comments left on the sandbox').toEqual([]);
 }
+
+// ---- Task 10: review submission, viewed, apply suggestion ------------------------------------------------
+
+const SANDBOX_REPO = `repos/${SANDBOX.owner}/${SANDBOX.repo}`;
+const BRANCH = 'review-me';
+
+/** Read-only `gh api` on the sandbox repo (the user's gh login); JSON result. */
+function ghApi<T>(path: string): T {
+  expect(path.startsWith(`${SANDBOX_REPO}/`), 'gh api only on the sandbox repo').toBe(true);
+  return JSON.parse(execFileSync('gh', ['api', '--paginate', '--slurp', path], { encoding: 'utf8' })).flat() as T;
+}
+const ghHead = (): string => (ghApi<{ object: { sha: string } }[]>(`${SANDBOX_REPO}/git/ref/heads/${BRANCH}`)[0]!).object.sha;
+function ghFileAt(sha: string, path: string): string[] {
+  const [f] = ghApi<{ content: string }[]>(`${SANDBOX_REPO}/contents/${path}?ref=${sha}`);
+  return Buffer.from(f!.content, 'base64').toString('utf8').split('\n');
+}
+
+/** Force-pushes the sandbox branch back to `sha` from a throwaway /tmp clone (sandbox only). */
+function restoreBranch(sha: string) {
+  expect(sha).toMatch(/^[0-9a-f]{40}$/);
+  const dir = mkdtempSync(join(tmpdir(), 'pierre-sandbox-'));
+  try {
+    execFileSync('git', ['clone', '-q', '--no-checkout', `https://github.com/${SANDBOX.owner}/${SANDBOX.repo}`, dir], { stdio: 'pipe' });
+    execFileSync('git', ['-C', dir, 'push', '-q', '--force', 'origin', `${sha}:refs/heads/${BRANCH}`], { stdio: 'pipe' });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** Viewed state per file as GitHub's own Files changed page has it (route `diffSummaries[].markedAsViewed`). */
+async function githubViewed(page: Page): Promise<Record<string, boolean>> {
+  const gh = await page.context().newPage();
+  try {
+    await gh.goto(prUrl(SANDBOX, '/changes'), { waitUntil: 'domcontentloaded' });
+    return await gh.evaluate(() => {
+      for (const el of document.querySelectorAll('script[data-target="react-app.embeddedData"]')) {
+        const route = JSON.parse(el.textContent ?? '{}')?.payload?.pullRequestsChangesRoute;
+        if (route) return Object.fromEntries((route.diffSummaries as { path: string; markedAsViewed: boolean }[]).map((d) => [d.path, d.markedAsViewed === true]));
+      }
+      throw new Error('no route data');
+    });
+  } finally {
+    await gh.close();
+  }
+}
+
+/** Runs `fn` with no token in Pierre (pierre.tokens backed up and emptied inside the extension page, then restored). */
+async function withoutTokens<T>(frame: Frame, fn: () => Promise<T>): Promise<T> {
+  await frame.evaluate(async () => {
+    const got = await chrome.storage.local.get(['pierre.tokens', 'pierre.e2e.activeBackup']);
+    if (!got['pierre.e2e.activeBackup']) await chrome.storage.local.set({ 'pierre.e2e.activeBackup': got['pierre.tokens'] ?? {} });
+    await chrome.storage.local.set({ 'pierre.tokens': {} });
+  });
+  try {
+    return await fn();
+  } finally {
+    await restoreTokens(frame);
+  }
+}
+
+/** Write paths taken by Pierre: `graphql:<op>` (token API) and `session:<METHOD> <endpoint>` (bridge, GitHub session). */
+function trackWrites(page: Page, ops: RegExp, endpoints: RegExp) {
+  const seen: string[] = [];
+  const onRequest = (r: Request) => {
+    if (r.url() === 'https://api.github.com/graphql') {
+      const op = ops.exec((JSON.parse(r.postData() ?? '{}').query as string | undefined) ?? '')?.[1];
+      if (op) seen.push(`graphql:${op}`);
+    } else if (r.url().startsWith('https://github.com/') && endpoints.test(new URL(r.url()).pathname)) {
+      seen.push(`session:${r.method()} ${new URL(r.url()).pathname.split('/').pop()}`);
+    }
+  };
+  page.on('request', onRequest);
+  return { seen, stop: () => page.off('request', onRequest) };
+}
+
+const header = (viewer: Viewer, path: string) => viewer.locator.locator(`.fh[data-path="${path}"]`);
+const reviewButton = (viewer: Viewer) => viewer.locator.getByTestId('review-button');
+
+async function discardLeftoverReview(viewer: Viewer): Promise<boolean> {
+  return viewer.frame().evaluate(() =>
+    window.__pierre!.review.withApi('clean up', async (api) => {
+      const pending = await api.pendingReview();
+      if (pending) await api.deleteReview(pending.nodeId);
+      return pending !== null;
+    }),
+  );
+}
+
+test.describe('review submission (Task 10)', () => {
+  test('two review comments submitted as Comment are one review on GitHub; discard removes the pending review; Approve / Request changes payloads', async ({ page }) => {
+    test.setTimeout(420_000);
+    let viewer = await openSandbox(page);
+    test.skip(!(await tokenStored(viewer.frame())), 'e2e writes pending token: run `npm run e2e:token` once');
+    expect(prUrl(SANDBOX)).toBe('https://github.com/dangh/pierre-sandbox/pull/1'); // never post anywhere else
+    if (await discardLeftoverReview(viewer)) viewer = await openSandbox(page);
+
+    const first = `${MARK} submit-1`;
+    const second = `${MARK} submit-2`;
+    const summary = `${MARK} summary`;
+    const dropped = `${MARK} discarded`;
+    try {
+      await test.step('start a review with two comments: the button counts them', async () => {
+        await plusOn(viewer, 11);
+        let c = composer(viewer, `${FILE}:additions:-11`);
+        await expect(c.locator('textarea')).toBeFocused();
+        await page.keyboard.type(first);
+        await c.getByRole('button', { name: 'Start a review' }).click();
+        await expect(c).toHaveCount(0);
+        await plusOn(viewer, 13);
+        c = composer(viewer, `${FILE}:additions:-13`);
+        await expect(c.locator('textarea')).toBeFocused();
+        await page.keyboard.type(second);
+        await c.getByRole('button', { name: 'Add review comment' }).click();
+        await expect(c).toHaveCount(0);
+        await expect(reviewButton(viewer)).toHaveText('Review (2 pending) ▾');
+      });
+
+      await test.step('submit as Comment: GitHub shows one review with both comments', async () => {
+        await reviewButton(viewer).click();
+        const panel = viewer.locator.locator('.review-panel');
+        await expect(panel.getByText("Pull request authors can't approve their own pull requests.")).toBeVisible();
+        await expect(panel.locator('input[value="APPROVE"]')).toBeDisabled();
+        await expect(panel.locator('input[value="REQUEST_CHANGES"]')).toBeDisabled();
+        await expect(panel.locator('input[value="COMMENT"]')).toBeChecked();
+        await panel.locator('textarea').fill(summary);
+        await panel.getByRole('button', { name: 'Submit review' }).click();
+        await expect(panel).toHaveCount(0);
+        await expect(reviewButton(viewer)).toHaveText('Review ▾');
+        const findReview = () => ghApi<{ id: number; body: string; state: string }[]>(`${SANDBOX_REPO}/pulls/${SANDBOX.number}/reviews`).find((r) => r.body === summary);
+        await expect.poll(() => findReview()?.state, { timeout: 30_000 }).toBe('COMMENTED');
+        const review = findReview()!;
+        const comments = ghApi<{ body: string; line: number }[]>(`${SANDBOX_REPO}/pulls/${SANDBOX.number}/reviews/${review.id}/comments`);
+        expect(comments.map((c) => c.body).sort()).toEqual([first, second].sort());
+        expect(await githubPendingReview(page)).toBeNull();
+        console.log(`[e2e] submitted review ${review.id}: ${comments.length} comments`);
+      });
+
+      await test.step('discard: the pending review and its comment are gone on GitHub', async () => {
+        await plusOn(viewer, 15);
+        const c = composer(viewer, `${FILE}:additions:-15`);
+        await expect(c.locator('textarea')).toBeFocused();
+        await page.keyboard.type(dropped);
+        await c.getByRole('button', { name: 'Start a review' }).click();
+        await expect(reviewButton(viewer)).toHaveText('Review (1 pending) ▾');
+        expect((await githubPendingReview(page))?.threads).toEqual([expect.objectContaining({ bodies: [dropped] })]);
+        await reviewButton(viewer).click();
+        const panel = viewer.locator.locator('.review-panel');
+        await panel.getByRole('button', { name: 'Discard pending review' }).click();
+        await expect(panel).toContainText('1 pending comment');
+        await panel.getByRole('button', { name: 'Discard review' }).click();
+        await expect(reviewButton(viewer)).toHaveText('Review ▾');
+        await expect(fileItem(viewer).locator('.thread', { hasText: dropped })).toHaveCount(0);
+        expect(await githubPendingReview(page)).toBeNull();
+        const all = ghApi<{ body: string }[]>(`${SANDBOX_REPO}/pulls/${SANDBOX.number}/comments`);
+        expect(all.some((c) => c.body === dropped)).toBe(false);
+        await page.keyboard.press('Escape');
+      });
+
+      await test.step('Approve / Request changes: request payload only (the viewer authored the sandbox PR)', async () => {
+        // Pretend another reviewer (store only), and answer GitHub's mutations locally: nothing reaches GitHub.
+        const sent: { op: string; variables: unknown }[] = [];
+        const handler = async (route: Route) => {
+          const body = JSON.parse(route.request().postData() ?? '{}') as { query?: string; variables?: unknown };
+          const op = /^mutation (StartReview|SubmitReview)\b/.exec(body.query ?? '')?.[1];
+          if (!op) return route.continue();
+          sent.push({ op, variables: body.variables });
+          const data = op === 'StartReview' ? { addPullRequestReview: { pullRequestReview: { id: 'PRR_e2e_fake' } } } : { submitPullRequestReview: { pullRequestReview: { id: 'PRR_e2e_fake' } } };
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data }) });
+        };
+        await page.context().route('https://api.github.com/graphql', handler);
+        const author = await viewer.frame().evaluate(() => {
+          const s = window.__pierre!.store.getState();
+          const was = s.pr!.author;
+          window.__pierre!.store.setState({ pr: { ...s.pr!, author: 'pierre-e2e-someone-else' } });
+          return was;
+        });
+        try {
+          for (const [event, text] of [['APPROVE', ''], ['REQUEST_CHANGES', `${MARK} please change`]] as const) {
+            await reviewButton(viewer).click();
+            const panel = viewer.locator.locator('.review-panel');
+            await expect(panel.getByText('Give feedback and approve merging these changes.')).toBeVisible();
+            await panel.locator(`input[value="${event}"]`).check();
+            if (text) await panel.locator('textarea').fill(text);
+            await panel.getByRole('button', { name: 'Submit review' }).click();
+            await expect(panel).toHaveCount(0);
+            expect(sent.at(-1)).toEqual({ op: 'SubmitReview', variables: { input: { pullRequestReviewId: 'PRR_e2e_fake', event, body: text } } });
+          }
+          expect(sent.map((s) => s.op)).toEqual(['StartReview', 'SubmitReview', 'StartReview', 'SubmitReview']);
+        } finally {
+          await page.context().unroute('https://api.github.com/graphql', handler);
+          await viewer.frame().evaluate((a) => {
+            const s = window.__pierre!.store.getState();
+            window.__pierre!.store.setState({ pr: { ...s.pr!, author: a } });
+          }, author);
+        }
+        expect(await githubPendingReview(page)).toBeNull();
+      });
+    } finally {
+      await cleanup(page, viewer.frame());
+    }
+  });
+});
+
+test.describe('viewed sync (Task 10)', () => {
+  test('Viewed in Pierre shows on GitHub and vice versa; the session fallback marks files without a token', async ({ page }) => {
+    test.setTimeout(300_000);
+    let viewer = await openSandbox(page);
+    const initial = await githubViewed(page);
+    console.log(`[e2e] viewed before: ${Object.values(initial).filter(Boolean).length}/${Object.keys(initial).length}`);
+    const OTHER = 'config/settings.json';
+    const writes = trackWrites(page, /\{\s*((?:un)?markFileAsViewed)\(/, /\/file_review$/);
+    const setInPierre = async (path: string, on: boolean) => {
+      const box = header(viewer, path).locator('.fh-viewed input');
+      await expect(box).toBeChecked({ checked: !on });
+      await box.click();
+      await expect(box).toBeChecked({ checked: on });
+      await expect.poll(async () => (await githubViewed(page))[path], { timeout: 30_000 }).toBe(on);
+      await expect(viewer.locator.getByRole('dialog')).toHaveCount(0); // never prompted
+      await expect(viewer.locator.locator('.toast-error')).toHaveCount(0);
+    };
+    try {
+      // Start from "not viewed" for the two files used.
+      await viewer.frame().evaluate(async (paths) => {
+        for (const p of paths) await window.__pierre!.session.rpc!.call('unmarkViewed', 'dangh', 'pierre-sandbox', 1, p);
+      }, [FILE, OTHER].filter((p) => initial[p]));
+      if (initial[FILE] || initial[OTHER]) viewer = await openSandbox(page);
+
+      await test.step('Pierre → GitHub with the stored token (token API, or the session when GitHub refuses the token)', async () => {
+        writes.seen.length = 0;
+        await setInPierre(FILE, true);
+        expect(await viewer.item(FILE)).toMatchObject({ collapsed: true });
+        console.log(`[e2e] viewed with token: ${writes.seen.join(' → ')}`);
+        expect(writes.seen.at(-1)).toMatch(/^(graphql:markFileAsViewed|session:POST file_review)$/);
+        if (writes.seen.length > 1) expect(writes.seen).toEqual(['graphql:markFileAsViewed', 'session:POST file_review']);
+        writes.seen.length = 0;
+        await setInPierre(FILE, false);
+        console.log(`[e2e] unviewed with token: ${writes.seen.join(' → ')}`);
+        expect(writes.seen.at(-1)).toMatch(/^(graphql:unmarkFileAsViewed|session:DELETE file_review)$/);
+      });
+
+      await test.step('token refused (GitHub\'s FORBIDDEN answer, simulated locally) → the GitHub session, no prompt', async () => {
+        // The stored fine-grained token IS accepted for markFileAsViewed (seen above), so GitHub's refusal of a token
+        // ("Resource not accessible by personal access token") is played locally; the session write is real.
+        const refuse = async (route: Route) => {
+          const q = (JSON.parse(route.request().postData() ?? '{}').query as string | undefined) ?? '';
+          const op = /\{\s*((?:un)?markFileAsViewed)\(/.exec(q)?.[1];
+          if (!op) return route.continue();
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ data: { [op]: null }, errors: [{ type: 'FORBIDDEN', path: [op], message: 'Resource not accessible by personal access token' }] }),
+          });
+        };
+        await page.context().route('https://api.github.com/graphql', refuse);
+        try {
+          writes.seen.length = 0;
+          await setInPierre(FILE, true);
+          await setInPierre(FILE, false);
+          expect(writes.seen).toEqual(['graphql:markFileAsViewed', 'session:POST file_review', 'graphql:unmarkFileAsViewed', 'session:DELETE file_review']);
+        } finally {
+          await page.context().unroute('https://api.github.com/graphql', refuse);
+        }
+      });
+
+      await test.step('no token: GitHub session only (file_review), no prompt', async () => {
+        await withoutTokens(viewer.frame(), async () => {
+          writes.seen.length = 0;
+          await setInPierre(FILE, true);
+          await setInPierre(FILE, false);
+          expect(writes.seen).toEqual(['session:POST file_review', 'session:DELETE file_review']);
+        });
+      });
+
+      await test.step('GitHub → Pierre: a file marked on GitHub\'s Files changed is viewed in Pierre after reload', async () => {
+        const digest = await viewer.frame().evaluate((p) => window.__pierre!.store.getState().files.get(p)!.digest, OTHER);
+        const gh = await page.context().newPage();
+        await gh.goto(prUrl(SANDBOX, `/changes#diff-${digest}`), { waitUntil: 'load' });
+        const region = gh.getByRole('region', { name: /config\/settings\.json/ });
+        const toggle = region.locator('button[aria-pressed]', { hasText: 'Viewed' });
+        await expect(toggle).toHaveAttribute('aria-pressed', 'false', { timeout: 30_000 });
+        // A click while GitHub is still hydrating can be lost: click until GitHub shows it pressed.
+        await expect(async () => {
+          if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click({ timeout: 5_000 });
+          await expect(toggle).toHaveAttribute('aria-pressed', 'true', { timeout: 3_000 });
+        }).toPass({ timeout: 45_000, intervals: [1_000, 2_000] });
+        await gh.close();
+        await expect.poll(async () => (await githubViewed(page))[OTHER], { timeout: 30_000 }).toBe(true);
+        viewer = await openSandbox(page);
+        await viewer.scrollToFile(OTHER);
+        await expect(header(viewer, OTHER).locator('.fh-viewed input')).toBeChecked();
+        await expect(viewer.locator.getByTestId('viewed-counter')).toHaveText('1 / 20 viewed');
+        expect(await viewer.item(OTHER)).toMatchObject({ collapsed: true });
+        await setInPierre(OTHER, false);
+      });
+    } finally {
+      writes.stop();
+      // Restore every file's viewed state (GitHub session, through Pierre's bridge).
+      const now = await githubViewed(page);
+      const diff = Object.keys(initial).filter((p) => now[p] !== initial[p]);
+      await viewer.frame().evaluate(async ({ diff, initial }) => {
+        for (const p of diff) await window.__pierre!.session.rpc!.call(initial[p] ? 'markViewed' : 'unmarkViewed', 'dangh', 'pierre-sandbox', 1, p);
+      }, { diff, initial });
+      expect(await githubViewed(page)).toEqual(initial);
+    }
+  });
+});
+
+test.describe('apply suggestion (Task 10)', () => {
+  test('commit one suggestion, then a batch of two: new commits on review-me with the suggested text, GitHub marks them applied; branch restored', async ({ page }) => {
+    test.setTimeout(480_000);
+    let viewer = await openSandbox(page);
+    test.skip(!(await tokenStored(viewer.frame())), 'needs a token to post the suggestion comments: run `npm run e2e:token` once');
+    expect(prUrl(SANDBOX)).toBe('https://github.com/dangh/pierre-sandbox/pull/1');
+    expect(await viewer.frame().evaluate(() => window.__pierre!.store.getState().pr!.viewer.canApplySuggestion)).toBe(true);
+    if (await discardLeftoverReview(viewer)) viewer = await openSandbox(page);
+    const before = ghHead();
+    console.log(`[e2e] ${BRANCH} head before: ${before}`);
+    expect(await viewer.frame().evaluate(() => window.__pierre!.store.getState().pr!.headOid)).toBe(before);
+
+    // Suggestions on new-side lines of FILE (each replaces one line, so the others keep their line numbers).
+    const lines = ghFileAt(before, FILE);
+    const suggestions = [
+      { name: 'A', line: 13 },
+      { name: 'B', line: 11 },
+      { name: 'C', line: 17 },
+    ].map((s) => ({ ...s, text: `${lines[s.line - 1]} // ${MARK} ${s.name}`, body: `${MARK} apply ${s.name}` }));
+    const thread = (body: string) => fileItem(viewer).locator('.thread', { hasText: body });
+    /** GitHub's thread data can lag a just-created comment by a moment: refetch until Pierre has every one. */
+    const threadsShown = (bodies: string[]) =>
+      expect
+        .poll(
+          () =>
+            viewer.frame().evaluate(async (list) => {
+              await window.__pierre!.review.refreshThreads();
+              const all = window.__pierre!.store.getState().threads.flatMap((t) => t.comments.map((c) => c.body));
+              return list.every((b) => all.some((x) => x.startsWith(b)));
+            }, bodies),
+          { timeout: 30_000, intervals: [500, 1_000, 2_000] },
+        )
+        .toBe(true);
+
+    try {
+      await viewer.frame().evaluate(
+        async ({ items, head }) => {
+          const r = window.__pierre!.review;
+          await r.withApi('post e2e suggestions', async (api) => {
+            for (const s of items) {
+              await api.createComment({ path: 'src/util/math.ts', line: s.line, side: 'additions', commitId: head, body: `${s.body}\n\`\`\`suggestion\n${s.text}\n\`\`\`` });
+            }
+          });
+        },
+        { items: suggestions, head: before },
+      );
+      viewer = await openSandbox(page);
+      await threadsShown(suggestions.map((s) => s.body));
+
+      let afterOne = '';
+      await test.step('Commit suggestion (single) → one commit with the suggested line; the thread is resolved on GitHub', async () => {
+        const a = suggestions[0]!;
+        await expect(thread(a.body).getByRole('button', { name: 'Commit suggestion' })).toBeVisible();
+        await thread(a.body).getByRole('button', { name: 'Commit suggestion' }).click();
+        const dialog = viewer.locator.getByRole('dialog');
+        await expect(dialog.locator('input[name="commit-message"]')).toHaveValue('Apply suggestions from code review');
+        await dialog.getByRole('button', { name: 'Commit changes' }).click();
+        await expect(dialog).toHaveCount(0, { timeout: 60_000 });
+        await expect.poll(() => ghHead(), { timeout: 30_000 }).not.toBe(before);
+        afterOne = ghHead();
+        const [commit] = ghApi<{ commit: { message: string }; parents: { sha: string }[] }[]>(`${SANDBOX_REPO}/commits/${afterOne}`);
+        expect(commit!.commit.message.split('\n')[0]).toBe('Apply suggestions from code review');
+        expect(commit!.parents.map((p) => p.sha)).toEqual([before]);
+        expect(ghFileAt(afterOne, FILE)[a.line - 1]).toBe(a.text);
+        await expect.poll(async () => threadWith(await githubThreads(page), a.body)?.isResolved, { timeout: 30_000 }).toBe(true);
+        // Pierre reloaded the PR: the new head is shown.
+        await expect.poll(() => viewer.frame().evaluate(() => window.__pierre!.store.getState().pr!.headOid), { timeout: 30_000 }).toBe(afterOne);
+        console.log(`[e2e] ${BRANCH} after single: ${afterOne}`);
+      });
+
+      await test.step('Add suggestion to batch ×2 → "Commit suggestions" → one commit with both lines; both threads resolved', async () => {
+        viewer = await openSandbox(page);
+        const [, b, c] = suggestions;
+        await threadsShown([b!.body, c!.body]);
+        for (const s of [b!, c!]) await thread(s.body).getByRole('button', { name: 'Add suggestion to batch' }).click();
+        const bar = viewer.locator.locator('.batch-bar');
+        await expect(bar).toContainText('2 suggestions in batch');
+        await bar.getByRole('button', { name: 'Commit suggestions' }).click();
+        const dialog = viewer.locator.getByRole('dialog');
+        await dialog.locator('input[name="commit-message"]').fill(`${MARK} batch`);
+        await dialog.getByRole('button', { name: 'Commit changes' }).click();
+        await expect(dialog).toHaveCount(0, { timeout: 60_000 });
+        await expect(bar).toHaveCount(0);
+        await expect.poll(() => ghHead(), { timeout: 30_000 }).not.toBe(afterOne);
+        const afterBatch = ghHead();
+        const [commit] = ghApi<{ commit: { message: string }; parents: { sha: string }[] }[]>(`${SANDBOX_REPO}/commits/${afterBatch}`);
+        expect(commit!.commit.message.split('\n')[0]).toBe(`${MARK} batch`);
+        expect(commit!.parents.map((p) => p.sha)).toEqual([afterOne]);
+        const file = ghFileAt(afterBatch, FILE);
+        for (const s of suggestions) expect(file[s.line - 1]).toBe(s.text);
+        const gh = await githubThreads(page);
+        expect([b!, c!].map((s) => threadWith(gh, s.body)?.isResolved)).toEqual([true, true]);
+        console.log(`[e2e] ${BRANCH} after batch: ${afterBatch}`);
+      });
+    } finally {
+      await cleanup(page, viewer.frame());
+      if (ghHead() !== before) restoreBranch(before);
+      await expect.poll(() => ghHead(), { timeout: 30_000 }).toBe(before);
+      console.log(`[e2e] ${BRANCH} restored to: ${ghHead()}`);
+    }
+  });
+});

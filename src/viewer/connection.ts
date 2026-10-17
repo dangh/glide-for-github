@@ -4,9 +4,9 @@
  * The content script posts `{type: 'pierre:port', colorMode}` with a MessagePort to this frame, and may
  * post a replacement at any time (bridge-ready race). `createConnection` exposes one stable `rpc` facade:
  * calls wait for the first port, and a call that fails because its port was replaced (`closed`) is re-issued
- * on the new port.
+ * on the new port, for reads and applySuggestions only (see `RETRY_ON_CLOSED`).
  */
-import { BridgeError, createRpcClient, type BridgeMethods, type RpcClient } from '../shared/rpc';
+import { BridgeError, createRpcClient, RETRY_ON_CLOSED, type BridgeMethods, type RpcClient } from '../shared/rpc';
 import type { PrRef } from '../shared/pr-url';
 import type { Rpc } from './github/private';
 
@@ -81,7 +81,8 @@ export function createConnection(win: Window, options: ConnectionOptions = {}): 
       try {
         return await current.call(method, ...args);
       } catch (err) {
-        if (disposed || attempt >= 2 || !(err instanceof BridgeError) || err.code !== 'closed') throw err;
+        // Session writes other than applySuggestions (same idempotency key) may already have reached GitHub: never re-send them.
+        if (disposed || attempt >= 2 || !RETRY_ON_CLOSED.has(method) || !(err instanceof BridgeError) || err.code !== 'closed') throw err;
         await nextClient(current);
       }
     }

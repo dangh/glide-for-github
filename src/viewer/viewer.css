@@ -965,3 +965,130 @@ button {
     transform: rotate(360deg);
   }
 }
+
+/* Review menu (Task 10): "Finish your review" panel under the toolbar's Review button */
+.review-menu .review-panel {
+  left: auto;
+  right: 0;
+  width: min(440px, 92vw);
+  padding: 12px;
+  font-size: 13px;
+}
+
+.review-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.review-summary {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  padding: 6px 8px;
+  font: 13px/1.5 var(--pierre-font);
+  color: var(--pierre-fg);
+  background: var(--pierre-bg);
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+}
+
+.review-events {
+  border: 0;
+  margin: 8px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.review-event {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.review-event > input {
+  margin-top: 3px;
+}
+
+.review-event-label {
+  display: block;
+  font-weight: 600;
+}
+
+.review-event-desc {
+  display: block;
+  color: var(--pierre-muted);
+  font-size: 12px;
+}
+
+.review-event-disabled {
+  cursor: not-allowed;
+}
+
+.review-event-disabled .review-event-label {
+  color: var(--pierre-muted);
+}
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.review-confirm {
+  font-size: 12px;
+}
+
+.btn-danger-text {
+  color: var(--pierre-danger);
+}
+
+.btn-danger {
+  color: #fff;
+  background: var(--pierre-danger);
+}
+
+/* Apply suggestion */
+.suggestion-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.suggestion-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.suggestion-label {
+  color: var(--pierre-muted);
+  font-size: 12px;
+}
+
+.batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--pierre-accent-bg);
+  border-bottom: 1px solid var(--pierre-accent-border);
+  font-size: 13px;
+  flex: none;
+}
+
+.commit-dialog .modal-field input[type='text'],
+.commit-dialog .modal-field textarea {
+  font: 13px var(--pierre-font);
+  font-weight: normal;
+  padding: 5px 8px;
+  color: var(--pierre-fg);
+  background: var(--pierre-bg);
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+}

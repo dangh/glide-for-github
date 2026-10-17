@@ -7,13 +7,13 @@ import { getOrCreateWorkerPoolSingleton, type WorkerPoolManager } from '@pierre/
 import { useEffect, useMemo } from 'react';
 import type { PrRef } from '../shared/pr-url';
 import type { DisplaySettings } from '../shared/settings';
-import { fetchPrData, fetchThreads, type Rpc } from './github/private';
-import { toThreadModels } from './github/threads';
+import type { Rpc } from './github/private';
 import { startLoader } from './state/controller';
-import { initPendingReview, resetReviewCaches } from './state/review';
+import { loadPr } from './state/load';
 import { session } from './state/session';
 import { effectiveThemeType, useSettings } from './state/settings';
 import { usePr } from './state/store';
+import { BatchBar, CommitDialogHost } from './ui/ApplySuggestions';
 import { DiffPane } from './ui/DiffPane';
 import { FatalError, Notice } from './ui/Notice';
 import { TokenPromptHost } from './ui/TokenPrompt';
@@ -64,19 +64,8 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetchPrData(rpc, prRef)
-      .then((data) => {
-        if (cancelled) return;
-        resetReviewCaches();
-        usePr.getState().setPr(data);
-        void initPendingReview(data);
-        // Threads render inline (annotations) and feed the comment counts; failures are not fatal.
-        fetchThreads(rpc, prRef, { markers: data.threadMarkers })
-          .then((raw) => {
-            if (!cancelled) usePr.getState().setThreads(toThreadModels(raw));
-          })
-          .catch((err: unknown) => console.warn('[pierre] threads', err));
-      })
+    // Threads render inline (annotations) and feed the comment counts; their failure is not fatal.
+    loadPr(rpc, prRef, () => !cancelled)
       .catch((err: unknown) => {
         if (!cancelled) usePr.getState().setFatal(err instanceof Error ? err.message : String(err));
       });
@@ -106,11 +95,13 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
     <WorkerPoolContext.Provider value={pool}>
       <div className="pierre-app">
         <Toolbar />
+        <BatchBar />
         <div className="pierre-body">
           <TreePane />
           <main className="pierre-main">{pr && settingsLoaded ? <DiffPane rpc={rpc} /> : <div className="pierre-loading">Loading pull request…</div>}</main>
         </div>
         <Notice />
+        <CommitDialogHost />
         <TokenPromptHost />
       </div>
     </WorkerPoolContext.Provider>

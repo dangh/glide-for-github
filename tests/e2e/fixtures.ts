@@ -186,7 +186,9 @@ export class Viewer {
 /** Opens a PR page and switches to the Pierre tab by clicking it (or with `#pierre`). */
 export async function openPierre(page: Page, pr: PrId, how: 'click' | 'hash' = 'click'): Promise<Viewer> {
   if (how === 'hash') {
-    await page.goto(prUrl(pr, '#pierre'), { waitUntil: 'domcontentloaded' });
+    // Already there: `goto` would be a same-document hash navigation (no reload), so reload to get fresh data.
+    if (page.url() === prUrl(pr, '#pierre')) await page.reload({ waitUntil: 'domcontentloaded' });
+    else await page.goto(prUrl(pr, '#pierre'), { waitUntil: 'domcontentloaded' });
   } else {
     await page.goto(prUrl(pr), { waitUntil: 'load' });
     const tab = page.locator('a[data-pierre-tab]');

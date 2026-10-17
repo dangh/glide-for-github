@@ -7,6 +7,7 @@ import { useSettings } from '../state/settings';
 import { usePr } from '../state/store';
 import { CommitRangePicker } from './CommitRangePicker';
 import { DisplayMenu } from './DisplayMenu';
+import { ReviewMenu } from './ReviewMenu';
 
 const DiffStyleToggle = memo(function DiffStyleToggle() {
   const diffStyle = useSettings((s) => s.settings.diff.diffStyle);
@@ -57,15 +58,6 @@ const ViewedCounter = memo(function ViewedCounter() {
   );
 });
 
-const ReviewButton = memo(function ReviewButton() {
-  const pending = usePr((s) => s.pendingReview?.count ?? 0);
-  return (
-    <button className="btn-primary" disabled title="Reviewing from Pierre is coming soon">
-      {pending > 0 ? `Review (${pending} pending)` : 'Review'} ▾
-    </button>
-  );
-});
-
 export const Toolbar = memo(function Toolbar() {
   return (
     <div className="pierre-toolbar" role="toolbar">
@@ -76,7 +68,7 @@ export const Toolbar = memo(function Toolbar() {
       <DisplayMenu />
       <span className="grow" />
       <ViewedCounter />
-      <ReviewButton />
+      <ReviewMenu />
     </div>
   );
 });

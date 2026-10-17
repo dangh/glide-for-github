@@ -107,6 +107,51 @@ describe('viewer connection', () => {
     await expect(conn.rpc.call('preview', 't', { owner: 'o', repo: 'r' })).rejects.toMatchObject({ status: 404 });
   });
 
+  it.each(['resolveThread', 'unresolveThread', 'markViewed', 'unmarkViewed'] as const)(
+    'never re-sends the session write %s when its port is replaced mid-call (rejects with closed)',
+    async (method) => {
+      const w = fakeWindow();
+      const seen: string[] = [];
+      const { createClient } = fakeClients((n, m) => (seen.push(`${n}:${m}`), n === 0 ? 'pending' : Promise.resolve('sent twice')));
+      const conn = createConnection(w.win, { createClient });
+      w.post({ type: 'pierre:port' });
+      const call = (conn.rpc.call as (m: string, ...a: unknown[]) => Promise<unknown>)(method, 'o', 'r', 1, '7');
+      await new Promise((r) => setTimeout(r, 0));
+      w.post({ type: 'pierre:port' });
+      await expect(call).rejects.toMatchObject({ code: 'closed' });
+      expect(seen).toEqual([`0:${method}`]);
+    },
+  );
+
+  it('re-issues applySuggestions on the replacement port with the SAME idempotency key (GitHub dedupes by key)', async () => {
+    const w = fakeWindow();
+    const args: unknown[][] = [];
+    const clients: number[] = [];
+    let n = 0;
+    const createClient = (): RpcClient<BridgeMethods> => {
+      const id = n++;
+      const pending = new Set<(e: unknown) => void>();
+      return {
+        call: ((_m: string, ...a: unknown[]) => {
+          args.push(a);
+          clients.push(id);
+          if (id === 0) return new Promise((_, reject) => pending.add(reject));
+          return Promise.resolve('applied');
+        }) as RpcClient<BridgeMethods>['call'],
+        close: () => pending.forEach((r) => r(new BridgeError({ status: 0, code: 'closed', message: 'RPC port closed' }))),
+      };
+    };
+    const conn = createConnection(w.win, { createClient });
+    w.post({ type: 'pierre:port' });
+    const body = { owner: 'o', repo: 'r', number: 1, comments: [{ id: 1 }], message: 'm', expectedHeadOid: 'a'.repeat(40) };
+    const call = conn.rpc.call('applySuggestions', body, 'key-1');
+    await new Promise((r) => setTimeout(r, 0));
+    w.post({ type: 'pierre:port' });
+    await expect(call).resolves.toBe('applied');
+    expect(clients).toEqual([0, 1]);
+    expect(args[1]).toEqual([body, 'key-1']);
+  });
+
   it('parses the viewer ?pr= parameter', () => {
     expect(parsePrParam('?pr=' + encodeURIComponent('dangh/pierre-sandbox#1'))).toEqual({
       owner: 'dangh',

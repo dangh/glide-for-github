@@ -1,13 +1,18 @@
 // @vitest-environment jsdom
 // (@pierre/diffs reads `navigator` at import time.)
 import { getSingularPatch } from '@pierre/diffs';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { BridgeError } from '../../src/shared/rpc';
+import { useTokenPrompt } from '../../src/viewer/auth/requireToken';
+import { setToken, setTokenStorage, type TokenStorageArea } from '../../src/viewer/auth/tokens';
+import { WriteError } from '../../src/viewer/github/errors';
 import type { FileSummary, PrData } from '../../src/viewer/github/private';
 import type { CommentModel, ThreadModel } from '../../src/viewer/github/threads';
 import { createAnnotationSource } from '../../src/viewer/state/annotations';
 import {
   fileTarget,
   newSideLines,
+  openComposer,
   openComposerIn,
   suggestionBlock,
   targetFromRange,
@@ -15,8 +20,10 @@ import {
   type CommentTarget,
 } from '../../src/viewer/state/compose';
 import { ItemSync, type PierreItem } from '../../src/viewer/state/items';
-import { mergeThreads } from '../../src/viewer/state/review';
-import { createPrStore } from '../../src/viewer/state/store';
+import { discardReview, mergeThreads, resetReviewCaches, setFileViewed, submitNewComment, submitReview } from '../../src/viewer/state/review';
+import { session } from '../../src/viewer/state/session';
+import { createPrStore, draftKey, isCollapsed, usePr } from '../../src/viewer/state/store';
+import { applyKeyName, commitSuggestions, suggestionCount } from '../../src/viewer/state/suggestions';
 
 const file = (path: string): FileSummary => ({
   path,
@@ -216,5 +223,253 @@ describe('mergeThreads', () => {
     const local = thread('local:99', 'a.ts', 3, { comments: [comment(99, 'new', { provisional: true })], provisional: true });
     const fetched = [thread('7', 'a.ts', 3, { comments: [comment(99, 'new')] })];
     expect(mergeThreads(fetched, [local], new Set()).map((t) => t.id)).toEqual(['7']);
+  });
+});
+
+// ---- Task 10: review submission, viewed sync, apply suggestion ------------------------------------------
+
+describe('review submission, viewed, apply suggestion (global store)', () => {
+  const TOKEN = 'ghp_ReviewTestToken0123456789';
+  const HEAD = 'c'.repeat(40);
+  const livePr: PrData = { ...pr, nodeId: 'PR_node', headOid: HEAD, baseOid: 'b'.repeat(40), files: [file('a.ts'), file('b.ts')] };
+
+  function fakeArea(): TokenStorageArea {
+    const data: Record<string, unknown> = {};
+    return {
+      get: async (key) => (key in data ? { [key]: structuredClone(data[key]) } : {}),
+      set: async (items) => void Object.assign(data, structuredClone(items)),
+    };
+  }
+  const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  /** GraphQL answers by operation name (`mutation StartReview(…`, `query PendingReview(…`). */
+  function graphql(answers: Record<string, () => Response>) {
+    const ops: { op: string; variables: Record<string, unknown> }[] = [];
+    fetchMock.mockImplementation(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      const op = /^(?:query|mutation)\s+(\w+)/.exec(body.query)![1]!;
+      ops.push({ op, variables: body.variables });
+      const answer = answers[op];
+      if (!answer) throw new Error(`unexpected ${op}`);
+      return answer();
+    });
+    return ops;
+  }
+  function fakeRpc(handler: (method: string, ...args: unknown[]) => Promise<unknown>) {
+    const calls: unknown[][] = [];
+    session.rpc = { call: (async (method: string, ...args: unknown[]) => (calls.push([method, ...args]), handler(method, ...args))) as never };
+    return calls;
+  }
+  const refusedViewed = (op: 'markFileAsViewed' | 'unmarkFileAsViewed') => () =>
+    json(200, { data: { [op]: null }, errors: [{ type: 'FORBIDDEN', message: 'Resource not accessible by personal access token' }] });
+
+  let fetchMock: ReturnType<typeof vi.fn>;
+  beforeEach(async () => {
+    setTokenStorage(fakeArea());
+    await setToken('o', TOKEN, { login: 'me' });
+    resetReviewCaches();
+    usePr.getState().setPr(livePr);
+    usePr.setState({ drafts: new Map(), threads: [], pendingReview: null, headMoved: false, suggestionBatch: [], notice: null });
+    sessionStorage.clear();
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    session.rpc = undefined;
+    for (const m of ['log', 'info', 'warn', 'error', 'debug'] as const) vi.spyOn(console, m).mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    setTokenStorage(undefined);
+    session.rpc = undefined;
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  describe('pending review count', () => {
+    const answers = {
+      PendingReview: () => json(200, { data: { repository: { pullRequest: { reviews: { nodes: [] } } } } }),
+      StartReview: () => json(200, { data: { addPullRequestReview: { pullRequestReview: { id: 'PRR_1' } } } }),
+      AddReviewThread: () =>
+        json(200, { data: { addPullRequestReviewThread: { thread: { id: 'PRRT_1', comments: { nodes: [{ id: 'PRRC_5', databaseId: 5 }] } } } } }),
+      SubmitReview: () => json(200, { data: { submitPullRequestReview: { pullRequestReview: { id: 'PRR_1' } } } }),
+      DeleteReview: () => json(200, { data: { deletePullRequestReview: { pullRequestReview: { id: 'PRR_1' } } } }),
+    };
+    const addReviewComment = async (line: number) => {
+      const key = openComposer(targetFromRange('a.ts', { start: line, side: 'additions', end: line }));
+      await submitNewComment(key, `review comment ${line}`, 'review');
+    };
+
+    it('add → 1 pending; submit as Comment → no pending review, its comments submitted, summary draft cleared', async () => {
+      const ops = graphql(answers);
+      await addReviewComment(2);
+      expect(usePr.getState().pendingReview).toEqual({ nodeId: 'PRR_1', count: 1 });
+      usePr.getState().setDraft(draftKey.reviewSummary, { body: 'Looks good', updatedAt: 1 });
+      await submitReview('COMMENT', 'Looks good');
+      expect(ops.at(-1)).toEqual({ op: 'SubmitReview', variables: { input: { pullRequestReviewId: 'PRR_1', event: 'COMMENT', body: 'Looks good' } } });
+      const s = usePr.getState();
+      expect(s.pendingReview).toBeNull();
+      expect(s.drafts.has(draftKey.reviewSummary)).toBe(false);
+      expect(s.threads.flatMap((t) => t.comments.map((c) => c.state))).toEqual(['submitted']);
+    });
+
+    it('submitting with no pending review starts an empty one first, then submits it (Approve)', async () => {
+      const ops = graphql(answers);
+      await submitReview('APPROVE', '');
+      expect(ops.map((o) => o.op)).toEqual(['PendingReview', 'StartReview', 'SubmitReview']);
+      expect(ops[1]!.variables).toEqual({ input: { pullRequestId: 'PR_node', commitOID: HEAD } });
+      expect(ops[2]!.variables).toEqual({ input: { pullRequestReviewId: 'PRR_1', event: 'APPROVE', body: '' } });
+      expect(usePr.getState().pendingReview).toBeNull();
+    });
+
+    it('discard deletes the pending review: count gone and its pending comments removed', async () => {
+      const ops = graphql(answers);
+      await addReviewComment(2);
+      usePr.getState().upsertThread(thread('9', 'b.ts', 1)); // a submitted thread stays
+      expect(usePr.getState().pendingReview?.count).toBe(1);
+      await discardReview();
+      expect(ops.at(-1)).toEqual({ op: 'DeleteReview', variables: { input: { pullRequestReviewId: 'PRR_1' } } });
+      expect(usePr.getState().pendingReview).toBeNull();
+      expect(usePr.getState().threads.map((t) => t.id)).toEqual(['9']);
+    });
+
+    it('a failed submit keeps the pending review, its count and the summary draft', async () => {
+      graphql({ ...answers, SubmitReview: () => json(200, { data: null, errors: [{ type: 'UNPROCESSABLE', message: 'Review cannot be submitted' }] }) });
+      await addReviewComment(2);
+      usePr.getState().setDraft(draftKey.reviewSummary, { body: 'sum', updatedAt: 1 });
+      await expect(submitReview('COMMENT', 'sum')).rejects.toThrow(/Review cannot be submitted/);
+      expect(usePr.getState().pendingReview).toEqual({ nodeId: 'PRR_1', count: 1 });
+      expect(usePr.getState().drafts.get(draftKey.reviewSummary)?.body).toBe('sum');
+    });
+  });
+
+  describe('viewed', () => {
+    it('toggles optimistically (and collapses) and marks it on GitHub with the token (markFileAsViewed)', async () => {
+      const ops = graphql({ MarkViewed: () => json(200, { data: { markFileAsViewed: { pullRequest: { id: 'PR_node' } } } }) });
+      const done = setFileViewed('a.ts', true);
+      expect(usePr.getState().viewed.has('a.ts')).toBe(true); // before GitHub answered
+      expect(isCollapsed(usePr.getState(), 'a.ts')).toBe(true);
+      await done;
+      expect(ops).toEqual([{ op: 'MarkViewed', variables: { input: { pullRequestId: 'PR_node', path: 'a.ts' } } }]);
+      expect(usePr.getState().viewed.has('a.ts')).toBe(true);
+    });
+
+    it('reverts when GitHub rejects it', async () => {
+      graphql({ UnmarkViewed: () => json(502, { message: 'Bad gateway' }) });
+      usePr.getState().setViewedLocal('a.ts', true);
+      await expect(setFileViewed('a.ts', false)).rejects.toBeInstanceOf(WriteError);
+      expect(usePr.getState().viewed.has('a.ts')).toBe(true);
+    });
+
+    it('a token GitHub refuses (fine-grained) falls back to the session file_review via the bridge, no prompt', async () => {
+      graphql({ MarkViewed: refusedViewed('markFileAsViewed') });
+      const calls = fakeRpc(async () => null);
+      await setFileViewed('a.ts', true);
+      expect(calls).toEqual([['markViewed', 'o', 'r', 1, 'a.ts']]);
+      expect(usePr.getState().viewed.has('a.ts')).toBe(true);
+      expect(useTokenPrompt.getState().queue).toHaveLength(0);
+    });
+
+    it('without a token, uses the session only (no API call, no prompt); unmark likewise', async () => {
+      setTokenStorage(fakeArea());
+      const calls = fakeRpc(async () => null);
+      await setFileViewed('b.ts', true);
+      await setFileViewed('b.ts', false);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(calls).toEqual([
+        ['markViewed', 'o', 'r', 1, 'b.ts'],
+        ['unmarkViewed', 'o', 'r', 1, 'b.ts'],
+      ]);
+      expect(usePr.getState().viewed.has('b.ts')).toBe(false);
+      expect(useTokenPrompt.getState().queue).toHaveLength(0);
+    });
+
+    it('reverts when the session fallback fails too', async () => {
+      setTokenStorage(fakeArea());
+      fakeRpc(async () => {
+        throw new BridgeError({ status: 422, message: 'can only be marked as viewed on the All files page' });
+      });
+      await expect(setFileViewed('a.ts', true)).rejects.toThrow(/All files page/);
+      expect(usePr.getState().viewed.has('a.ts')).toBe(false);
+    });
+  });
+
+  describe('apply suggestions', () => {
+    const ref = (commentId: number, suggestionIndex = 0) => ({
+      commentId,
+      suggestionIndex,
+      path: 'a.ts',
+      url: `https://github.com/o/r/pull/1#discussion_r${commentId}`,
+    });
+    const applyCalls = (calls: unknown[][]) => calls.filter((c) => c[0] === 'applySuggestions');
+
+    it('sends sorted comments, the message and the PR head with a per-PR key; success clears key and batch and reloads the PR', async () => {
+      const calls = fakeRpc(async (method) => {
+        if (method === 'applySuggestions') return {};
+        throw new BridgeError({ status: 0, code: 'network', message: 'offline in tests' });
+      });
+      for (const r of [ref(12, 1), ref(7), ref(12, 0)]) usePr.getState().addToBatch(r);
+      await commitSuggestions(usePr.getState().suggestionBatch, 'Apply suggestions from code review');
+      const [call] = applyCalls(calls);
+      expect(call![1]).toEqual({
+        owner: 'o',
+        repo: 'r',
+        number: 1,
+        comments: [{ id: 7, suggestionIndex: 0 }, { id: 12, suggestionIndex: 0 }, { id: 12, suggestionIndex: 1 }],
+        message: 'Apply suggestions from code review',
+        expectedHeadOid: HEAD,
+      });
+      expect(call![2]).toMatch(/^[0-9a-f-]{36}$/);
+      expect(sessionStorage.getItem(applyKeyName(livePr.ref))).toBeNull();
+      expect(usePr.getState().suggestionBatch).toEqual([]);
+      expect(calls.some((c) => c[0] === 'get' && c[1] === '/o/r/pull/1/changes')).toBe(true); // PR data reloaded
+    });
+
+    it('head moved: a 409 HEAD_OID_MISMATCH sets headMoved and keeps the suggestion batch', async () => {
+      fakeRpc(async () => {
+        throw new BridgeError({ status: 409, code: 'HEAD_OID_MISMATCH', message: 'HTTP 409' });
+      });
+      usePr.getState().addToBatch(ref(7));
+      usePr.getState().addToBatch(ref(8));
+      const err = await commitSuggestions(usePr.getState().suggestionBatch, 'm').catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(WriteError);
+      expect((err as WriteError).kind).toBe('conflict');
+      expect((err as Error).message).toMatch(/head moved/i);
+      expect(usePr.getState().headMoved).toBe(true);
+      expect(usePr.getState().suggestionBatch.map((r) => r.commentId)).toEqual([7, 8]);
+    });
+
+    it('reuses the idempotency key across a retry after a failure, and uses a new one after success', async () => {
+      let n = 0;
+      const calls = fakeRpc(async (method) => {
+        if (method !== 'applySuggestions') return null;
+        if (n++ === 0) throw new BridgeError({ status: 0, code: 'network', message: 'Failed to fetch' });
+        return {};
+      });
+      usePr.getState().addToBatch(ref(7));
+      await expect(commitSuggestions([ref(7)], 'm')).rejects.toBeInstanceOf(WriteError);
+      expect(usePr.getState().suggestionBatch).toHaveLength(1); // kept for the retry
+      await commitSuggestions([ref(7)], 'm');
+      await commitSuggestions([ref(9)], 'm');
+      const keys = applyCalls(calls).map((c) => c[2]);
+      expect(keys).toHaveLength(3);
+      expect(keys[1]).toBe(keys[0]);
+      expect(keys[2]).not.toBe(keys[0]);
+      expect(sessionStorage.getItem(applyKeyName(livePr.ref))).toBeNull();
+    });
+
+    it('any other failure is a WriteError with GitHub\'s message; nothing applied, batch kept', async () => {
+      fakeRpc(async () => {
+        throw new BridgeError({ status: 422, message: 'Suggestion is outdated' });
+      });
+      usePr.getState().addToBatch(ref(7));
+      await expect(commitSuggestions([ref(7)], 'm')).rejects.toThrow(/Suggestion is outdated/);
+      expect(usePr.getState().headMoved).toBe(false);
+      expect(usePr.getState().suggestionBatch).toHaveLength(1);
+    });
+
+    it('counts suggestion blocks in a comment body (fenced ```suggestion, not inside other fences)', () => {
+      expect(suggestionCount('plain')).toBe(0);
+      expect(suggestionCount('Try:\n```suggestion\nconst a = 1;\n```\n')).toBe(1);
+      expect(suggestionCount('```suggestion\na\n```\ntext\n````suggestion\nb\n```\n````\n')).toBe(2);
+      expect(suggestionCount('```ts\n```suggestion\n```\n')).toBe(0);
+      expect(suggestionCount('  ```suggestion\nx\n  ```')).toBe(1);
+    });
   });
 });

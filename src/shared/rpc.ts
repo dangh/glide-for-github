@@ -41,7 +41,10 @@ export interface ApplySuggestionsBody {
   repo: string;
   /** Pull request number. */
   number: number;
-  /** `id` is the comment's `databaseId`; `suggestionIndex` picks one suggestion block of a multi-suggestion comment. */
+  /**
+   * `id` is the comment's `databaseId`; `suggestionIndex` picks the suggestion block (0-based). GitHub requires the
+   * index (400 "requires a suggestion_index" without it), also when the comment has a single suggestion.
+   */
   comments: { id: number; suggestionIndex?: number }[];
   /** Commit message. */
   message: string;
@@ -102,7 +105,29 @@ export type BridgeMethods = {
    */
   resolveThread(owner: string, repo: string, number: number, threadId: string): Json;
   unresolveThread(owner: string, repo: string, number: number, threadId: string): Json;
+  /**
+   * Mark / unmark a file as viewed with the user's GitHub session (R§3), exactly as GitHub's client does:
+   * `POST <o>/<r>/pull/<n>/file_review` with `{"path": path, "viewed": "viewed"}`, and `DELETE` to the same URL
+   * with `{"path": path, "_method": "delete"}`. `path` is the repo file path (non-empty, no NUL/CR/LF, at most
+   * 4096 characters), sent verbatim in the JSON body. The session fallback for `markFileAsViewed` /
+   * `unmarkFileAsViewed` when no token is stored or GitHub refuses it.
+   */
+  markViewed(owner: string, repo: string, number: number, path: string): Json;
+  unmarkViewed(owner: string, repo: string, number: number, path: string): Json;
 };
+
+/**
+ * Bridge methods the viewer connection may re-issue when their port is replaced mid-call (`closed`): reads, and
+ * `applySuggestions`, which carries an `Idempotency-Key` GitHub dedupes on (the retry sends the same key). Every
+ * other session write (resolve/unresolve, mark/unmark viewed) may already have reached GitHub when the port
+ * closed, so it is never re-sent blindly: it rejects with `closed` and the user retries.
+ */
+export const RETRY_ON_CLOSED: ReadonlySet<keyof BridgeMethods> = new Set<keyof BridgeMethods>(['get', 'getText', 'preview', 'applySuggestions']);
+
+/** Orders apply-suggestion comments by (id, suggestionIndex), absent index first, as GitHub's client sends them (R§5). */
+export function sortSuggestionComments<T extends { id: number; suggestionIndex?: number }>(comments: readonly T[]): T[] {
+  return [...comments].sort((a, b) => a.id - b.id || (a.suggestionIndex ?? -1) - (b.suggestionIndex ?? -1));
+}
 
 /**
  * Builds the raw query for `GET .../page_data/diff_entries` exactly as GitHub does (R§1.2):

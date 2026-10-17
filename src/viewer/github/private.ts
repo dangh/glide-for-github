@@ -4,7 +4,7 @@
  * Verified against dangh/pierre-sandbox#1 (fixtures in tests/fixtures/sandbox, scripts/capture-fixtures.mjs).
  */
 import type { PrRef } from '../../shared/pr-url';
-import { BridgeError, diffEntriesRaw, type BridgeMethods, type BridgeQuery, type RpcClient } from '../../shared/rpc';
+import { BridgeError, diffEntriesRaw, sortSuggestionComments, type BridgeMethods, type BridgeQuery, type Json, type RpcClient } from '../../shared/rpc';
 
 /** The part of the RPC client this module needs (a fake in tests). */
 export type Rpc = Pick<RpcClient<BridgeMethods>, 'call'>;
@@ -140,6 +140,8 @@ export interface GithubComment {
   reactionGroups?: GithubReactionGroup[];
   viewerCanUpdate?: boolean;
   viewerCanDelete?: boolean;
+  /** `https://github.com/<o>/<r>/pull/<n>#discussion_r<databaseId>`. */
+  url?: string;
 }
 
 /** Thread from the route's `markers.threads` or `page_data/threads` (no positioning). */
@@ -602,4 +604,34 @@ export async function fetchThreads(rpc: Rpc, ref: PrRef, opts: { markers?: Threa
   }
 
   return { threads: [...byId.values()], markers, previews, positioning };
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Writing (the one session write of the spec, plus the session fallbacks of Ruling 13)
+
+export interface ApplySuggestionsParams {
+  /** `id` = comment database id; `suggestionIndex` = the block (0-based), required by GitHub even for one block. */
+  comments: { id: number; suggestionIndex: number }[];
+  message: string;
+  /** The PR head the suggestions were made against; GitHub answers 409 `HEAD_OID_MISMATCH` when it moved. */
+  expectedHeadOid: string;
+}
+
+/**
+ * Commits suggestions with the user's GitHub session (R§5): `POST page_data/apply_review_suggestions` through the
+ * bridge, `Idempotency-Key: idempotencyKey`. Comments are sent sorted by (id, suggestionIndex), as GitHub's client does.
+ */
+export function applySuggestions(rpc: Rpc, ref: PrRef, params: ApplySuggestionsParams, idempotencyKey: string): Promise<Json> {
+  return rpc.call(
+    'applySuggestions',
+    {
+      owner: ref.owner,
+      repo: ref.repo,
+      number: ref.number,
+      comments: sortSuggestionComments(params.comments),
+      message: params.message,
+      expectedHeadOid: params.expectedHeadOid,
+    },
+    idempotencyKey,
+  );
 }

@@ -13,6 +13,8 @@ import { deleteComment, errorMessage, REACTIONS, setResolved, toggleReaction } f
 import { draftKey, threadByKey, usePr } from '../state/store';
 import { Composer, focusComposer } from './Composer';
 import { CommentBody } from './Markdown';
+import { SuggestionActions } from './ApplySuggestions';
+import { canApply } from '../state/suggestions';
 
 // ---- expansion state, kept outside React so a remount (scrolling away and back) keeps it ---------------
 
@@ -125,7 +127,7 @@ const Reactions = memo(function Reactions({ comment }: { comment: CommentModel }
   );
 });
 
-const Comment = memo(function Comment({ threadKey, comment }: { threadKey: string; comment: CommentModel }) {
+const Comment = memo(function Comment({ threadKey, comment, applyPath }: { threadKey: string; comment: CommentModel; applyPath?: string }) {
   const editKey = draftKey.edit(comment.databaseId);
   const editing = usePr((s) => s.drafts.has(editKey));
   const [confirming, setConfirming] = useState(false);
@@ -182,6 +184,7 @@ const Comment = memo(function Comment({ threadKey, comment }: { threadKey: strin
       ) : (
         <CommentBody html={comment.bodyHTML} text={comment.body} />
       )}
+      {!editing && applyPath !== undefined && <SuggestionActions path={applyPath} comment={comment} />}
       <ActionError error={error} />
       {!editing && <Reactions comment={comment} />}
     </div>
@@ -204,6 +207,7 @@ export const Thread = memo(function Thread({ threadKey }: { threadKey: string })
   const replyKey = draftKey.reply(threadKey);
   const replying = usePr((s) => s.drafts.has(replyKey));
   const open = useExpanded(threadKey);
+  const pr = usePr((s) => s.pr);
   const { busy, error, run } = useAction();
 
   if (!thread || thread.comments.length === 0) return null;
@@ -239,7 +243,7 @@ export const Thread = memo(function Thread({ threadKey }: { threadKey: string })
       {shown && (
         <>
           {thread.comments.map((c) => (
-            <Comment key={c.databaseId} threadKey={threadKey} comment={c} />
+            <Comment key={c.databaseId} threadKey={threadKey} comment={c} {...(canApply(pr, thread, c) ? { applyPath: thread.path } : {})} />
           ))}
           {replying ? (
             <Composer key={replyKey} draftKey={replyKey} mode="reply" threadKey={threadKey} />

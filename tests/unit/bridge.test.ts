@@ -365,6 +365,18 @@ describe('bridge applySuggestions', () => {
     });
   });
 
+  it('sends comments sorted by (id, suggestionIndex), whatever order the caller used', async () => {
+    const { fn, calls } = fakeFetch(() => json({}));
+    const comments = [{ id: 12, suggestionIndex: 1 }, { id: 11 }, { id: 12, suggestionIndex: 0 }, { id: 3, suggestionIndex: 2 }];
+    await createBridgeImpl({ doc: document, fetch: fn }).applySuggestions({ ...body, comments }, 'k1');
+    expect(JSON.parse(calls[0]!.init.body as string).comments).toEqual([
+      { id: 3, suggestionIndex: 2 },
+      { id: 11 },
+      { id: 12, suggestionIndex: 0 },
+      { id: 12, suggestionIndex: 1 },
+    ]);
+  });
+
   it('surfaces a 409 HEAD_OID_MISMATCH', async () => {
     const { fn } = fakeFetch(() => json({ code: 'HEAD_OID_MISMATCH' }, { status: 409 }));
     await expect(createBridgeImpl({ doc: document, fetch: fn }).applySuggestions(body, 'k1')).rejects.toMatchObject({
@@ -457,6 +469,87 @@ describe('bridge resolveThread / unresolveThread (R§4.6, session fallback)', ()
       await expect(impl[method]!(...args)).rejects.toMatchObject({ status: 0 });
       expect(fn).not.toHaveBeenCalled();
     }
+  });
+});
+
+describe('bridge markViewed / unmarkViewed (R§3 file_review, session fallback)', () => {
+  it('markViewed POSTs {path, viewed: "viewed"} to /pull/<n>/file_review with the verified-fetch JSON headers', async () => {
+    const { fn, calls } = fakeFetch(() => json({ ok: true }));
+    const out = await createBridgeImpl({ doc: document, fetch: fn }).markViewed('dangh', 'pierre-sandbox', 1, 'src/util/math.ts');
+    expect(out).toEqual({ ok: true });
+    const c = calls[0]!;
+    expect(c.url).toBe('https://github.com/dangh/pierre-sandbox/pull/1/file_review');
+    expect(c.init.method).toBe('POST');
+    expect(c.init.credentials).toBe('same-origin');
+    expect(headersOf(c)).toMatchObject({
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'GitHub-Verified-Fetch': 'true',
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-Fetch-Nonce': 'nonce-1',
+    });
+    expect(c.init.body).toBe('{"path":"src/util/math.ts","viewed":"viewed"}');
+  });
+
+  it('unmarkViewed DELETEs {path, _method: "delete"} to the same endpoint', async () => {
+    const { fn, calls } = fakeFetch(() => json({ ok: true }));
+    await createBridgeImpl({ doc: document, fetch: fn }).unmarkViewed('dangh', 'pierre-sandbox', 1, 'docs/a b/ü.md');
+    const c = calls[0]!;
+    expect(c.url).toBe('https://github.com/dangh/pierre-sandbox/pull/1/file_review');
+    expect(c.init.method).toBe('DELETE');
+    expect(headersOf(c)).toMatchObject({ 'Content-Type': 'application/json', 'X-Fetch-Nonce': 'nonce-1' });
+    expect(JSON.parse(c.init.body as string)).toEqual({ path: 'docs/a b/ü.md', _method: 'delete' });
+  });
+
+  it('sends the path exactly as given (no encoding, no normalization)', async () => {
+    const { fn, calls } = fakeFetch(() => json({}));
+    const path = 'weird/%2e%2e/"quoted"\\x.ts';
+    await createBridgeImpl({ doc: document, fetch: fn }).markViewed('dangh', 'pierre-sandbox', 1, path);
+    expect(JSON.parse(calls[0]!.init.body as string).path).toBe(path);
+    expect(calls[0]!.url).toBe('https://github.com/dangh/pierre-sandbox/pull/1/file_review');
+  });
+
+  it('tolerates an empty 2xx body', async () => {
+    const { fn } = fakeFetch(() => new Response(null, { status: 204 }));
+    await expect(createBridgeImpl({ doc: document, fetch: fn }).markViewed('dangh', 'pierre-sandbox', 1, 'a.ts')).resolves.toBeNull();
+  });
+
+  it('rejects non-2xx with GitHub\'s error', async () => {
+    const { fn } = fakeFetch(() => json({ error: 'Not authorized' }, { status: 403 }));
+    await expect(createBridgeImpl({ doc: document, fetch: fn }).unmarkViewed('dangh', 'pierre-sandbox', 1, 'a.ts')).rejects.toMatchObject({
+      status: 403,
+      message: 'Not authorized',
+    });
+  });
+
+  const good = ['dangh', 'pierre-sandbox', 1, 'src/a.ts'] as const;
+  it.each([
+    ['owner', ['../x', good[1], good[2], good[3]]],
+    ['owner', ['..', good[1], good[2], good[3]]],
+    ['repo', [good[0], 'a/b', good[2], good[3]]],
+    ['number', [good[0], good[1], 0, good[3]]],
+    ['number', [good[0], good[1], 1.5, good[3]]],
+    ['number', [good[0], good[1], '1', good[3]]],
+    ['path', [good[0], good[1], good[2], '']],
+    ['path', [good[0], good[1], good[2], 'a\u0000b']],
+    ['path', [good[0], good[1], good[2], 'a\nb']],
+    ['path', [good[0], good[1], good[2], 'a\rb']],
+    ['path', [good[0], good[1], good[2], 'x'.repeat(4097)]],
+    ['path', [good[0], good[1], good[2], 12]],
+    ['path', [good[0], good[1], good[2], ['a.ts']]],
+  ])('rejects a bad %s without calling fetch', async (_name, args) => {
+    for (const method of ['markViewed', 'unmarkViewed'] as const) {
+      const { fn } = fakeFetch();
+      const impl = createBridgeImpl({ doc: document, fetch: fn }) as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>;
+      await expect(impl[method]!(...args)).rejects.toMatchObject({ status: 0, code: 'bad_request' });
+      expect(fn).not.toHaveBeenCalled();
+    }
+  });
+
+  it('accepts a path of exactly 4096 characters', async () => {
+    const { fn } = fakeFetch(() => json({}));
+    await createBridgeImpl({ doc: document, fetch: fn }).markViewed('dangh', 'pierre-sandbox', 1, 'x'.repeat(4096));
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 });
 

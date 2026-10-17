@@ -1,7 +1,7 @@
 /**
  * Viewer state (zustand). Later tasks depend on these names:
  * - Task 9: `threads`, `upsertThread`, `removeComment`, `drafts`/`setDraft`/`clearDraft` (composer drafts), items' annotations.
- * - Task 10: `viewed`/`setViewedLocal`, `pendingReview`, `headMoved`.
+ * - Task 10: `viewed`/`setViewedLocal`, `pendingReview`, `headMoved`, `suggestionBatch`.
  * - Task 11: `headMoved`, `drafts` (persisted per PR).
  *
  * Every collection is replaced (never mutated in place) so selectors can compare by reference; no-op actions
@@ -61,6 +61,23 @@ export interface FileLoadState {
   message?: string;
 }
 
+/** One suggestion block of a review comment, queued for "Commit suggestions" (apply suggestion, R§5). */
+export interface SuggestionRef {
+  /** The comment's database id (`comments[].id` of `apply_review_suggestions`). */
+  commentId: number;
+  /**
+   * Which suggestion block of the comment (0-based). Always sent: GitHub answers 400 "User comment … requires a
+   * suggestion_index" without it, also for a comment with a single suggestion (verified on the sandbox, 2026-10-17).
+   */
+  suggestionIndex: number;
+  path: string;
+  /** The comment on GitHub ("Open on GitHub" when applying fails). */
+  url: string;
+}
+
+export const sameSuggestion = (a: Pick<SuggestionRef, 'commentId' | 'suggestionIndex'>, b: Pick<SuggestionRef, 'commentId' | 'suggestionIndex'>) =>
+  a.commentId === b.commentId && a.suggestionIndex === b.suggestionIndex;
+
 export interface Notice {
   kind: 'info' | 'error';
   message: string;
@@ -89,6 +106,8 @@ export interface PrState {
   drafts: Map<DraftKey, Draft>;
   pendingReview: { nodeId: string; count: number } | null;
   headMoved: boolean;
+  /** Suggestions added to the batch ("Add suggestion to batch"), in the order added. */
+  suggestionBatch: SuggestionRef[];
   /** User collapse overrides by path (absent = default: collapsed iff viewed). */
   collapsed: Map<string, boolean>;
   notice: Notice | null;
@@ -111,6 +130,8 @@ export interface PrState {
   clearDraft(key: DraftKey): void;
   setPendingReview(review: { nodeId: string; count: number } | null): void;
   setHeadMoved(moved: boolean): void;
+  addToBatch(ref: SuggestionRef): void;
+  removeFromBatch(refs: readonly Pick<SuggestionRef, 'commentId' | 'suggestionIndex'>[]): void;
   setNotice(notice: Notice | null): void;
 }
 
@@ -126,6 +147,7 @@ const initialData = () => ({
   drafts: new Map<DraftKey, Draft>(),
   pendingReview: null,
   headMoved: false,
+  suggestionBatch: [] as SuggestionRef[],
   collapsed: new Map<string, boolean>(),
   notice: null,
   fatal: null,
@@ -146,6 +168,7 @@ export const createPrStore = () =>
         load: new Map(pr.files.map((f) => [f.path, PENDING])),
         viewed: new Set(pr.files.filter((f) => f.viewed).map((f) => f.path)),
         collapsed: new Map(),
+        headMoved: false,
         fatal: null,
       }),
 
@@ -242,7 +265,13 @@ export const createPrStore = () =>
       }),
 
     setPendingReview: (pendingReview) => set({ pendingReview }),
-    setHeadMoved: (headMoved) => set({ headMoved }),
+    setHeadMoved: (headMoved) => set((s) => (s.headMoved === headMoved ? s : { headMoved })),
+    addToBatch: (ref) => set((s) => (s.suggestionBatch.some((r) => sameSuggestion(r, ref)) ? s : { suggestionBatch: [...s.suggestionBatch, ref] })),
+    removeFromBatch: (refs) =>
+      set((s) => {
+        const next = s.suggestionBatch.filter((r) => !refs.some((x) => sameSuggestion(r, x)));
+        return next.length === s.suggestionBatch.length ? s : { suggestionBatch: next };
+      }),
     setNotice: (notice) => set({ notice }),
   }));
 

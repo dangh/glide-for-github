@@ -13,6 +13,7 @@
  */
 import {
   serveRpc,
+  sortSuggestionComments,
   type ApplySuggestionsBody,
   type BridgeErrorPayload,
   type BridgeMethods,
@@ -32,6 +33,8 @@ const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{1,128}$/;
 const THREAD_ID = /^\d+$/;
 const OID = /^[0-9a-f]{40}([0-9a-f]{24})?$/;
 const DOT_NAMES = new Set(['.', '..']);
+/** Longest repo file path accepted by `markViewed` / `unmarkViewed`. */
+const MAX_FILE_PATH = 4096;
 
 const notAllowed = (message: string): BridgeErrorPayload => ({ status: 0, code: 'not_allowed', message });
 const badRequest = (message: string): BridgeErrorPayload => ({ status: 0, code: 'bad_request', message });
@@ -181,10 +184,11 @@ function applyRequest(body: unknown, key: unknown): { path: string; json: string
   }
   if (typeof b.message !== 'string') throw badRequest('message must be a string');
   if (typeof b.expectedHeadOid !== 'string' || !OID.test(b.expectedHeadOid)) throw badRequest('expectedHeadOid must be a commit sha');
+  const rebuilt = comments.map((c) => ({ id: c.id as number, ...(c.suggestionIndex !== undefined ? { suggestionIndex: c.suggestionIndex as number } : {}) }));
   return {
     path: `/${b.owner}/${b.repo}/pull/${b.number}/page_data/apply_review_suggestions`,
     json: JSON.stringify({
-      comments: comments.map((c) => ({ id: c.id, ...(c.suggestionIndex !== undefined ? { suggestionIndex: c.suggestionIndex } : {}) })),
+      comments: sortSuggestionComments(rebuilt),
       message: b.message,
       expectedHeadOid: b.expectedHeadOid,
     }),
@@ -196,6 +200,19 @@ function threadRequest(endpoint: 'resolve_thread' | 'unresolve_thread', owner: u
   if (!isName(owner) || !isName(repo) || !isPosInt(number)) throw badRequest('Invalid pull request');
   if (typeof threadId !== 'string' || !THREAD_ID.test(threadId)) throw badRequest('threadId must be a numeric thread id');
   return { path: `/${owner}/${repo}/pull/${number}/page_data/${endpoint}`, json: JSON.stringify({ threadId }) };
+}
+
+/**
+ * `file_review` (R§3): path from validated parts; the file path goes verbatim into the JSON body, which is rebuilt
+ * field by field exactly as GitHub's client sends it (`viewed: "viewed"` to mark, `_method: "delete"` to unmark).
+ */
+function fileReviewRequest(viewed: boolean, owner: unknown, repo: unknown, number: unknown, path: unknown) {
+  if (!isName(owner) || !isName(repo) || !isPosInt(number)) throw badRequest('Invalid pull request');
+  if (typeof path !== 'string' || path === '' || path.length > MAX_FILE_PATH || /[\0\r\n]/.test(path)) throw badRequest('Invalid file path');
+  return {
+    path: `/${owner}/${repo}/pull/${number}/file_review`,
+    json: JSON.stringify(viewed ? { path, viewed: 'viewed' } : { path, _method: 'delete' }),
+  };
 }
 
 export function createBridgeImpl(deps: BridgeDeps = {}): RpcImpl<BridgeMethods> {
@@ -248,11 +265,19 @@ export function createBridgeImpl(deps: BridgeDeps = {}): RpcImpl<BridgeMethods> 
     async unresolveThread(owner, repo, number, threadId) {
       return postJson(threadRequest('unresolve_thread', owner, repo, number, threadId));
     },
+
+    async markViewed(owner, repo, number, path) {
+      return postJson(fileReviewRequest(true, owner, repo, number, path));
+    },
+
+    async unmarkViewed(owner, repo, number, path) {
+      return postJson(fileReviewRequest(false, owner, repo, number, path), 'DELETE');
+    },
   };
 
-  async function postJson({ path, json }: { path: string; json: string }): Promise<Json> {
+  async function postJson({ path, json }: { path: string; json: string }, method: 'POST' | 'DELETE' = 'POST'): Promise<Json> {
     const headers = { ...githubHeaders(doc()), Accept: 'application/json', 'Content-Type': 'application/json' };
-    const res = await send(deps, origin() + path, { method: 'POST', headers, body: json, credentials: 'same-origin' });
+    const res = await send(deps, origin() + path, { method, headers, body: json, credentials: 'same-origin' });
     if (!res.ok) throw await errorFrom(res);
     return readJson(res);
   }
