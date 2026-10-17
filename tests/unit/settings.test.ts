@@ -657,8 +657,8 @@ describe('toDiffOptions', () => {
       overflow: 'wrap',
       lineDiffType: 'word',
       diffIndicators: 'classic',
-      // No "@@ -a,b +c,d @@" rows by default: a plain separator with the expand affordance.
-      hunkSeparators: 'simple',
+      // No "@@ -a,b +c,d @@" text by default: a slim "N unmodified lines" row with expand buttons.
+      hunkSeparators: 'line-info-basic',
       lineHoverHighlight: 'disabled',
       stickyHeaders: true,
       expansionLineCount: 20,
@@ -669,7 +669,7 @@ describe('toDiffOptions', () => {
   it("resolves 'default' option by option, leaving explicit siblings alone", () => {
     const o = toDiffOptions({ ...DEFAULT_SETTINGS, diff: { ...explicitDiff, themeLight: 'default', hunkSeparators: 'default' } });
     expect(o.theme).toEqual({ light: 'github-light-default', dark: 'github-dark' });
-    expect(o.hunkSeparators).toBe('simple');
+    expect(o.hunkSeparators).toBe('line-info-basic');
     expect(o.diffStyle).toBe('split');
   });
 

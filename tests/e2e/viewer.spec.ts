@@ -26,6 +26,39 @@ async function resetSettings(viewer: Viewer) {
 const diffText = (viewer: Viewer) =>
   viewer.frame().evaluate(() => [...document.querySelectorAll('diffs-container')].map((c) => c.shadowRoot?.textContent ?? '').join('\n'));
 
+/**
+ * The first "N unmodified lines" expander row of a file: its gap size and a click on its expand button (not "Expand
+ * all"). Pierre renders each separator in the gutter and the code column; the gutter copy holds the visible button.
+ * The click is a real mouse click at the button (moved off the sticky file header first), because Playwright's
+ * actionability checks mistake Pierre's layered rows for an overlay.
+ */
+async function expander(viewer: Viewer, path: string) {
+  const find = () =>
+    viewer.frame().evaluate((p) => {
+      const header = [...document.querySelectorAll<HTMLElement>('.fh')].find((e) => e.dataset.path === p);
+      const root = header?.closest('diffs-container')?.shadowRoot;
+      const row = [...(root?.querySelectorAll('[data-gutter] > [data-separator="line-info-basic"]') ?? [])].find((r) => /\d+ unmodified line/.test(r.textContent ?? ''));
+      const button = row?.querySelector('[data-expand-button]:not([data-expand-all-button])');
+      if (!row || !button) return null;
+      const r = button.getBoundingClientRect();
+      return { gap: Number(/(\d+) unmodified/.exec(row.textContent!)![1]), x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    }, path);
+  await viewer.frame().evaluate(() => void (document.querySelector('.pierre-diffs')!.scrollTop -= 120));
+  await expect.poll(async () => (await find()) !== null, { timeout: 15_000 }).toBe(true);
+  const found = (await find())!;
+  return {
+    gap: found.gap,
+    click: async () => {
+      const frame = (await viewer.page.locator('iframe[data-pierre-viewer]').boundingBox())!;
+      // Pierre's interaction layer acts on a pointer that has moved onto the row first (as a user's would).
+      await viewer.page.mouse.move(frame.x + found.x, frame.y + found.y);
+      await viewer.page.waitForTimeout(300);
+      await viewer.page.mouse.down();
+      await viewer.page.mouse.up();
+    },
+  };
+}
+
 /** The tree's git status lane: number of rows that have one, and the letters shown. */
 const gitLane = (viewer: Viewer) =>
   viewer.frame().evaluate(() => {
@@ -164,7 +197,7 @@ test.describe('sandbox PR', () => {
     await resetSettings(again);
   });
 
-  test("default look is GitHub's: no hunk rows, no A/M/D letters, GitHub colors, fonts and file boxes", async ({ page }) => {
+  test("default look is GitHub's: expandable rows without @@, no A/M/D letters, GitHub colors, fonts and file boxes", async ({ page }) => {
     const viewer = await openPierre(page, SANDBOX, 'hash');
     await resetSettings(viewer);
     await viewer.allFetched();
@@ -172,9 +205,18 @@ test.describe('sandbox PR', () => {
     await viewer.scrollToFile(path);
     await expect.poll(async () => (await viewer.item(path))?.lines ?? 0).toBeGreaterThan(0);
 
-    // No "@@ -a,b +c,d @@" rows and no "N unmodified lines" rows...
-    expect(await diffText(viewer)).not.toMatch(/@@|unmodified lines|More unchanged context/);
-    // ...while an explicit choice still shows them (the check above is not vacuous).
+    // No "@@ -a,b +c,d @@" text: the hunk rows are GitHub-like slim expanders ("N unmodified lines")...
+    expect(await diffText(viewer)).not.toMatch(/@@/);
+    // ...and one click on an expander reveals that gap (6 lines here; at most expansionLineCount = 20 per click).
+    const GAP = 'src/util/math.ts';
+    await viewer.scrollToFile(GAP);
+    await expect.poll(async () => (await viewer.item(GAP))?.lines ?? 0).toBeGreaterThan(0);
+    const before = (await viewer.item(GAP))!.lines;
+    const gapRow = await expander(viewer, GAP);
+    await gapRow.click();
+    await expect.poll(async () => (await viewer.item(GAP))!.lines - before, { timeout: 15_000 }).toBe(Math.min(gapRow.gap, 20));
+    expect(await diffText(viewer)).not.toMatch(/@@/);
+    // An explicit choice still shows @@ hunk headers (the check above is not vacuous).
     await viewer.frame().evaluate(() => window.__pierre!.settings.getState().update({ diff: { hunkSeparators: 'metadata' } }));
     await expect.poll(() => diffText(viewer), { timeout: 15_000 }).toMatch(/@@ -\d+/);
     await viewer.frame().evaluate(() => window.__pierre!.settings.getState().update({ diff: { hunkSeparators: 'default' } }));
@@ -385,6 +427,22 @@ test.describe('sandbox PR', () => {
 });
 
 test.describe('react/react#37778 (read-only)', () => {
+  test('a default expander reveals at most 20 lines per click (expansionLineCount)', async ({ page }) => {
+    const viewer = await openPierre(page, REACT, 'hash');
+    await resetSettings(viewer);
+    // This file's only hunk starts at line 110: 109 unchanged lines above it, more than one click's worth.
+    const FILE = 'compiler/apps/playground/components/Header.tsx';
+    await viewer.scrollToFile(FILE);
+    await expect.poll(async () => (await viewer.item(FILE))?.lines ?? 0, { timeout: 30_000 }).toBeGreaterThan(0);
+    expect(await diffText(viewer)).not.toMatch(/@@/);
+    const before = (await viewer.item(FILE))!.lines;
+    const row = await expander(viewer, FILE);
+    expect(row.gap).toBeGreaterThan(20);
+    await row.click();
+    await expect.poll(async () => (await viewer.item(FILE))!.lines - before, { timeout: 30_000 }).toBe(20);
+    await expect.poll(() => diffText(viewer)).toContain(`${row.gap - 20} unmodified lines`);
+  });
+
   test('one early click on the Glide tab opens Glide while GitHub is still loading', async ({ page }) => {
     // GitHub re-renders its tab strip during load, re-injecting our tab between pointerdown and pointerup; a single
     // press as soon as the tab exists must still open Glide (no retry).

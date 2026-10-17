@@ -10,11 +10,12 @@
  *                                                                             (classic `.blob-code-inner { white-space: pre-wrap }`)
  * diff.lineDiffType          'default'    'word'                              GitHub highlights changed words
  * diff.diffIndicators        'default'    'classic'                           +/- signs in the line gutter
- * diff.hunkSeparators        'default'    'simple'                            no "@@ -a,b +c,d @@" rows (user request);
- *                                                                             a plain divider between hunks. NOTE: Pierre's
- *                                                                             'simple' has NO expand buttons (only the
- *                                                                             line-info* types do), so unchanged context
- *                                                                             cannot be expanded in this mode
+ * diff.hunkSeparators        'default'    'line-info-basic'                   user's choice: a slim "N unmodified lines" row
+ *                                                                             with expand buttons and no "@@ -a,b +c,d @@"
+ *                                                                             text, flush with the code (no gap), like
+ *                                                                             GitHub's expander rows. (Pierre's createSeparator
+ *                                                                             renders hunk specs only for 'metadata';
+ *                                                                             'simple' has no expand buttons.)
  * diff.themeLight/Dark       'default'    'github-light-default' /            GitHub's Primer syntax colors (Shiki's
  *                                         'github-dark-default'               bundled GitHub themes)
  * diff.themeType             'default'    'system' (follows GitHub's mode)    GitHub's default theme setting syncs with the OS
@@ -26,6 +27,7 @@
  * diff.disableLineNumbers    false        line numbers shown                  GitHub shows both line numbers
  * diff.expandUnchanged       false        unchanged lines collapsed           GitHub collapses unchanged context
  * diff.expansionLineCount    20           20 lines per expand click           GitHub's expander reveals 20 lines
+ *                                                                             (gaps over 20 lines get up/down buttons)
  * diff.collapsedContextThreshold 1        Pierre's value (no GitHub analogue)
  * diff.stickyHeader          true         file headers stick while scrolling  GitHub's file headers are sticky
  * diff.tokenizeMax* and maxLineDiffLength Pierre's limits (performance; no visible GitHub analogue)
@@ -57,7 +59,7 @@ export const GITHUB_DIFF = Object.freeze({
   overflow: 'wrap',
   lineDiffType: 'word',
   diffIndicators: 'classic',
-  hunkSeparators: 'simple',
+  hunkSeparators: 'line-info-basic',
   themeLight: 'github-light-default',
   themeDark: 'github-dark-default',
   themeType: 'system',

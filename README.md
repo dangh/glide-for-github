@@ -27,7 +27,7 @@ review features: comments, suggestions, resolving threads, viewed files and revi
 - Display options (layout, themes, line wrapping, hunk rows, tree icons and position, fonts, and more) are on the
   options page and in the viewer's Display menu, with a live preview on the options page. Every option starts at
   "Default (GitHub)", which looks like GitHub's own Files changed page (unified, GitHub's colors, fonts and file boxes,
-  no `@@` rows, no status letters in the tree); Pierre's other styles are one choice away. Changes apply to open pull
+  slim expandable "N unmodified lines" rows instead of `@@` headers, no status letters in the tree); Pierre's other styles are one choice away. Changes apply to open pull
   requests without a reload.
 
 ## Install

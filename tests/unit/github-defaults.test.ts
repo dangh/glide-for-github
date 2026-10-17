@@ -26,7 +26,7 @@ describe("the GitHub mapping of 'default'", () => {
       overflow: 'wrap',
       lineDiffType: 'word',
       diffIndicators: 'classic',
-      hunkSeparators: 'simple',
+      hunkSeparators: 'line-info-basic',
       themeLight: 'github-light-default',
       themeDark: 'github-dark-default',
       themeType: 'system',
