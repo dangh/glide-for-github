@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { FileSummary, PrData } from '../../src/viewer/github/private';
 import type { ThreadModel } from '../../src/viewer/github/threads';
 import { commentCount, createPrStore, draftKey, isCollapsed, threadsByPath } from '../../src/viewer/state/store';
-import { decorationFor, filesChangedUrl, visibleFiles } from '../../src/viewer/state/view';
+import { decorationFor, filesChangedUrl, gitStatusEntries, visibleFiles } from '../../src/viewer/state/view';
 
 const file = (path: string, extra: Partial<FileSummary> = {}): FileSummary => ({
   path,
@@ -138,6 +138,16 @@ describe('store', () => {
 });
 
 describe('view helpers', () => {
+  it('gitStatusEntries: none when the git status option is off (no letters, no folder roll-ups)', () => {
+    const files = [file('a.ts', { status: 'added' }), file('b.ts'), file('c.ts', { status: 'deleted' })];
+    expect(gitStatusEntries(files, false)).toBeUndefined();
+    expect(gitStatusEntries(files, true)).toEqual([
+      { path: 'a.ts', status: 'added' },
+      { path: 'b.ts', status: 'modified' },
+      { path: 'c.ts', status: 'deleted' },
+    ]);
+  });
+
   it('decorationFor shows comment count, viewed tick and rename tooltip', () => {
     const store = createPrStore();
     store.getState().setPr(pr([file('a.ts', { viewed: true }), file('b.ts'), file('c.ts', { prevPath: 'old/c.ts' })]));

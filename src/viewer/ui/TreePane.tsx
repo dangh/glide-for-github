@@ -1,5 +1,5 @@
 /**
- * File tree (@pierre/trees) with git status badges, comment-count and viewed decorations, a filter box,
+ * File tree (@pierre/trees) with optional git status badges, comment-count and viewed decorations, a filter box,
  * selection → scroll the diff list, and diff scroll position → tree selection.
  *
  * Tree options are construction-time in @pierre/trees, so a Display-menu change remounts the tree (cheap).
@@ -9,11 +9,10 @@ import type { GitStatusEntry } from '@pierre/trees';
 import { FileTree, useFileTree } from '@pierre/trees/react';
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { DEFAULT_SETTINGS, toTreeOptions, type TreeSettings } from '../../shared/settings';
-import type { FileSummary } from '../github/private';
 import { session } from '../state/session';
 import { effectiveThemeType, useSettings } from '../state/settings';
 import { usePr } from '../state/store';
-import { decorationFor } from '../state/view';
+import { decorationFor, gitStatusEntries } from '../state/view';
 
 type TreeModel = ReturnType<typeof useFileTree>['model'];
 const ancestorsOf = (path: string): string[] => {
@@ -23,14 +22,14 @@ const ancestorsOf = (path: string): string[] => {
   return out;
 };
 
-function Tree({ paths, gitStatus, settings, colorScheme }: { paths: string[]; gitStatus: GitStatusEntry[]; settings: TreeSettings; colorScheme: string }) {
+function Tree({ paths, gitStatus, settings, colorScheme }: { paths: string[]; gitStatus: GitStatusEntry[] | undefined; settings: TreeSettings; colorScheme: string }) {
   /** True while the diff scroll position updates the selection: that selection must not scroll the diff. */
   const syncing = useRef(false);
   const modelRef = useRef<TreeModel | null>(null);
 
   const { model } = useFileTree({
     paths,
-    gitStatus,
+    ...(gitStatus ? { gitStatus } : {}),
     ...toTreeOptions({ ...DEFAULT_SETTINGS, tree: settings }),
     renderRowDecoration: ({ item }) => (item.kind === 'file' ? decorationFor(usePr.getState(), item.path) : null),
     onSelectionChange: (selected) => {
@@ -94,10 +93,7 @@ export const TreePane = memo(function TreePane() {
   const pr = usePr((s) => s.pr);
   const settings = useSettings((s) => s.settings.tree);
   const themeType = useSettings((s) => effectiveThemeType(s.settings.diff.themeType, s.colorMode));
-  const gitStatus = useMemo<GitStatusEntry[]>(
-    () => (pr ? pr.files.map((f: FileSummary) => ({ path: f.path, status: f.status })) : []),
-    [pr],
-  );
+  const gitStatus = useMemo(() => gitStatusEntries(pr?.files ?? [], settings.showGitStatus), [pr, settings.showGitStatus]);
   const key = useMemo(() => JSON.stringify(settings), [settings]);
   const colorScheme = themeType === 'system' ? 'light dark' : themeType;
 

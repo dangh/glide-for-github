@@ -61,6 +61,7 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
   const hideWhitespace = useSettings((s) => s.settings.review.hideWhitespace);
   const diffSettings = useSettings((s) => s.settings.diff);
   const themeType = useSettings((s) => effectiveThemeType(s.settings.diff.themeType, s.colorMode));
+  const treePosition = useSettings((s) => s.settings.layout.treePosition);
 
   // The pool is created once settings are known (its initial render options come from them).
   const pool = useMemo(() => (settingsLoaded ? createWorkerPool(useSettings.getState().settings) : undefined), [settingsLoaded]);
@@ -112,7 +113,7 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
         <DisplayStyle />
         <Toolbar />
         <BatchBar />
-        <div className="pierre-body">
+        <div className="pierre-body" data-tree-position={treePosition}>
           <TreePane />
           <main className="pierre-main">{pr && settingsLoaded ? <DiffPane rpc={rpc} /> : <div className="pierre-loading">Loading pull request…</div>}</main>
         </div>

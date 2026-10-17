@@ -1,8 +1,10 @@
 /** Pure view helpers (viewport math, tree decorations), kept out of the React components for unit tests. */
 import type { FileDiffContentsLoader } from '@pierre/diffs';
+import type { GitStatusEntry } from '@pierre/trees';
 import type { CodeViewReactOptions } from '@pierre/diffs/react';
 import { DEFAULT_SETTINGS, toDiffOptions, type DiffSettings } from '../../shared/settings';
 import type { PrRef } from '../../shared/pr-url';
+import type { FileSummary } from '../github/private';
 import type { AnnotationMeta } from './items';
 import { effectiveThemeType } from './settings';
 import { commentCount, threadsByPath, type PrState } from './store';
@@ -74,6 +76,14 @@ export function visibleFiles(
     ids.push(order[i]!);
   }
   return { ids, current: order[lo] };
+}
+
+/**
+ * The tree's `gitStatus` (A/M/D letters, colored names and folder roll-ups), or undefined when the
+ * `tree.showGitStatus` option is off, so @pierre/trees draws no status at all.
+ */
+export function gitStatusEntries(files: readonly FileSummary[], show: boolean): GitStatusEntry[] | undefined {
+  return show ? files.map((f) => ({ path: f.path, status: f.status })) : undefined;
 }
 
 export type Decoration = { text: string; title?: string; parts?: { text: string; color?: string }[] } | null;
