@@ -1,0 +1,473 @@
+/* Pierre for GitHub viewer. Colors follow GitHub's Primer palette; light/dark via color-scheme (set by App). */
+:root {
+  color-scheme: light dark;
+  --pierre-fg: light-dark(#1f2328, #e6edf3);
+  --pierre-muted: light-dark(#59636e, #9198a1);
+  --pierre-bg: light-dark(#ffffff, #0d1117);
+  --pierre-bg-subtle: light-dark(#f6f8fa, #151b23);
+  --pierre-border: light-dark(#d1d9e0, #3d444d);
+  --pierre-accent: light-dark(#0969da, #4493f8);
+  --pierre-accent-bg: light-dark(#ddf4ff, #121d2f);
+  --pierre-accent-border: light-dark(#54aeff, #1f6feb);
+  --pierre-success: light-dark(#1a7f37, #3fb950);
+  --pierre-danger: light-dark(#d1242f, #f85149);
+  --pierre-attention: light-dark(#9a6700, #d29922);
+  --pierre-done: light-dark(#8250df, #ab7df8);
+  --pierre-primary-bg: light-dark(#1f883d, #238636);
+  --pierre-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+  --pierre-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font: 14px/1.5 var(--pierre-font);
+  color: var(--pierre-fg);
+  background: var(--pierre-bg);
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.pierre-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Toolbar */
+.pierre-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--pierre-border);
+  font-size: 12px;
+  flex: none;
+}
+
+.grow,
+.fh-grow {
+  flex: 1;
+}
+
+.pill {
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+  padding: 3px 10px;
+  background: var(--pierre-bg-subtle);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.pill:hover {
+  border-color: var(--pierre-muted);
+}
+
+.pill-on {
+  background: var(--pierre-accent-bg);
+  border-color: var(--pierre-accent-border);
+}
+
+.pill-disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.seg {
+  display: inline-flex;
+}
+
+.seg .pill:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.seg .pill:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  margin-left: -1px;
+}
+
+.viewed-counter {
+  color: var(--pierre-muted);
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--pierre-primary-bg);
+  color: #fff;
+  border: 1px solid rgba(31, 35, 40, 0.15);
+  border-radius: 6px;
+  padding: 3px 12px;
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Popovers */
+.popover {
+  position: relative;
+}
+
+.popover-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  min-width: 260px;
+  max-height: min(70vh, 560px);
+  overflow: auto;
+  background: var(--pierre-bg);
+  border: 1px solid var(--pierre-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(66, 74, 83, 0.2);
+  padding: 4px;
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  max-width: 420px;
+}
+
+.menu-item {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: var(--pierre-bg-subtle);
+}
+
+.menu-item-on {
+  background: var(--pierre-accent-bg);
+}
+
+.menu-sub,
+.menu-sep {
+  color: var(--pierre-muted);
+  font-size: 11px;
+}
+
+.menu-sep {
+  padding: 6px 8px 2px;
+  border-top: 1px solid var(--pierre-border);
+  margin-top: 4px;
+}
+
+.menu-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-form {
+  width: 340px;
+  padding: 4px 6px;
+}
+
+.settings-form fieldset {
+  border: 0;
+  border-top: 1px solid var(--pierre-border);
+  margin: 4px 0;
+  padding: 6px 0 2px;
+}
+
+.settings-form fieldset:first-of-type {
+  border-top: 0;
+}
+
+.settings-form legend {
+  font-weight: 600;
+  padding: 0;
+}
+
+.field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.field select,
+.field input[type='number'],
+.field input[type='text'] {
+  width: 160px;
+  font: inherit;
+  padding: 2px 4px;
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+  background: var(--pierre-bg);
+  color: inherit;
+}
+
+.field-check {
+  justify-content: flex-start;
+}
+
+.advanced summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 6px 0;
+  border-top: 1px solid var(--pierre-border);
+}
+
+/* Body */
+.pierre-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.pierre-tree-pane {
+  width: 300px;
+  flex: none;
+  border-right: 1px solid var(--pierre-border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.pierre-tree {
+  overscroll-behavior: contain;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: block;
+}
+
+.pierre-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+}
+
+.pierre-diffs {
+  height: 100%;
+  overflow: auto;
+  /* Never chain scrolling to GitHub's page around the iframe. */
+  overscroll-behavior: contain;
+}
+
+.pierre-loading {
+  padding: 24px;
+  color: var(--pierre-muted);
+}
+
+/* File header (slotted into each Pierre item) */
+.fh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 4px;
+  font: 12px/1.4 var(--pierre-font);
+  color: var(--pierre-fg);
+  background: var(--pierre-bg-subtle);
+  border-bottom: 1px solid var(--pierre-border);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.fh-chevron {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  width: 22px;
+  padding: 0;
+  color: var(--pierre-muted);
+}
+
+.fh-badge {
+  font: 600 11px/16px var(--pierre-mono);
+  width: 16px;
+  text-align: center;
+  border-radius: 4px;
+  flex: none;
+}
+
+.fh-added {
+  color: var(--pierre-success);
+}
+
+.fh-modified {
+  color: var(--pierre-attention);
+}
+
+.fh-deleted {
+  color: var(--pierre-danger);
+}
+
+.fh-renamed {
+  color: var(--pierre-done);
+}
+
+.fh-path {
+  font-family: var(--pierre-mono);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 0 1 auto;
+  direction: ltr;
+}
+
+.fh-prev {
+  color: var(--pierre-muted);
+  font-weight: 400;
+}
+
+.fh-arrow {
+  color: var(--pierre-muted);
+}
+
+.fh-counts {
+  display: inline-flex;
+  gap: 6px;
+  font-family: var(--pierre-mono);
+  flex: none;
+}
+
+.fh-add {
+  color: var(--pierre-success);
+}
+
+.fh-del {
+  color: var(--pierre-danger);
+}
+
+.fh-note {
+  flex: none;
+}
+
+.fh-muted {
+  color: var(--pierre-muted);
+}
+
+.fh-error {
+  color: var(--pierre-danger);
+}
+
+.fh-link {
+  border: 0;
+  background: none;
+  color: var(--pierre-accent);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.fh-button {
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+  background: var(--pierre-bg);
+  padding: 1px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.fh-comments {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--pierre-muted);
+  flex: none;
+}
+
+.fh-viewed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+  padding: 1px 8px;
+  cursor: pointer;
+  flex: none;
+  background: var(--pierre-bg);
+}
+
+.fh[data-viewed] .fh-viewed {
+  background: var(--pierre-accent-bg);
+  border-color: var(--pierre-accent-border);
+}
+
+.icon {
+  vertical-align: text-bottom;
+}
+
+/* Notices */
+.toast {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--pierre-fg);
+  color: var(--pierre-bg);
+  font-size: 13px;
+  z-index: 30;
+  box-shadow: 0 8px 24px rgba(66, 74, 83, 0.3);
+}
+
+.toast-error {
+  background: var(--pierre-danger);
+  color: #fff;
+}
+
+.toast-close {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.banner {
+  padding: 6px 12px;
+  background: var(--pierre-accent-bg);
+  border-top: 1px solid var(--pierre-accent-border);
+  font-size: 13px;
+}
+
+.fatal {
+  padding: 32px;
+  max-width: 640px;
+}
+
+.fatal h2 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}

@@ -145,6 +145,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
       );
       expect(host.iframe.src).toContain('pr=dangh%2Fpierre-sandbox%231');
       expect(host.iframe.style.height).toMatch(/^calc\(100vh - \d+px\)$/);
+      expect(host.iframe.style.minHeight).toBe('320px');
       expect(hiddenAncestor(content)).toBe(true);
 
       host.unmount();
@@ -169,6 +170,19 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
       expect(msg).toEqual({ type: 'pierre:port', colorMode: 'dark' });
       expect(origin).toBe('chrome-extension://abcdefghijklmnop');
       expect(transfer).toHaveLength(1);
+    });
+
+    it('sizes the viewer to end at the bottom of the viewport, from its own top', () => {
+      const rect = vi.spyOn(HTMLIFrameElement.prototype, 'getBoundingClientRect');
+      rect.mockReturnValue({ top: 261.4, left: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 261.4, toJSON() {} } as DOMRect);
+      const host = mountViewer(document, ref);
+      expect(host.iframe.style.height).toBe('calc(100vh - 261px)');
+
+      // Layout above the viewer changed (GitHub re-rendered the header): resize and refresh re-measure.
+      rect.mockReturnValue({ top: 300, left: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 300, toJSON() {} } as DOMRect);
+      window.dispatchEvent(new Event('resize'));
+      expect(host.iframe.style.height).toBe('calc(100vh - 300px)');
+      host.unmount();
     });
 
     it('tells the bridge to reset on unmount', () => {

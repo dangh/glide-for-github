@@ -50,6 +50,7 @@ await Promise.all([
   cp(r('manifest.json'), resolve(dist, 'manifest.json')),
   cp(r('src/content/content.css'), resolve(dist, 'content.css')),
   cp(r('src/viewer/viewer.html'), resolve(dist, 'viewer.html')),
+  cp(r('src/viewer/viewer.css'), resolve(dist, 'viewer.css')),
   cp(r('src/options/options.html'), resolve(dist, 'options.html')),
   cp(r('icons'), resolve(dist, 'icons'), { recursive: true }),
 ]);

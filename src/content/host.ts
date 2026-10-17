@@ -1,8 +1,18 @@
 import { prKey, type PrRef } from '../shared/pr-url';
 import { findTabNav } from './tab';
 
-/** Offset of the viewer below the top of the viewport: GitHub's global header height. */
-export const HEADER_OFFSET_PX = 60;
+/** The viewer never gets shorter than this (small windows scroll the page instead). */
+export const MIN_VIEWER_HEIGHT_PX = 320;
+
+/**
+ * Height that makes the iframe end exactly at the bottom of the viewport when the page is scrolled to the
+ * top: `100vh` minus the iframe's offset from the top of the document (GitHub's header, PR title, tabs).
+ * (The iframe also has `min-height: MIN_VIEWER_HEIGHT_PX`.)
+ */
+export function viewerHeight(iframe: HTMLElement, win: Window): string {
+  const top = Math.max(0, Math.round(iframe.getBoundingClientRect().top + win.scrollY));
+  return `calc(100vh - ${top}px)`;
+}
 
 /** The only `chrome.*` use in the content script, injectable so jsdom tests can fake it. */
 let resolveExtensionUrl = (path: string): string => chrome.runtime.getURL(path);
@@ -53,7 +63,12 @@ export function mountViewer(doc: Document, ref: PrRef): ViewerHost {
   iframe.setAttribute('src', resolveExtensionUrl('viewer.html?pr=' + encodeURIComponent(prKey(ref))));
   iframe.setAttribute('title', 'Pierre');
   iframe.setAttribute('data-pierre-viewer', '');
-  iframe.style.cssText = `display:block;width:100%;height:calc(100vh - ${HEADER_OFFSET_PX}px);border:0;`;
+  iframe.style.cssText = `display:block;width:100%;border:0;min-height:${MIN_VIEWER_HEIGHT_PX}px;`;
+  const fitHeight = () => {
+    if (!mounted || !iframe.isConnected) return;
+    const height = viewerHeight(iframe, win);
+    if (iframe.style.height !== height) iframe.style.height = height;
+  };
 
   // Hide GitHub's tab content, remembering each element's inline style to restore it exactly.
   const hidden = new Map<HTMLElement, string | null>();
@@ -104,6 +119,8 @@ export function mountViewer(doc: Document, ref: PrRef): ViewerHost {
 
   hideContent();
   parent.append(iframe);
+  fitHeight();
+  win.addEventListener('resize', fitHeight);
   sendToBridge();
 
   return {
@@ -113,6 +130,7 @@ export function mountViewer(doc: Document, ref: PrRef): ViewerHost {
         return false;
       }
       hideContent();
+      fitHeight();
       return true;
     },
     unmount() {
@@ -120,6 +138,7 @@ export function mountViewer(doc: Document, ref: PrRef): ViewerHost {
       mounted = false;
       iframe.removeEventListener('load', onLoad);
       win.removeEventListener('message', onBridgeReady);
+      win.removeEventListener('resize', fitHeight);
       iframe.remove();
       for (const [el, style] of hidden) {
         if (style === null) el.removeAttribute('style');
