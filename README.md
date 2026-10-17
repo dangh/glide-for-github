@@ -1,4 +1,6 @@
-# Glide for GitHub
+<p align="center"><img src="icons/icon.svg" width="96" height="96" alt=""></p>
+
+<h1 align="center">Glide for GitHub</h1>
 
 A Chrome extension (Manifest V3) that adds a **Glide** tab next to **Files changed** on GitHub pull requests. The tab
 shows the same pull request with a fast diff viewer and file tree, powered by
