@@ -223,6 +223,18 @@ test.describe('sandbox PR', () => {
 });
 
 test.describe('react/react#37778 (read-only)', () => {
+  test('one early click on the Pierre tab opens Pierre while GitHub is still loading', async ({ page }) => {
+    // GitHub re-renders its tab strip during load, re-injecting our tab between pointerdown and pointerup; a single
+    // press as soon as the tab exists must still open Pierre (no retry).
+    await page.goto(prUrl(REACT), { waitUntil: 'commit' });
+    const tab = page.locator('a[data-pierre-tab]');
+    await tab.waitFor({ timeout: 30_000 });
+    const box = (await tab.boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await expect.poll(() => page.url(), { timeout: 10_000 }).toMatch(/#pierre$/);
+    await new Viewer(page).ready();
+  });
+
   test('opens, lists every file, loads every diff, counter matches GitHub', async ({ page }) => {
     const github = await githubViewedCount(page, REACT);
     const started = Date.now();

@@ -58,21 +58,65 @@ export function createLifecycle(win: Window & typeof globalThis = window): Lifec
     timer = setTimeout(sync, DEBOUNCE_MS);
   }
 
-  /** Clicking Pierre on any page of the same PR stays on that page and only adds `#pierre`. */
-  function onClick(event: MouseEvent): void {
-    if (event.defaultPrevented || event.button !== 0) return;
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    const tab = event.target instanceof win.Element ? event.target.closest<HTMLAnchorElement>('a[data-pierre-tab]') : null;
-    if (!tab) return;
+  const plainPress = (event: MouseEvent) =>
+    event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+  const pierreTabOf = (target: EventTarget | null) =>
+    target instanceof win.Element ? target.closest<HTMLAnchorElement>('a[data-pierre-tab]') : null;
+  /** The tab is for the PR on screen (a tab of another PR is left to the browser). */
+  const samePr = (tab: HTMLAnchorElement) => {
     const here = parsePrUrl(win.location.href);
     const there = parsePrUrl(tab.href);
-    if (!here || !there || prKey(here) !== prKey(there)) return; // different PR: let the browser navigate
-    event.preventDefault();
-    event.stopPropagation(); // keep GitHub's router and Turbo out of it
+    return !!here && !!there && prKey(here) === prKey(there);
+  };
+  function activate(): void {
     if (!isPierreActive(win.location.href)) {
       win.history.pushState(win.history.state, '', win.location.pathname + win.location.search + '#pierre');
     }
     sync();
+  }
+
+  /**
+   * A press on the tab that may lose its click. While GitHub is still loading it re-renders the tab strip, and the
+   * tab is re-injected (a new element) between pointerdown and pointerup: the browser then fires no click on it, so
+   * the press was simply lost (Task 7 concern 1; seen in Task 12 as pointerdown on the tab, mousedown on a DIV).
+   * A release inside the rectangle that was pressed, shortly after, opens Pierre unless a click on the tab did.
+   */
+  const PRESS_MS = 1500;
+  let press: { at: number; rect: DOMRect } | null = null;
+  /** The release being checked: `handled` is set when the click that follows it reached the tab. */
+  let release: { handled: boolean } | null = null;
+  let releaseTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function onPointerDown(event: PointerEvent): void {
+    const tab = pierreTabOf(event.target);
+    press = tab && plainPress(event) && samePr(tab) ? { at: event.timeStamp, rect: tab.getBoundingClientRect() } : null;
+  }
+
+  function onPointerUp(event: PointerEvent): void {
+    const p = press;
+    press = null;
+    if (!p || !plainPress(event) || event.timeStamp - p.at > PRESS_MS) return;
+    const { left, right, top, bottom } = p.rect;
+    if (event.clientX < left || event.clientX > right || event.clientY < top || event.clientY > bottom) return;
+    // The click, if the browser fires one, is dispatched in this same task, before the timeout.
+    const r = { handled: false };
+    release = r;
+    clearTimeout(releaseTimer);
+    releaseTimer = setTimeout(() => {
+      if (release === r) release = null;
+      if (!r.handled && parsePrUrl(win.location.href)) activate();
+    }, 0);
+  }
+
+  /** Clicking Pierre on any page of the same PR stays on that page and only adds `#pierre`. */
+  function onClick(event: MouseEvent): void {
+    if (event.defaultPrevented || !plainPress(event)) return;
+    const tab = pierreTabOf(event.target);
+    if (!tab || !samePr(tab)) return; // different PR: let the browser navigate
+    if (release) release.handled = true;
+    event.preventDefault();
+    event.stopPropagation(); // keep GitHub's router and Turbo out of it
+    activate();
   }
 
   function start(): void {
@@ -88,8 +132,9 @@ export function createLifecycle(win: Window & typeof globalThis = window): Lifec
     const navigation = (win as unknown as { navigation?: NavigationTarget }).navigation;
     if (navigation) listen(navigation, 'navigatesuccess', schedule);
 
-    doc.addEventListener('click', onClick as EventListener, true);
-    cleanups.push(() => doc.removeEventListener('click', onClick as EventListener, true));
+    listen(doc, 'click', onClick as EventListener as () => void, true);
+    listen(doc, 'pointerdown', onPointerDown as EventListener as () => void, true);
+    listen(doc, 'pointerup', onPointerUp as EventListener as () => void, true);
 
     // Observe the root, not <body>: Turbo Drive replaces document.body on classic-UI navigations,
     // which would leave an observer on <body> watching a detached node.
@@ -101,6 +146,9 @@ export function createLifecycle(win: Window & typeof globalThis = window): Lifec
 
   function stop(): void {
     clearTimeout(timer);
+    clearTimeout(releaseTimer);
+    press = null;
+    release = null;
     observer?.disconnect();
     observer = null;
     for (const fn of cleanups) fn();

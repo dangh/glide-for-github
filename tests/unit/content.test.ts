@@ -354,6 +354,68 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
       expect(viewers()).toHaveLength(1);
     });
 
+    describe('a press whose click is lost while GitHub re-renders the tab strip', () => {
+      const RECT = { left: 100, right: 180, top: 10, bottom: 40, width: 80, height: 30, x: 100, y: 10 };
+      const pointer = (type: string, x: number, y: number) =>
+        new (window.PointerEvent ?? MouseEvent)(type, { bubbles: true, cancelable: true, button: 0, clientX: x, clientY: y });
+      const tick = () => new Promise((r) => setTimeout(r, 0));
+      const pressTab = () => {
+        const tab = pierreTabs()[0] as HTMLAnchorElement;
+        vi.spyOn(tab, 'getBoundingClientRect').mockReturnValue({ ...RECT, toJSON: () => RECT } as DOMRect);
+        const down = pointer('pointerdown', 140, 25);
+        tab.dispatchEvent(down);
+        return Object.assign(tab, { pressedAt: down.timeStamp });
+      };
+
+      it('opens Pierre when the tab was re-injected between pointerdown and pointerup (no click on it)', async () => {
+        const life = createLifecycle(window);
+        life.start();
+        const tab = pressTab();
+        tab.remove(); // GitHub re-rendered the strip; our tab comes back as a new element
+        life.sync();
+        expect(pierreTabs()[0]).not.toBe(tab);
+        document.body.dispatchEvent(pointer('pointerup', 141, 26));
+        document.body.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })); // lands elsewhere
+        expect(window.location.hash).toBe('');
+        await tick();
+        expect(window.location.hash).toBe('#pierre');
+        expect(window.location.pathname).toBe('/dangh/pierre-sandbox/pull/1/changes');
+        expect(viewers()).toHaveLength(1);
+        life.stop();
+      });
+
+      it('a normal press and click activates once', async () => {
+        const life = createLifecycle(window);
+        life.start();
+        const push = vi.spyOn(window.history, 'pushState');
+        const tab = pressTab();
+        tab.dispatchEvent(pointer('pointerup', 140, 25));
+        tab.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+        await tick();
+        expect(push).toHaveBeenCalledTimes(1);
+        expect(window.location.hash).toBe('#pierre');
+        expect(viewers()).toHaveLength(1);
+        life.stop();
+      });
+
+      it('a release outside the pressed tab, or long after, does nothing', async () => {
+        const life = createLifecycle(window);
+        life.start();
+        pressTab();
+        document.body.dispatchEvent(pointer('pointerup', 300, 25)); // dragged away
+        await tick();
+        expect(window.location.hash).toBe('');
+        const tab = pressTab();
+        const late = pointer('pointerup', 140, 25);
+        Object.defineProperty(late, 'timeStamp', { value: tab.pressedAt + 5_000 });
+        tab.dispatchEvent(late);
+        await tick();
+        expect(window.location.hash).toBe('');
+        expect(viewers()).toHaveLength(0);
+        life.stop();
+      });
+    });
+
     it('leaves modified clicks to the browser', () => {
       const life = createLifecycle(window);
       life.start();
