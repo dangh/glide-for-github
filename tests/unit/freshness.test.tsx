@@ -8,6 +8,9 @@ import { fetchHeadOid, type FileSummary, type PrData, type Rpc } from '../../src
 import { openComposer, targetFromRange } from '../../src/viewer/state/compose';
 import { draftsKeyName, initDraftPersistence } from '../../src/viewer/state/drafts';
 import { createFreshness, noteWrite, POLL_INTERVAL_MS, startFreshness } from '../../src/viewer/state/freshness';
+import { scheduleRefresh } from '../../src/viewer/state/review';
+import { session } from '../../src/viewer/state/session';
+import { commitSuggestions } from '../../src/viewer/state/suggestions';
 import { createPrStore, draftKey } from '../../src/viewer/state/store';
 import { usePr } from '../../src/viewer/state/store';
 import { Composer } from '../../src/viewer/ui/Composer';
@@ -186,40 +189,82 @@ describe('freshness polling', () => {
     f.stop();
   });
 
-  it('a write triggers a check; writes during a poll cause one follow-up, not a parallel request', async () => {
-    let release!: () => void;
-    let gate = new Promise<void>((r) => (release = r));
-    let active = 0;
-    let peak = 0;
-    let total = 0;
-    const rpc = {
-      call: vi.fn(async () => {
-        total++;
-        peak = Math.max(peak, ++active);
-        await gate;
-        active--;
-        return route(head);
-      }),
-    } as unknown as Rpc;
-    const f = createFreshness({ rpc: () => rpc, doc: fakeDoc().doc });
-    f.noteWrite();
-    f.noteWrite();
-    f.noteWrite();
-    await flush();
-    expect(total).toBe(1);
-    gate = Promise.resolve();
-    release();
-    await vi.advanceTimersByTimeAsync(0);
-    expect(total).toBe(2);
-    expect(peak).toBe(1);
-    f.stop();
-  });
+  describe('write-triggered checks (coalesced)', () => {
+    it('are debounced by 3 s: a burst of writes makes one check', async () => {
+      const { f, calls } = make();
+      f.noteWrite();
+      await vi.advanceTimersByTimeAsync(1000);
+      f.noteWrite();
+      await vi.advanceTimersByTimeAsync(1000);
+      f.noteWrite();
+      await vi.advanceTimersByTimeAsync(2999);
+      expect(calls).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(calls).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(calls).toHaveLength(1); // not started: no interval, nothing else
+      f.stop();
+    });
 
-  it('a write while the tab is hidden does not poll', async () => {
-    const { f, calls } = make('hidden');
-    f.noteWrite();
-    await flush();
-    expect(calls).toHaveLength(0);
+    it('are skipped when the last check finished less than 10 s ago, and run again after that', async () => {
+      const { f, calls } = make();
+      await f.check();
+      expect(calls).toHaveLength(1);
+      f.noteWrite();
+      await vi.advanceTimersByTimeAsync(3000); // 3 s after the last check: skipped
+      expect(calls).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(8000); // t = 11 s
+      f.noteWrite();
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(calls).toHaveLength(2);
+      f.stop();
+    });
+
+    it('join a check that is already in flight instead of starting another', async () => {
+      let release!: () => void;
+      const gate = new Promise<void>((r) => (release = r));
+      let active = 0;
+      let peak = 0;
+      let total = 0;
+      const rpc = {
+        call: vi.fn(async () => {
+          total++;
+          peak = Math.max(peak, ++active);
+          await gate;
+          active--;
+          return route(head);
+        }),
+      } as unknown as Rpc;
+      const f = createFreshness({ rpc: () => rpc, doc: fakeDoc().doc });
+      void f.check();
+      await flush();
+      f.noteWrite();
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(total).toBe(1);
+      release();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(total).toBe(1);
+      expect(peak).toBe(1);
+      f.stop();
+    });
+
+    it('do nothing while the tab is hidden (the check on becoming visible covers it), and stop() cancels a pending one', async () => {
+      const hidden = make('hidden');
+      hidden.f.noteWrite();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(hidden.calls).toHaveLength(0);
+
+      const { f, calls, d } = make();
+      f.noteWrite();
+      d.set('hidden'); // hidden during the debounce
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(calls).toHaveLength(0);
+      f.noteWrite(); // (visible again below)
+      d.set('visible');
+      f.stop();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(calls).toHaveLength(0);
+    });
   });
 
   it('drops a result that arrives after the PR was reloaded, and survives request errors', async () => {
@@ -247,14 +292,61 @@ describe('freshness polling', () => {
     const stop = startFreshness({ rpc: () => rpc, doc: fakeDoc().doc });
     head = 'head3';
     noteWrite();
-    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(3000);
     expect(calls).toHaveLength(1);
     expect(usePr.getState().headMoved).toBe(true);
     stop();
     usePr.setState({ headMoved: false });
     noteWrite();
-    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(3000);
     expect(calls).toHaveLength(1);
+  });
+
+  describe('which writes trigger a check', () => {
+    let routeCalls = 0;
+    const installRpc = () => {
+      routeCalls = 0;
+      return {
+        call: vi.fn(async (method: string, path: string) => {
+          if (method === 'applySuggestions') return {};
+          if (method === 'get' && String(path).endsWith('/changes')) routeCalls++;
+          return route(head);
+        }),
+      } as unknown as Rpc;
+    };
+    beforeEach(() => {
+      for (const m of ['log', 'info', 'warn', 'error', 'debug'] as const) vi.spyOn(console, m).mockImplementation(() => undefined);
+      sessionStorage.clear();
+    });
+    afterEach(() => {
+      session.rpc = undefined;
+    });
+
+    it('apply suggestions (the head-moving write) triggers one coalesced check after the commit', async () => {
+      const rpc = installRpc();
+      session.rpc = rpc;
+      const stop = startFreshness({ rpc: () => rpc, doc: fakeDoc().doc });
+      const ref = { commentId: 7, suggestionIndex: 0, path: 'a.ts', url: 'https://github.com/o/r/pull/7#discussion_r7' };
+      usePr.getState().addToBatch(ref);
+      await commitSuggestions([ref], 'm');
+      const afterCommit = routeCalls; // the commit's own PR reload
+      expect(afterCommit).toBeGreaterThan(0);
+      await vi.advanceTimersByTimeAsync(2999);
+      expect(routeCalls).toBe(afterCommit);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(routeCalls).toBe(afterCommit + 1);
+      stop();
+    });
+
+    it('comment writes (scheduleRefresh), viewed, reactions and resolves do not poll', async () => {
+      const rpc = installRpc();
+      session.rpc = undefined; // scheduleRefresh then makes no request of its own
+      const stop = startFreshness({ rpc: () => rpc, doc: fakeDoc().doc });
+      scheduleRefresh(0);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(routeCalls).toBe(0);
+      stop();
+    });
   });
 });
 
@@ -320,6 +412,21 @@ describe('draft persistence (survives a page reload)', () => {
     b.getState().setPr({ ...pr, ref: { ...pr.ref, number: 8 } });
     expect(b.getState().drafts.size).toBe(0);
     stopB();
+  });
+
+  it('a failing write removes the stale stored snapshot so a reload cannot restore outdated text', () => {
+    const store = createPrStore();
+    const stop = initDraftPersistence(store);
+    store.getState().setPr(pr);
+    store.getState().setDraft(draftKey.reviewSummary, { body: 'old text', updatedAt: 1 });
+    expect(sessionStorage.getItem(draftsKeyName(pr.ref))).toContain('old text');
+    const set = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError');
+    });
+    store.getState().setDraft(draftKey.reviewSummary, { body: 'newer text', updatedAt: 2 });
+    set.mockRestore();
+    expect(sessionStorage.getItem(draftsKeyName(pr.ref))).toBeNull();
+    stop();
   });
 
   it('ignores malformed storage and malformed entries', () => {

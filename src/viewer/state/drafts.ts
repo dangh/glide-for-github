@@ -85,7 +85,13 @@ export function initDraftPersistence(store = usePr): () => void {
       if (entries.length === 0) sessionStore().removeItem(name);
       else sessionStore().setItem(name, JSON.stringify(entries));
     } catch {
-      // quota / blocked storage: drafts still live in memory for this page
+      // quota / blocked storage: drafts still live in memory for this page. Drop the stale snapshot so a later
+      // reload does not restore outdated text over what was typed since.
+      try {
+        sessionStore().removeItem(name);
+      } catch {
+        // storage unusable
+      }
     }
   };
   sync(store.getState());

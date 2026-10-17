@@ -93,7 +93,13 @@ function ReviewPanel({ close }: { close: () => void }) {
   useEffect(() => {
     const el = ref.current;
     el?.focus();
-    return () => save(el);
+    // A real reload may come before the debounce fires: write the summary now (it is then in sessionStorage).
+    const flush = () => save(el);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      save(el);
+    };
   }, [save]);
 
   const onInput = () => {

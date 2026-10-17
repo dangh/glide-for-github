@@ -16,6 +16,7 @@ import { BridgeError } from '../../shared/rpc';
 import { WriteError } from '../github/errors';
 import { applySuggestions } from '../github/private';
 import { sessionStore } from './batch';
+import { noteWrite } from './freshness';
 import { loadPr } from './load';
 import { sessionError } from './review';
 import { session } from './session';
@@ -90,4 +91,5 @@ export async function commitSuggestions(refs: readonly SuggestionRef[], message:
   } catch {
     usePr.getState().setNotice({ kind: 'info', message: 'Suggestions committed. Reload to see the new commit.' });
   }
+  noteWrite(); // the only write that moves the head: confirm the shown head is current (coalesced)
 }

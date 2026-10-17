@@ -154,6 +154,15 @@ describe('ReviewMenu', () => {
     expect(usePr.getState().drafts.has(draftKey.reviewSummary)).toBe(false);
   });
 
+  it('a summary typed less than a debounce ago is saved on pagehide (a real reload)', async () => {
+    await render(<ReviewMenu />);
+    await click(button(/^Review/)!);
+    await type(document.querySelector<HTMLTextAreaElement>('.review-menu textarea')!, 'half typed summary');
+    expect(usePr.getState().drafts.has(draftKey.reviewSummary)).toBe(false); // still inside the debounce
+    window.dispatchEvent(new Event('pagehide'));
+    expect(usePr.getState().drafts.get(draftKey.reviewSummary)?.body).toBe('half typed summary');
+  });
+
   it('Comment needs a summary or pending comments; the summary is kept as the review-summary draft', async () => {
     await render(<ReviewMenu />);
     await click(button(/^Review/)!);

@@ -15,7 +15,6 @@ import { isAuthError, WriteError } from '../github/errors';
 import { fetchThreads, type PrData } from '../github/private';
 import { toThreadModels, type CommentModel, type ThreadModel } from '../github/threads';
 import { targetOfDraft, type CommentTarget } from './compose';
-import { noteWrite } from './freshness';
 import { rangeOids } from './range';
 import { session } from './session';
 import { BridgeError } from '../../shared/rpc';
@@ -222,7 +221,6 @@ let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
 /** Refetches threads (bodies rendered by GitHub, real ids, permissions) shortly after a write. */
 export function scheduleRefresh(delay = REFRESH_DELAY_MS): void {
-  noteWrite(); // every caller just completed a write
   clearTimeout(refreshTimer);
   refreshTimer = setTimeout(() => {
     refreshThreads().catch((err: unknown) => console.warn('[pierre] thread refresh', err));
@@ -337,7 +335,6 @@ export async function toggleReaction(databaseId: number, content: ReactionConten
   setReaction(databaseId, content, !had);
   try {
     await withApi('react', (api) => (had ? api.removeReaction(found.comment.nodeId, content) : api.addReaction(found.comment.nodeId, content)));
-    noteWrite();
   } catch (err) {
     setReaction(databaseId, content, had);
     throw err;
@@ -434,7 +431,6 @@ export async function setResolved(key: string, resolved: boolean): Promise<void>
       },
     );
     apply(resolved); // a refresh in between may have brought the old state back
-    noteWrite();
   } catch (err) {
     apply(!resolved);
     throw err;
@@ -526,7 +522,6 @@ export async function setFileViewed(path: string, viewed: boolean): Promise<void
         await rpc.call(viewed ? 'markViewed' : 'unmarkViewed', owner, repo, number, path);
       },
     );
-    noteWrite();
   } catch (err) {
     if (viewedOps.get(path) === op && usePr.getState().pr === pr) usePr.getState().setViewedLocal(path, !viewed);
     throw err;
