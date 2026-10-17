@@ -91,8 +91,10 @@ export function createLifecycle(win: Window & typeof globalThis = window): Lifec
     doc.addEventListener('click', onClick as EventListener, true);
     cleanups.push(() => doc.removeEventListener('click', onClick as EventListener, true));
 
+    // Observe the root, not <body>: Turbo Drive replaces document.body on classic-UI navigations,
+    // which would leave an observer on <body> watching a detached node.
     observer = new MutationObserver(schedule);
-    observer.observe(doc.body, { childList: true, subtree: true });
+    observer.observe(doc.documentElement, { childList: true, subtree: true });
 
     sync();
   }

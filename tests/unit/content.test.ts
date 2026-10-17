@@ -241,6 +241,23 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
       expect(viewers()[0]!.getAttribute('src')).toContain('pr=dangh%2Fpierre-sandbox%232');
     });
 
+    it('keeps observing after Turbo replaces document.body', async () => {
+      const life = createLifecycle(window);
+      life.start();
+      expect(pierreTabs()).toHaveLength(1);
+
+      // Turbo Drive swaps in a brand new <body>; the nav renders into it later with no event.
+      const newBody = document.createElement('body');
+      document.documentElement.replaceChild(newBody, document.body);
+      expect(pierreTabs()).toHaveLength(0);
+      await new Promise((r) => setTimeout(r, 80));
+
+      newBody.innerHTML = fixture(file);
+      await new Promise((r) => setTimeout(r, 150));
+      life.stop();
+      expect(pierreTabs()).toHaveLength(1);
+    });
+
     it('clicking the tab stays on the current page, adds #pierre, and mounts without navigating', () => {
       const life = createLifecycle(window);
       life.start();
