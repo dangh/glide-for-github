@@ -31,7 +31,11 @@
  *   themeType                 'system' | 'light' | 'dark'                 'system'   File.js / FileDiff.js (`themeType = "system"`)
  *   lineHoverHighlight        'disabled' | 'both' | 'number' | 'line'     'disabled' InteractionManager.js (`lineHoverHighlight = "disabled"`)
  *   tokenizeMaxLineLength     positive integer                            1000       DiffHunksRenderer.js (`1e3`)
+ *   tokenizeMaxLength         positive integer (total chars tokenized)    100000     DEFAULT_TOKENIZE_MAX_LENGTH (constants)
  *   maxLineDiffLength         positive integer                            1000       same (`maxLineDiffLength = 1e3`)
+ *   layoutGap / layoutPaddingTop / layoutPaddingBottom   non-negative integers (px; CodeViewOptions.layout)
+ *                                                                         8 / 8 / 8  DEFAULT_CODE_VIEW_LAYOUT (constants); gap =
+ *                             spacing between file cards, padding = space above the first / below the last card
  *
  * INCLUDED, tree (@pierre/trees `FileTreeOptions`):
  *   flattenEmptyDirectories   boolean                                     true       path-store/src/options.js (`!== false`)
@@ -41,7 +45,9 @@
  *   icons                     'minimal' | 'standard' | 'complete'         'complete' iconConfig.js normalizeFileTreeIcons
  *   coloredIcons              boolean (FileTreeIconConfig.colored)        true       iconConfig.js (`colored ?? true`)
  *   stickyFolders             boolean                                     false      render/FileTreeView.js (`stickyFolders = false`)
- *   search                    boolean (shows the search input)            false      render/FileTreeView.js (`searchEnabled = false`)
+ *   search                    boolean (shows the search input)            true       EXTENSION DEFAULT (controller ruling: the approved
+ *                             layout mockup has a "Filter files" box above the tree). Pierre's own default is false
+ *                             (render/FileTreeView.js `searchEnabled = false`).
  *   searchBlurBehavior        'close' | 'retain'                          'close'    render/FileTreeView.js (`searchBlurBehavior = "close"`)
  *
  * INCLUDED, review: hideWhitespace (boolean, default false; extension-owned, not a Pierre option).
@@ -51,8 +57,8 @@
  *   theme as a single string    covered by themeLight/themeDark (the extension always passes the light/dark pair)
  *   disableFileHeader           the viewer's per-file header hosts its own collapse/viewed controls
  *   collapsed                   per-item state, driven by the viewer
- *   disableVirtualizationBuffers, useCSSClasses, useTokenTransformer, tokenizeMaxLength, itemMetrics,
- *   pointerEventsOnScroll, smoothScrollSettings, layout, __devOnlyValidateItemHeights, __debugPointerEvents,
+ *   disableVirtualizationBuffers, useCSSClasses, useTokenTransformer, itemMetrics,
+ *   pointerEventsOnScroll, smoothScrollSettings, __devOnlyValidateItemHeights, __debugPointerEvents,
  *   disableErrorHandling        internal / perf / virtualization tuning, not reader-facing display choices
  *   unsafeCSS                   arbitrary CSS injection (diffs and trees)
  *   parseDiffOptions, loadDiffFiles   diff computation / data loading; hideWhitespace is handled in `review`
@@ -101,7 +107,11 @@ export interface DiffSettings {
   themeType: ThemeTypes;
   lineHoverHighlight: LineHoverHighlight;
   tokenizeMaxLineLength: number;
+  tokenizeMaxLength: number;
   maxLineDiffLength: number;
+  layoutGap: number;
+  layoutPaddingTop: number;
+  layoutPaddingBottom: number;
 }
 
 export interface TreeSettings {
@@ -192,7 +202,7 @@ function deepFreeze<T extends object>(value: T): T {
   return Object.freeze(value);
 }
 
-/** Pierre's own defaults (sources in the header comment). Frozen; `loadSettings` returns fresh mutable copies. */
+/** Pierre's own defaults (sources in the header comment), except `tree.search` which is the extension's default. Frozen; `loadSettings` returns fresh mutable copies. */
 export const DEFAULT_SETTINGS: DisplaySettings = deepFreeze({
   diff: {
     diffStyle: 'split',
@@ -211,7 +221,11 @@ export const DEFAULT_SETTINGS: DisplaySettings = deepFreeze({
     themeType: 'system',
     lineHoverHighlight: 'disabled',
     tokenizeMaxLineLength: 1000,
+    tokenizeMaxLength: 100000,
     maxLineDiffLength: 1000,
+    layoutGap: 8,
+    layoutPaddingTop: 8,
+    layoutPaddingBottom: 8,
   },
   tree: {
     flattenEmptyDirectories: true,
@@ -221,7 +235,7 @@ export const DEFAULT_SETTINGS: DisplaySettings = deepFreeze({
     icons: 'complete',
     coloredIcons: true,
     stickyFolders: false,
-    search: false,
+    search: true, // extension default (Pierre's is false); see header
     searchBlurBehavior: 'close',
   },
   review: { hideWhitespace: false },
@@ -262,7 +276,11 @@ const DIFF_SCHEMA: Schema<DiffSettings> = {
   themeType: oneOf(THEME_TYPES),
   lineHoverHighlight: oneOf(LINE_HOVER_HIGHLIGHTS),
   tokenizeMaxLineLength: (v): v is number => isInt(v, 1),
+  tokenizeMaxLength: (v): v is number => isInt(v, 1),
   maxLineDiffLength: (v): v is number => isInt(v, 1),
+  layoutGap: (v): v is number => isInt(v, 0),
+  layoutPaddingTop: (v): v is number => isInt(v, 0),
+  layoutPaddingBottom: (v): v is number => isInt(v, 0),
 };
 
 const TREE_SCHEMA: Schema<TreeSettings> = {
@@ -434,7 +452,9 @@ export function toDiffOptions<LAnnotation = undefined, Caret = undefined>(
     stickyHeaders: d.stickyHeader,
     lineHoverHighlight: d.lineHoverHighlight,
     tokenizeMaxLineLength: d.tokenizeMaxLineLength,
+    tokenizeMaxLength: d.tokenizeMaxLength,
     maxLineDiffLength: d.maxLineDiffLength,
+    layout: { gap: d.layoutGap, paddingTop: d.layoutPaddingTop, paddingBottom: d.layoutPaddingBottom },
     preferredHighlighter: 'shiki-js',
   };
 }

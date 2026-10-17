@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_COLLAPSED_CONTEXT_THRESHOLD, DEFAULT_THEMES } from '@pierre/diffs';
+import {
+  DEFAULT_CODE_VIEW_LAYOUT,
+  DEFAULT_COLLAPSED_CONTEXT_THRESHOLD,
+  DEFAULT_THEMES,
+  DEFAULT_TOKENIZE_MAX_LENGTH,
+} from '@pierre/diffs';
 import {
   DEFAULT_SETTINGS,
   SETTINGS_STORAGE_KEY,
@@ -80,7 +85,11 @@ describe('DEFAULT_SETTINGS', () => {
         themeType: 'system',
         lineHoverHighlight: 'disabled',
         tokenizeMaxLineLength: 1000,
+        tokenizeMaxLength: 100000,
         maxLineDiffLength: 1000,
+        layoutGap: 8,
+        layoutPaddingTop: 8,
+        layoutPaddingBottom: 8,
       },
       tree: {
         flattenEmptyDirectories: true,
@@ -90,7 +99,7 @@ describe('DEFAULT_SETTINGS', () => {
         icons: 'complete',
         coloredIcons: true,
         stickyFolders: false,
-        search: false,
+        search: true,
         searchBlurBehavior: 'close',
       },
       review: { hideWhitespace: false },
@@ -101,6 +110,10 @@ describe('DEFAULT_SETTINGS', () => {
     expect(DEFAULT_SETTINGS.diff.themeLight).toBe(DEFAULT_THEMES.light);
     expect(DEFAULT_SETTINGS.diff.themeDark).toBe(DEFAULT_THEMES.dark);
     expect(DEFAULT_SETTINGS.diff.collapsedContextThreshold).toBe(DEFAULT_COLLAPSED_CONTEXT_THRESHOLD);
+    expect(DEFAULT_SETTINGS.diff.tokenizeMaxLength).toBe(DEFAULT_TOKENIZE_MAX_LENGTH);
+    expect(DEFAULT_SETTINGS.diff.layoutGap).toBe(DEFAULT_CODE_VIEW_LAYOUT.gap);
+    expect(DEFAULT_SETTINGS.diff.layoutPaddingTop).toBe(DEFAULT_CODE_VIEW_LAYOUT.paddingTop);
+    expect(DEFAULT_SETTINGS.diff.layoutPaddingBottom).toBe(DEFAULT_CODE_VIEW_LAYOUT.paddingBottom);
   });
 
   it('is immutable so a stray write cannot corrupt the defaults', () => {
@@ -166,6 +179,10 @@ describe('loadSettings', () => {
         collapsedContextThreshold: 1.5,
         tokenizeMaxLineLength: Number.NaN,
         maxLineDiffLength: Infinity,
+        tokenizeMaxLength: 0,
+        layoutGap: -1,
+        layoutPaddingTop: 2.5,
+        layoutPaddingBottom: '8',
         themeLight: '',
         themeDark: 7,
         themeType: 'dim',
@@ -191,6 +208,14 @@ describe('loadSettings', () => {
     const s = await loadSettings();
     expect(s.tree.initialExpansion).toBe(2);
     expect(s.tree.density).toBe(1.25);
+  });
+
+  it('accepts zero for the layout spacing and a custom tokenizeMaxLength', async () => {
+    fake.data[SETTINGS_STORAGE_KEY] = {
+      diff: { layoutGap: 0, layoutPaddingTop: 0, layoutPaddingBottom: 16, tokenizeMaxLength: 50000 },
+    };
+    const s = await loadSettings();
+    expect(s.diff).toMatchObject({ layoutGap: 0, layoutPaddingTop: 0, layoutPaddingBottom: 16, tokenizeMaxLength: 50000 });
   });
 
   it('survives garbage in storage', async () => {
@@ -352,7 +377,11 @@ describe('toDiffOptions', () => {
         themeType: 'dark',
         lineHoverHighlight: 'both',
         tokenizeMaxLineLength: 500,
+        tokenizeMaxLength: 60000,
         maxLineDiffLength: 2000,
+        layoutGap: 12,
+        layoutPaddingTop: 4,
+        layoutPaddingBottom: 20,
       },
     };
     expect(toDiffOptions(s)).toEqual({
@@ -372,10 +401,16 @@ describe('toDiffOptions', () => {
       stickyHeaders: true,
       lineHoverHighlight: 'both',
       tokenizeMaxLineLength: 500,
+      tokenizeMaxLength: 60000,
       maxLineDiffLength: 2000,
+      layout: { gap: 12, paddingTop: 4, paddingBottom: 20 },
       preferredHighlighter: 'shiki-js',
     });
     expect(toDiffOptions(s)).not.toHaveProperty('stickyHeader');
+  });
+
+  it('emits the library default layout for the default settings', () => {
+    expect(toDiffOptions(DEFAULT_SETTINGS).layout).toEqual(DEFAULT_CODE_VIEW_LAYOUT);
   });
 
   it('does not set options the viewer owns', () => {
@@ -395,7 +430,7 @@ describe('toTreeOptions', () => {
       density: 'default',
       icons: { set: 'complete', colored: true },
       stickyFolders: false,
-      search: false,
+      search: true,
       searchBlurBehavior: 'close',
     });
     expect(
@@ -409,7 +444,7 @@ describe('toTreeOptions', () => {
           icons: 'minimal',
           coloredIcons: false,
           stickyFolders: true,
-          search: true,
+          search: false,
           searchBlurBehavior: 'retain',
         },
       }),
@@ -420,7 +455,7 @@ describe('toTreeOptions', () => {
       density: 'compact',
       icons: { set: 'minimal', colored: false },
       stickyFolders: true,
-      search: true,
+      search: false,
       searchBlurBehavior: 'retain',
     });
   });
