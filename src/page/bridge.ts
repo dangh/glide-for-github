@@ -284,8 +284,11 @@ export function createBridgeImpl(deps: BridgeDeps = {}): RpcImpl<BridgeMethods> 
 }
 
 /** Starts the handshake listener on `win`. Returns a stop function that also closes any active port. */
-export function startBridge(win: Window, deps: Omit<BridgeDeps, 'doc'> = {}): () => void {
-  const impl = createBridgeImpl({ ...deps, doc: win.document });
+export function startBridge(
+  win: Window,
+  deps: Omit<BridgeDeps, 'doc'> = {},
+  impl: RpcImpl<BridgeMethods> = createBridgeImpl({ ...deps, doc: win.document }),
+): () => void {
   let active: MessagePort | null = null;
 
   const release = () => {

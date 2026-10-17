@@ -98,7 +98,8 @@ export function mountViewer(doc: Document, ref: PrRef): ViewerHost {
   };
   iframe.addEventListener('load', onLoad, { once: true });
 
-  // Both scripts run at document_idle in unspecified order. If the bridge starts after we mounted, our
+  // The bridge runs at document_start, this script at document_idle, but a bridge that started late (e.g. an
+  // extension update) must still work. If the bridge starts after we mounted, our
   // first port went nowhere; it announces itself with `pierre:bridge-ready` and we hand out a fresh
   // channel to both sides. (The viewer accepts a replacement port at any time: see src/shared/rpc.ts.)
   const onBridgeReady = (event: MessageEvent) => {

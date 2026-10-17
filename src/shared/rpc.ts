@@ -6,7 +6,7 @@
  * - The content script hands the viewer a port with `postMessage({type: 'pierre:port', colorMode}, extOrigin, [port])`.
  * - The viewer MUST accept a replacement `pierre:port` at ANY time, not only the first one. The content
  *   script re-creates the channel when the MAIN-world bridge announces itself after the viewer mounted
- *   (both scripts run at document_idle in unspecified order), and a re-created channel may arrive after
+ *   (it normally starts first, at document_start, but may start late), and a re-created channel may arrive after
  *   the viewer already started calling. On each `pierre:port`: `oldClient.close()` (pending calls reject
  *   with code `closed`), then `createRpcClient(newPort)`, and retry or re-issue what failed.
  *

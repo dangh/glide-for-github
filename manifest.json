@@ -22,7 +22,7 @@
       "matches": ["https://github.com/*"],
       "js": ["bridge.js"],
       "world": "MAIN",
-      "run_at": "document_idle"
+      "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [
