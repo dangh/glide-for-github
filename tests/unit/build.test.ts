@@ -1,0 +1,69 @@
+import { execFileSync } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { beforeAll, describe, expect, it } from 'vitest';
+
+const root = resolve(__dirname, '../..');
+const dist = join(root, 'dist');
+
+function walk(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const p = join(dir, name);
+    return statSync(p).isDirectory() ? walk(p) : [p];
+  });
+}
+
+interface Manifest {
+  icons?: Record<string, string>;
+  options_page?: string;
+  content_scripts?: { js?: string[]; css?: string[] }[];
+  web_accessible_resources?: { resources: string[] }[];
+}
+
+describe('build output', () => {
+  let manifest: Manifest;
+
+  beforeAll(() => {
+    execFileSync('node', ['build.mjs'], { cwd: root, stdio: 'pipe' });
+    manifest = JSON.parse(readFileSync(join(dist, 'manifest.json'), 'utf8'));
+  });
+
+  it('emits every file referenced by dist/manifest.json', () => {
+    const refs = new Set<string>();
+    for (const cs of manifest.content_scripts ?? []) {
+      for (const f of [...(cs.js ?? []), ...(cs.css ?? [])]) refs.add(f);
+    }
+    if (manifest.options_page) refs.add(manifest.options_page);
+    for (const f of Object.values(manifest.icons ?? {})) refs.add(f);
+    for (const war of manifest.web_accessible_resources ?? []) {
+      // Only concrete filenames; globs such as chunks/* or *.css are skipped.
+      for (const r of war.resources) if (!r.includes('*')) refs.add(r);
+    }
+    expect(refs.size).toBeGreaterThan(0);
+    const missing = [...refs].filter((f) => !existsSync(join(dist, f)));
+    expect(missing).toEqual([]);
+  });
+
+  it('emits the Pierre worker as a self-contained dist/pierre-worker.js', () => {
+    const worker = readFileSync(join(dist, 'pierre-worker.js'), 'utf8');
+    expect(worker.length).toBeGreaterThan(0);
+    // No unresolved relative imports left over from the portable worker.
+    expect(worker).not.toMatch(/\bimport\(\s*["']\.{1,2}\//);
+    expect(worker).not.toMatch(/^\s*import\s.+from\s/m);
+  });
+
+  it('does not load remote scripts', () => {
+    const files = walk(dist);
+    const html = files.filter((f) => f.endsWith('.html'));
+    const js = files.filter((f) => f.endsWith('.js'));
+    expect(html.length).toBeGreaterThan(0);
+    expect(js.length).toBeGreaterThan(0);
+    for (const f of html) {
+      expect(readFileSync(f, 'utf8'), f).not.toMatch(/<script[^>]*\ssrc=["']?http/i);
+    }
+    const remote = /importScripts\(\s*["']http|import\(\s*["']http/;
+    for (const f of js) {
+      expect(readFileSync(f, 'utf8'), f).not.toMatch(remote);
+    }
+  });
+});
