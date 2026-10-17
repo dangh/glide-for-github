@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { BRAND } from '../../src/shared/brand';
 
 const root = resolve(__dirname, '../..');
 const dist = join(root, 'dist');
@@ -14,6 +15,8 @@ function walk(dir: string): string[] {
 }
 
 interface Manifest {
+  name?: string;
+  description?: string;
   icons?: Record<string, string>;
   options_page?: string;
   content_scripts?: { js?: string[]; css?: string[] }[];
@@ -52,6 +55,17 @@ describe('build output', () => {
       const missing = refs.filter((f) => !existsSync(join(dist, f)));
       expect(missing, page).toEqual([]);
     }
+  });
+
+  it("takes the product name and description from BRAND (one place to rename)", () => {
+    expect(manifest.name).toBe(BRAND.name);
+    expect(manifest.description).toBe(BRAND.description);
+    for (const page of ['options.html', 'viewer.html']) {
+      const html = readFileSync(join(dist, page), 'utf8');
+      expect(html, page).toContain(`<title>${BRAND.name}`);
+      expect(html, page).not.toContain('%BRAND');
+    }
+    expect(readFileSync(join(dist, 'manifest.json'), 'utf8')).not.toContain('%BRAND');
   });
 
   it('emits the Pierre worker as a self-contained dist/pierre-worker.js', () => {

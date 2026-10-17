@@ -15,7 +15,7 @@
     "e2e:headless": "npm run build && PIERRE_E2E_HEADLESS=1 playwright test",
     "perf": "npm run build && PIERRE_PERF=1 DISPLAY=${DISPLAY:-:0} WAYLAND_DISPLAY= playwright test tests/e2e/perf.spec.ts",
     "e2e:token": "npm run build && DISPLAY=${DISPLAY:-:0} WAYLAND_DISPLAY= node scripts/token-setup.mjs",
-    "zip": "npm run build && rm -f pierre-for-github.zip && cd dist && zip -qr ../pierre-for-github.zip ."
+    "zip": "node scripts/zip.mjs"
   },
   "dependencies": {
     "@pierre/diffs": "^1.5.2",

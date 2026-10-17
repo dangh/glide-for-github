@@ -436,6 +436,26 @@ describe('saving while the page closes (pagehide flush)', () => {
     });
   });
 
+  it('recognizes echoes of its own writes whatever the key order of the merged value (patch key before an existing one)', async () => {
+    fake.data[SETTINGS_STORAGE_KEY] = { diff: { overflow: 'wrap' } };
+    await loadSettings();
+    onSettingsChange(() => {});
+    const spy = watchSet(true);
+    // Merged value is { overflow, diffStyle } (insertion order) but the echo is sanitized to schema order { diffStyle, overflow }.
+    void saveSettings({ diff: { diffStyle: 'unified' } });
+    void saveSettings({ tree: { stickyFolders: true } });
+    // Only the first echo has arrived when the third save happens.
+    fake.fire(spy.held.shift()!, 'sync');
+    void saveSettings({ review: { hideWhitespace: true } });
+    expect(spy.calls.at(-1)).toEqual({
+      [SETTINGS_STORAGE_KEY]: {
+        diff: { diffStyle: 'unified', overflow: 'wrap' },
+        tree: { stickyFolders: true },
+        review: { hideWhitespace: true },
+      },
+    });
+  });
+
   it('forgets the cache after a failed write and reads storage again', async () => {
     await loadSettings();
     onSettingsChange(() => {});

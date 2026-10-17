@@ -1,3 +1,4 @@
+import { BRAND } from '../shared/brand';
 import { prKey, type PrRef } from '../shared/pr-url';
 import { findTabNav } from './tab';
 
@@ -55,13 +56,13 @@ function originOf(url: string): string {
 export function mountViewer(doc: Document, ref: PrRef): ViewerHost {
   const win = doc.defaultView;
   const anchor = findContentAnchor(doc);
-  if (!win || !anchor || !anchor.parentElement) throw new Error('Pierre: PR tab content container not found');
+  if (!win || !anchor || !anchor.parentElement) throw new Error(`${BRAND.short}: PR tab content container not found`);
   const parent = anchor.parentElement;
   let mounted = true;
 
   const iframe = doc.createElement('iframe');
   iframe.setAttribute('src', resolveExtensionUrl('viewer.html?pr=' + encodeURIComponent(prKey(ref))));
-  iframe.setAttribute('title', 'Pierre');
+  iframe.setAttribute('title', BRAND.short);
   iframe.setAttribute('data-pierre-viewer', '');
   iframe.style.cssText = `display:block;width:100%;border:0;min-height:${MIN_VIEWER_HEIGHT_PX}px;`;
   const fitHeight = () => {

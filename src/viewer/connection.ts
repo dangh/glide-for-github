@@ -6,6 +6,7 @@
  * calls wait for the first port, and a call that fails because its port was replaced (`closed`) is re-issued
  * on the new port, for reads and applySuggestions only (see `RETRY_ON_CLOSED`).
  */
+import { BRAND } from '../shared/brand';
 import { BridgeError, createRpcClient, RETRY_ON_CLOSED, type BridgeMethods, type RpcClient } from '../shared/rpc';
 import type { PrRef } from '../shared/pr-url';
 import type { Rpc } from './github/private';
@@ -110,7 +111,7 @@ export function parsePrParam(search: string): PrRef | null {
 /** How long the viewer waits for the content script's port before telling the user to reload the page. */
 export const PORT_TIMEOUT_MS = 5000;
 /** Shown when no port ever arrives: the extension was updated (or reloaded) and this page's content script is gone. */
-export const PORT_TIMEOUT_MESSAGE = 'Reload the page to use Pierre. The extension was updated, so this page can no longer talk to it.';
+export const PORT_TIMEOUT_MESSAGE = `Reload the page to use ${BRAND.short}. The extension was updated, so this page can no longer talk to it.`;
 
 /**
  * Calls `onTimeout(PORT_TIMEOUT_MESSAGE)` when `ready` (the first port) has not resolved within `ms`. A port that

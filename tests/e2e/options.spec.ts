@@ -45,9 +45,12 @@ test.describe('options page', () => {
       const row = page.locator(`[data-testid="token-row"][data-owner="${owner}"]`);
       await expect(row).toContainText(/classic|fine-grained/);
     }
-    // No token-shaped string anywhere in the page.
-    const html = await page.content();
-    expect(html).not.toMatch(/gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}/);
+    // No token-shaped string anywhere in the page. The regex runs in the page and only a count comes back, so a
+    // failure cannot print the page (or a token) into the test output.
+    const tokenShaped = await page.evaluate(
+      () => (document.documentElement.outerHTML.match(/gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}/g) ?? []).length,
+    );
+    expect(tokenShaped).toBe(0);
     await page.close();
   });
 

@@ -36,8 +36,8 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabi
 function reasonText(owner: string, reason: string | undefined, ref: PrRef): string {
   const where = ref.owner.toLowerCase() === owner.toLowerCase() ? `${ref.owner}/${ref.repo}` : owner;
   return reason
-    ? `To ${reason} on ${where}, Pierre needs a GitHub token for ${owner}.`
-    : `To make changes on ${where}, Pierre needs a GitHub token for ${owner}.`;
+    ? `To ${reason} on ${where}, ${BRAND.short} needs a GitHub token for ${owner}.`
+    : `To make changes on ${where}, ${BRAND.short} needs a GitHub token for ${owner}.`;
 }
 
 /** Owner as GitHub allows it: 1 to 39 letters, digits or single inner hyphens. */
@@ -67,16 +67,22 @@ function TokenDialog({ request, standalone }: DialogProps) {
   const field = useRef<HTMLInputElement>(null);
   const alive = useRef(true);
 
-  const owner = request ? request.owner : ownerText.trim();
-  const ownerOk = standalone ? allOwners || OWNER_PATTERN.test(owner) : true;
+  // Callers often pass a fresh `standalone` object on every render; the latest one is read at call time so the
+  // focus effect below does not re-run (and move focus) when a parent re-renders.
+  const standaloneRef = useRef(standalone);
+  standaloneRef.current = standalone;
+  const isStandalone = standalone !== undefined;
 
-  const cancel = useCallback(() => (request ? cancelPrompt(request) : standalone?.onCancel()), [request, standalone]);
+  const owner = request ? request.owner : ownerText.trim();
+  const ownerOk = isStandalone ? allOwners || OWNER_PATTERN.test(owner) : true;
+
+  const cancel = useCallback(() => (request ? cancelPrompt(request) : standaloneRef.current?.onCancel()), [request]);
 
   // Focus management: password field first (owner field in standalone mode), Tab trapped inside, focus returned to the opener on close.
   useEffect(() => {
     alive.current = true;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    (standalone ? dialog.current?.querySelector<HTMLInputElement>('input[name="pierre-token-owner"]') : field.current)?.focus();
+    (isStandalone ? dialog.current?.querySelector<HTMLInputElement>('input[name="pierre-token-owner"]') : field.current)?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         // Captured and stopped: Esc closes the prompt only, never an inline composer underneath.
@@ -106,7 +112,7 @@ function TokenDialog({ request, standalone }: DialogProps) {
       document.removeEventListener('keydown', onKey, true);
       opener?.focus?.();
     };
-  }, [cancel, standalone]);
+  }, [cancel, isStandalone]);
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -130,7 +136,7 @@ function TokenDialog({ request, standalone }: DialogProps) {
       if (request && allOwners && owner.toLowerCase() !== DEFAULT_OWNER_KEY) await removeToken(owner);
       if (!alive.current) return;
       if (request) completePrompt(request, api);
-      else standalone?.onSaved(key === DEFAULT_OWNER_KEY ? key : key.toLowerCase());
+      else standaloneRef.current?.onSaved(key === DEFAULT_OWNER_KEY ? key : key.toLowerCase());
     } catch (err) {
       if (!alive.current) return;
       setError(isWriteError(err) ? err.message : 'Could not save the token.');
@@ -143,12 +149,12 @@ function TokenDialog({ request, standalone }: DialogProps) {
     <div className="modal-backdrop">
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby="token-prompt-title" ref={dialog}>
         <form onSubmit={save}>
-          <h2 id="token-prompt-title">{request ? 'Connect Pierre to GitHub' : 'Add a GitHub token'}</h2>
+          <h2 id="token-prompt-title">{request ? `Connect ${BRAND.short} to GitHub` : 'Add a GitHub token'}</h2>
           {request?.problem && <p className="modal-problem">{request.problem}</p>}
           <p>
             {request
               ? reasonText(owner, request.reason, request.ref)
-              : 'A token lets Pierre post review comments and apply suggestions. Tokens are per repository owner (a user or an organization).'}
+              : `A token lets ${BRAND.short} post comments, replies, reviews and reactions, and is the fallback for resolving threads and marking files viewed when your GitHub session cannot. Applying suggestions uses your session. Tokens are per repository owner (a user or an organization).`}
           </p>
           <ul className="modal-links">
             <li>

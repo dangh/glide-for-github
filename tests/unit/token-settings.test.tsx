@@ -111,6 +111,18 @@ describe('TokenSettings', () => {
     expect(container.innerHTML).not.toContain(SECRET_NEW);
   });
 
+  it('keeps focus in the open dialog when the list refreshes underneath it', async () => {
+    await click(button('Add token'));
+    const secret = document.querySelector<HTMLInputElement>('input[type="password"]')!;
+    secret.focus();
+    expect(document.activeElement).toBe(secret);
+    await setToken('other', SECRET_NEW, { login: 'carol' });
+    await act(async () => listeners.forEach((l) => l({ [TOKENS_STORAGE_KEY]: {} }, 'local')));
+    await settle();
+    expect(rows().map((r) => r.dataset.owner)).toContain('other');
+    expect(document.activeElement).toBe(document.querySelector('input[type="password"]'));
+  });
+
   it('shows an empty state without tokens', async () => {
     area.data[TOKENS_STORAGE_KEY] = {};
     await act(async () => root.render(createElement('div')));

@@ -1,11 +1,28 @@
-import { build } from 'esbuild';
-import { cp, mkdir, rm } from 'node:fs/promises';
+import { build, transform } from 'esbuild';
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const dist = resolve(root, 'dist');
 const r = (...p) => resolve(root, ...p);
+
+/** BRAND (src/shared/brand.ts, TypeScript) for the static files: transpiled on the fly and imported. */
+async function loadBrand() {
+  const { code } = await transform(await readFile(r('src/shared/brand.ts'), 'utf8'), { loader: 'ts', format: 'esm' });
+  return (await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`)).BRAND;
+}
+const BRAND = await loadBrand();
+const jsonString = (value) => JSON.stringify(value).slice(1, -1);
+const htmlText = (value) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+/** Copies a static file replacing the `%BRAND_*%` placeholders (`escape` fits the file's syntax). */
+async function copyBranded(from, to, escape) {
+  const text = (await readFile(from, 'utf8'))
+    .replaceAll('%BRAND_NAME%', () => escape(BRAND.name))
+    .replaceAll('%BRAND_DESCRIPTION%', () => escape(BRAND.description));
+  await writeFile(to, text);
+}
 
 const common = {
   bundle: true,
@@ -47,11 +64,11 @@ await Promise.all([
 ]);
 
 await Promise.all([
-  cp(r('manifest.json'), resolve(dist, 'manifest.json')),
+  copyBranded(r('manifest.json'), resolve(dist, 'manifest.json'), jsonString),
   cp(r('src/content/content.css'), resolve(dist, 'content.css')),
-  cp(r('src/viewer/viewer.html'), resolve(dist, 'viewer.html')),
+  copyBranded(r('src/viewer/viewer.html'), resolve(dist, 'viewer.html'), htmlText),
   cp(r('src/viewer/viewer.css'), resolve(dist, 'viewer.css')),
-  cp(r('src/options/options.html'), resolve(dist, 'options.html')),
+  copyBranded(r('src/options/options.html'), resolve(dist, 'options.html'), htmlText),
   cp(r('src/options/options.css'), resolve(dist, 'options.css')),
   cp(r('icons'), resolve(dist, 'icons'), { recursive: true }),
 ]);

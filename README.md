@@ -15,7 +15,9 @@ review features: comments, suggestions, resolving threads, viewed files and revi
 - Apply a suggestion, or a batch of suggestions, as a commit (see the caveat below).
 - Viewed checkboxes stay in sync with GitHub's own viewed state, in both directions.
 - Commit range picker (all commits, one commit, a range) and hide-whitespace.
-- Reading needs no token. Writing needs one (next section).
+- Reading needs no token. Posting comments, replies, reviews, edits and reactions needs one (next section). Applying
+  suggestions, resolving threads and marking files viewed use your signed-in GitHub session, so they work without a
+  token.
 - Display options (layout, themes, line wrapping, tree density, and more) are on the options page and in the viewer's
   Display menu, with a live preview on the options page. Changes apply to open pull requests without a reload.
 
@@ -33,34 +35,40 @@ Requires Node 20.19 or newer to build, and a Chromium-based browser that support
 
 ## Token setup
 
-Reading a pull request works without a token. To comment, review, resolve threads or mark files viewed, Pierre asks for
-a GitHub token the first time you need one. You can also add and remove tokens on the options page (right-click the
+Reading a pull request works without a token, and so do applying suggestions, resolving threads and marking files viewed
+(they use your signed-in GitHub session). To post comments, replies, reviews, edits or reactions, Pierre asks for a
+GitHub token the first time you need one. You can also add and remove tokens on the options page (right-click the
 extension icon, then **Options**).
 
 - **Fine-grained token (recommended).** Create it for the account or organization that owns the repositories, with
   **Pull requests: Read and write** and **Contents: Read**. The prompt links to GitHub's token page with these
   permissions filled in. A fine-grained token covers one owner, so add one per owner you review for.
-- **Classic token.** Needs the `repo` scope. One classic token can serve every owner ("Use this token for all owners").
+- **Classic token.** Needs the `repo` scope (or `public_repo`, which works for public repositories only). One classic
+  token can serve every owner ("Use this token for all owners").
 - If your organization uses SAML SSO, authorize the token for it after creating it.
-- Resolving threads and marking files viewed use GitHub's GraphQL API, which some fine-grained tokens cannot call. When
-  the token cannot, Pierre falls back to your signed-in GitHub session for those two actions, so they keep working.
+- Resolving threads and marking files viewed: with a token stored, Pierre uses GitHub's GraphQL API first, which some
+  fine-grained tokens cannot call. If no token is stored, or GitHub refuses it for that action, Pierre uses your
+  signed-in GitHub session instead. It asks for a token only if the session is refused as well.
 
 ## Privacy
 
-- The extension only talks to `github.com` and `api.github.com`. It has no server of its own, no analytics and loads no
-  remote code.
+- The extension only talks to GitHub: `github.com`, `api.github.com` and GitHub's image servers (for avatars and
+  images in comments). No third parties; it has no server of its own, no analytics and loads no remote code.
 - Your token is stored in `chrome.storage.local`, on this device only. It is sent only to `api.github.com`, only from
   the extension's own pages, never to the github.com page, and the options page never displays it.
 - Display settings are stored in `chrome.storage.sync`, so Chrome can sync them between your signed-in browsers. They
   contain no tokens and no pull request data.
 
-## Apply suggestion: please read
+## Private GitHub endpoints: please read
 
-"Apply suggestion" (single or batch) commits to the pull request branch. GitHub offers no public API for it, so Pierre
-calls the same **private endpoint GitHub's own page uses**, through your signed-in GitHub session (not your token). It
-can break without notice if GitHub changes that endpoint. When it fails, Pierre says so and you can apply the
-suggestion on GitHub instead. Everything else that writes (comments, replies, reviews, edits, reactions) uses
-GitHub's documented REST and GraphQL APIs.
+GitHub offers no public API for applying a suggestion, so **Apply suggestion** (single or batch) calls the same
+**private endpoint GitHub's own page uses** (`page_data/apply_review_suggestions`), through your signed-in GitHub
+session, not your token. The session fallback for **resolving threads** (`page_data/resolve_thread`,
+`unresolve_thread`) and **marking files viewed** (`file_review`) uses private endpoints in the same way.
+
+These can break without notice if GitHub changes them. When one fails, Pierre says so and you can do the action on
+GitHub instead. Comments, replies, reviews, edits and reactions use GitHub's documented REST and GraphQL APIs with your
+token, and so do resolve and viewed whenever the token is allowed to.
 
 ## Performance
 

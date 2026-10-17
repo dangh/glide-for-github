@@ -3,9 +3,9 @@
  * a confirmation, and adds one through TokenPrompt in standalone mode. Follows changes made elsewhere (the viewer
  * saving a token from its own prompt) through `chrome.storage.onChanged`.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DEFAULT_OWNER_KEY, TOKENS_STORAGE_KEY, listTokens, removeToken, type TokenInfo } from '../viewer/auth/tokens';
-import { TokenPrompt } from '../viewer/ui/TokenPrompt';
+import { TokenPrompt, type StandaloneTokenPrompt } from '../viewer/ui/TokenPrompt';
 
 function useTokens(): [TokenInfo[] | null, () => void] {
   const [tokens, setTokens] = useState<TokenInfo[] | null>(null);
@@ -70,6 +70,17 @@ export function TokenSettings() {
   const [tokens, refresh] = useTokens();
   const [adding, setAdding] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const standalone = useMemo<StandaloneTokenPrompt>(
+    () => ({
+      onSaved: (owner) => {
+        setAdding(false);
+        setNotice(`Saved a token for ${owner === DEFAULT_OWNER_KEY ? 'all owners' : owner}.`);
+        refresh();
+      },
+      onCancel: () => setAdding(false),
+    }),
+    [refresh],
+  );
 
   return (
     <section className="options-section" aria-labelledby="tokens-heading">
@@ -98,18 +109,7 @@ export function TokenSettings() {
           </span>
         )}
       </div>
-      {adding && (
-        <TokenPrompt
-          standalone={{
-            onSaved: (owner) => {
-              setAdding(false);
-              setNotice(`Saved a token for ${owner === DEFAULT_OWNER_KEY ? 'all owners' : owner}.`);
-              refresh();
-            },
-            onCancel: () => setAdding(false),
-          }}
-        />
-      )}
+      {adding && <TokenPrompt standalone={standalone} />}
     </section>
   );
 }

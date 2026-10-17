@@ -1,4 +1,5 @@
 import { createRoot } from 'react-dom/client';
+import { BRAND } from '../shared/brand';
 import { App } from './App';
 import { createConnection, parsePrParam, watchPort } from './connection';
 import { initBatchPersistence } from './state/batch';
@@ -20,7 +21,7 @@ window.__pierre = { store: usePr, settings: useSettings, session, review };
 const root = createRoot(document.getElementById('root')!);
 const prRef = parsePrParam(location.search);
 if (!prRef) {
-  root.render(<div className="fatal">Pierre: missing pull request.</div>);
+  root.render(<div className="fatal">{BRAND.short}: missing pull request.</div>);
 } else {
   const connection = createConnection(window);
   session.rpc = connection.rpc;

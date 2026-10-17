@@ -1,3 +1,4 @@
+import { BRAND } from '../shared/brand';
 import { pierreUrl, type PrRef } from '../shared/pr-url';
 
 /**
@@ -55,7 +56,7 @@ function createTab(doc: Document, files: HTMLAnchorElement, ref: PrRef): HTMLAnc
   path.setAttribute('d', 'M8 1.5 14.5 8 8 14.5 1.5 8Z');
   icon.append(path);
 
-  tab.append(icon, 'Pierre');
+  tab.append(icon, BRAND.short);
   return tab;
 }
 

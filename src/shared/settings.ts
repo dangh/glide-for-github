@@ -434,7 +434,8 @@ let known: DeepPartial<DisplaySettings> | undefined;
 let followers = 0;
 let outstanding: string[] = [];
 let slowWrites = 0;
-const fingerprint = (o: DeepPartial<DisplaySettings>): string => JSON.stringify(o);
+/** Canonical form (schema key order), so a merged value and its sanitized echo from `storage.onChanged` compare equal. */
+const fingerprint = (o: DeepPartial<DisplaySettings>): string => JSON.stringify(sanitizeOverrides(o));
 
 function forgetKnown(): void {
   known = undefined;

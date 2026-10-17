@@ -132,6 +132,20 @@ describe('TokenPrompt, standalone', () => {
     expect(onCancel).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps focus when the parent re-renders with new callbacks', async () => {
+    secret().focus();
+    await act(async () => root.render(createElement(TokenPrompt, { standalone: { onSaved: vi.fn(), onCancel: vi.fn() } })));
+    expect(document.activeElement).toBe(secret());
+  });
+
+  it('calls the latest callbacks after a re-render', async () => {
+    const latest = vi.fn();
+    await act(async () => root.render(createElement(TokenPrompt, { standalone: { onSaved: vi.fn(), onCancel: latest } })));
+    await click(button('Cancel'));
+    expect(latest).toHaveBeenCalledTimes(1);
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
   it('never puts the token in the DOM', async () => {
     await type(secret(), TOKEN);
     expect(document.body.innerHTML).not.toContain(TOKEN);

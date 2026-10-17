@@ -1,5 +1,6 @@
 /** Transient notices (bottom toast), the "PR updated" banner (Task 11) and the full-pane error. */
 import { memo, useEffect } from 'react';
+import { BRAND } from '../../shared/brand';
 import { reloadPr } from '../state/load';
 import { errorMessage } from '../state/review';
 import { usePr } from '../state/store';
@@ -49,7 +50,7 @@ export const Notice = memo(function Notice() {
 export function FatalError({ message, filesUrl, onRetry }: { message: string; filesUrl?: string; onRetry?: () => void }) {
   return (
     <div className="fatal" role="alert">
-      <h2>Pierre could not load this pull request</h2>
+      <h2>{BRAND.short} could not load this pull request</h2>
       <p>{message}</p>
       <p className="fatal-actions">
         {onRetry && (
