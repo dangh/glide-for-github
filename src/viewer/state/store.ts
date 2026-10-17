@@ -14,7 +14,7 @@ import type { FileSummary, PrData } from '../github/private';
 import type { DiffSide, ThreadModel } from '../github/threads';
 import type { CommitRange } from './range';
 
-/** `${path}:${side}:${startLine ?? ''}-${line}` | `reply:${threadId}` | `edit:${databaseId}` | `review-summary`. */
+/** `${path}:${side}:${startLine ?? ''}-${line}` | `reply:${threadKey}` | `edit:${databaseId}` | `review-summary`. */
 export type DraftKey = string;
 
 export interface Draft {
@@ -26,7 +26,7 @@ export interface Draft {
   startLine?: number;
   startSide?: DiffSide;
   subject?: 'line' | 'file';
-  /** Reply target. */
+  /** Reply target (`threadKey`). */
   threadId?: string;
   /** Edit target (comment databaseId). */
   databaseId?: number;
@@ -35,7 +35,8 @@ export interface Draft {
 
 export const draftKey = {
   line: (path: string, side: DiffSide, line: number, startLine?: number): DraftKey => `${path}:${side}:${startLine ?? ''}-${line}`,
-  reply: (threadId: string): DraftKey => `reply:${threadId}`,
+  /** Keyed by `threadKey(thread)` (first comment id), stable across the provisional → server swap. */
+  reply: (threadKey: string): DraftKey => `reply:${threadKey}`,
   edit: (databaseId: number): DraftKey => `edit:${databaseId}`,
   reviewSummary: 'review-summary' as DraftKey,
 };
@@ -280,6 +281,25 @@ export function threadById(threads: ThreadModel[], id: string): ThreadModel | un
     threadsByIdCache.set(threads, map);
   }
   return map.get(id);
+}
+
+/**
+ * A thread's stable key: its first comment's database id. Unlike `id`, it does not change when a provisional
+ * thread (`local:<dbId>`) is replaced by the server's copy, so annotation slots, reply drafts (`draftKey.reply(key)`)
+ * and expansion state keyed by it survive the swap.
+ */
+export const threadKey = (t: ThreadModel): string => String(t.comments[0]?.databaseId ?? t.id);
+
+const threadsByKeyCache = new WeakMap<ThreadModel[], Map<string, ThreadModel>>();
+
+/** A thread by `threadKey`; the index is cached per `threads` array. */
+export function threadByKey(threads: ThreadModel[], key: string): ThreadModel | undefined {
+  let map = threadsByKeyCache.get(threads);
+  if (!map) {
+    map = new Map(threads.map((t) => [threadKey(t), t]));
+    threadsByKeyCache.set(threads, map);
+  }
+  return map.get(key);
 }
 
 /** Comment count per path (all comments of all threads on the file). */

@@ -7,13 +7,16 @@ import { setToken, setTokenStorage, type TokenStorageArea } from '../../src/view
 import type { FileSummary, PrData } from '../../src/viewer/github/private';
 import type { CommentModel, ThreadModel } from '../../src/viewer/github/threads';
 import { openComposer, targetFromRange } from '../../src/viewer/state/compose';
-import { resetReviewCaches } from '../../src/viewer/state/review';
+import { createAnnotationSource } from '../../src/viewer/state/annotations';
+import { mergeThreads, resetReviewCaches } from '../../src/viewer/state/review';
 import { session } from '../../src/viewer/state/session';
 import { draftKey, usePr } from '../../src/viewer/state/store';
 import { Composer } from '../../src/viewer/ui/Composer';
+import { renderAnnotation } from '../../src/viewer/ui/DiffPane';
 import { sanitizeHtml } from '../../src/viewer/ui/Markdown';
 import { Thread } from '../../src/viewer/ui/Thread';
 import { TokenPromptHost } from '../../src/viewer/ui/TokenPrompt';
+import { BridgeError } from '../../src/shared/rpc';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -107,7 +110,7 @@ const gqlBodies = () => fetchMock.mock.calls.filter(([url]) => String(url).endsW
 describe('Thread', () => {
   it('renders comments with GitHub HTML, author, time and reactions', async () => {
     usePr.getState().setThreads([thread('1')]);
-    await render(<Thread threadId="1" />);
+    await render(<Thread threadKey="10" />);
     expect(container.querySelector('.markdown-body')!.innerHTML).toBe('<p>body 10</p>');
     expect(container.querySelector('.comment-author')!.textContent).toBe('dangh');
     expect(container.querySelector('[data-reaction="THUMBS_UP"]')!.textContent).toBe('👍 1');
@@ -118,8 +121,8 @@ describe('Thread', () => {
     usePr.getState().setThreads([thread('1', { isOutdated: true }), thread('2', { isResolved: true })]);
     await render(
       <>
-        <Thread threadId="1" />
-        <Thread threadId="2" />
+        <Thread threadKey="10" />
+        <Thread threadKey="20" />
       </>,
     );
     const [outdated, resolved] = [...container.querySelectorAll<HTMLElement>('.thread')];
@@ -135,7 +138,7 @@ describe('Thread', () => {
   it('toggling a reaction the viewer has removes it (viewerHasReacted), optimistically', async () => {
     usePr.getState().setThreads([thread('1')]);
     fetchMock.mockResolvedValue(json(200, { data: { removeReaction: { reaction: { content: 'THUMBS_UP' } } } }));
-    await render(<Thread threadId="1" />);
+    await render(<Thread threadKey="10" />);
     await click(container.querySelector('[data-reaction="THUMBS_UP"]')!);
     await settle();
     expect(gqlBodies()[0].query).toContain('removeReaction');
@@ -146,7 +149,7 @@ describe('Thread', () => {
   it('a failed reaction is reverted and shown with Retry', async () => {
     usePr.getState().setThreads([thread('1')]);
     fetchMock.mockResolvedValue(json(200, { errors: [{ type: 'FORBIDDEN', message: 'nope' }] }));
-    await render(<Thread threadId="1" />);
+    await render(<Thread threadKey="10" />);
     await click(container.querySelector('[aria-label="Add reaction"]')!);
     await click(container.querySelector('.reaction-menu [data-reaction="HEART"]')!);
     await settle();
@@ -179,8 +182,8 @@ describe('Thread', () => {
     });
     await render(
       <>
-        <Thread threadId="1" />
-        <Thread threadId="2" />
+        <Thread threadKey="10" />
+        <Thread threadKey="20" />
       </>,
     );
     const [b1, b2] = [...container.querySelectorAll('button')].filter((b) => b.textContent === 'Resolve conversation');
@@ -197,7 +200,7 @@ describe('Thread', () => {
   it('reply posts a REST reply, or a review reply while a review is pending', async () => {
     usePr.getState().setThreads([thread('1')]);
     fetchMock.mockResolvedValue(json(201, { id: 11, node_id: 'PRRC_11' }));
-    await render(<Thread threadId="1" />);
+    await render(<Thread threadKey="10" />);
     await click(button('Reply…')!);
     const ta = container.querySelector('textarea')!;
     await act(async () => {
@@ -210,7 +213,7 @@ describe('Thread', () => {
     expect(url).toBe('https://api.github.com/repos/dangh/pierre-sandbox/pulls/1/comments/10/replies');
     expect(JSON.parse(init.body)).toEqual({ body: 'thanks' });
     expect(usePr.getState().threads[0]!.comments.map((c) => c.databaseId)).toEqual([10, 11]);
-    expect(usePr.getState().drafts.has(draftKey.reply('1'))).toBe(false);
+    expect(usePr.getState().drafts.has(draftKey.reply('10'))).toBe(false);
 
     // Pending review: addPullRequestReviewThreadReply with the cached thread node id.
     usePr.getState().setPendingReview({ nodeId: 'PRR_1', count: 0 });
@@ -241,7 +244,7 @@ describe('Thread', () => {
     fetchMock.mockImplementation(async (_url: string, init: RequestInit) =>
       init.method === 'DELETE' ? new Response(null, { status: 204 }) : json(200, { id: 10, node_id: 'PRRC_10' }),
     );
-    await render(<Thread threadId="1" />);
+    await render(<Thread threadKey="10" />);
     await click(container.querySelector('[data-comment-id="10"]')!.querySelector('button')!); // Edit
     const ta = container.querySelector('textarea')!;
     expect(ta.value).toBe('body 10');
@@ -262,6 +265,174 @@ describe('Thread', () => {
     await settle();
     expect(fetchMock.mock.calls[1]![1].method).toBe('DELETE');
     expect(usePr.getState().threads[0]!.comments.map((c) => c.databaseId)).toEqual([10]);
+  });
+});
+
+describe('resolve: token first, then the GitHub session (bridge)', () => {
+  const refused = () => json(200, { data: { resolveReviewThread: null }, errors: [{ type: 'FORBIDDEN', message: 'Resource not accessible by personal access token' }] });
+  const nodeIds = () =>
+    json(200, { data: { repository: { pullRequest: { reviewThreads: { nodes: [{ id: 'PRRT_1', comments: { nodes: [{ databaseId: 10 }] } }], pageInfo: { hasNextPage: false } } } } } });
+  function fakeRpc(result: () => Promise<unknown> = async () => null) {
+    const calls: unknown[][] = [];
+    session.rpc = { call: (async (...args: unknown[]) => (calls.push(args), result())) as never };
+    return calls;
+  }
+  afterEach(() => {
+    session.rpc = undefined;
+  });
+  const resolveButton = () => button('Resolve conversation')!;
+
+  it('a token GitHub refuses (fine-grained) falls back to the session: page_data/resolve_thread, no prompt', async () => {
+    usePr.getState().setThreads([thread('1')]);
+    fetchMock.mockImplementation(async (_u: string, init: RequestInit) => (String(init.body).includes('reviewThreads') ? nodeIds() : refused()));
+    const calls = fakeRpc();
+    await render(
+      <>
+        <Thread threadKey="10" />
+        <TokenPromptHost />
+      </>,
+    );
+    await click(resolveButton());
+    await settle();
+    await settle();
+    expect(gqlBodies().some((b) => b.query.includes('resolveReviewThread'))).toBe(true);
+    expect(calls).toEqual([['resolveThread', 'dangh', 'pierre-sandbox', 1, '1']]);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(usePr.getState().threads[0]!.isResolved).toBe(true);
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('without a token, uses the session directly (no API call, no prompt); unresolve likewise', async () => {
+    setTokenStorage(fakeArea()); // empty
+    usePr.getState().setThreads([thread('1')]);
+    const calls = fakeRpc();
+    await render(
+      <>
+        <Thread threadKey="10" />
+        <TokenPromptHost />
+      </>,
+    );
+    await click(resolveButton());
+    await settle();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(usePr.getState().threads[0]!.isResolved).toBe(true);
+    await click(container.querySelector('.thread-fold')!);
+    await click(button('Unresolve conversation')!);
+    await settle();
+    expect(calls).toEqual([
+      ['resolveThread', 'dangh', 'pierre-sandbox', 1, '1'],
+      ['unresolveThread', 'dangh', 'pierre-sandbox', 1, '1'],
+    ]);
+    expect(usePr.getState().threads[0]!.isResolved).toBe(false);
+  });
+
+  it('when the session is refused too, prompts for a token (forced, with the reason) and retries with it', async () => {
+    usePr.getState().setThreads([thread('1')]);
+    const NEW = 'ghp_ThreadClassicToken0123456789';
+    fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+      if (url.endsWith('/user')) return json(200, { login: 'dangh' });
+      const body = String(init.body);
+      if (body.includes('reviewThreads')) return nodeIds();
+      const auth = (init.headers as Record<string, string>).Authorization;
+      return auth === `Bearer ${NEW}` ? json(200, { data: { resolveReviewThread: { thread: { id: 'PRRT_1', isResolved: true } } } }) : refused();
+    });
+    const calls = fakeRpc(async () => {
+      throw new BridgeError({ status: 403, message: 'Forbidden' });
+    });
+    await render(
+      <>
+        <Thread threadKey="10" />
+        <TokenPromptHost />
+      </>,
+    );
+    await click(resolveButton());
+    await settle();
+    await settle();
+    expect(calls).toHaveLength(1);
+    const dialog = document.querySelector('[role="dialog"]')!;
+    expect(dialog).not.toBeNull();
+    expect(usePr.getState().threads[0]!.isResolved).toBe(true); // optimistic while asking
+    const field = dialog.querySelector<HTMLInputElement>('input[type="password"]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, NEW);
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await click([...document.querySelectorAll('button')].find((b) => b.textContent === 'Save token')!);
+    await settle();
+    await settle();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    const resolves = fetchMock.mock.calls.filter(([, init]) => String(init.body).includes('resolveReviewThread'));
+    expect((resolves.at(-1)![1].headers as Record<string, string>).Authorization).toBe(`Bearer ${NEW}`);
+    expect(usePr.getState().threads[0]!.isResolved).toBe(true);
+  });
+
+  it('a session failure that is not about authorization shows inline with Retry and reverts, no prompt', async () => {
+    setTokenStorage(fakeArea());
+    usePr.getState().setThreads([thread('1')]);
+    fakeRpc(async () => {
+      throw new BridgeError({ status: 422, message: 'Thread cannot be resolved' });
+    });
+    await render(
+      <>
+        <Thread threadKey="10" />
+        <TokenPromptHost />
+      </>,
+    );
+    await click(resolveButton());
+    await settle();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(usePr.getState().threads[0]!.isResolved).toBe(false);
+    expect(container.querySelector('[role="alert"]')!.textContent).toContain('Thread cannot be resolved');
+    expect(container.querySelector('[role="alert"]')!.textContent).toContain('Retry');
+  });
+});
+
+describe('provisional → server thread', () => {
+  it('a reply being typed on a just-posted thread survives the refresh replacing the provisional thread', async () => {
+    const local = thread('local:99', { provisional: true, comments: [comment(99, { provisional: true, reactions: [] })] });
+    usePr.getState().setThreads([local]);
+    const source = createAnnotationSource();
+    // Like Pierre: annotation slots keyed by index, content from DiffPane's renderAnnotation.
+    function Annotations() {
+      const list = usePr((s) => source('src/a.ts', s));
+      return (
+        <>
+          {list.map((a, i) => (
+            <div key={i}>{renderAnnotation(a)}</div>
+          ))}
+        </>
+      );
+    }
+    await render(<Annotations />);
+    const before = source('src/a.ts', usePr.getState());
+    await click(button('Reply…')!);
+    const ta = container.querySelector('textarea')!;
+    ta.focus();
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(ta, 'half a reply');
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    // The refetch lands: the server copy (real id) replaces the provisional thread.
+    await act(async () => {
+      usePr.getState().setThreads(mergeThreads([thread('7', { comments: [comment(99, { reactions: [] })] })], usePr.getState().threads, new Set()));
+    });
+    await settle();
+    expect(usePr.getState().threads.map((t) => t.id)).toEqual(['7']);
+    expect(source('src/a.ts', usePr.getState())).toBe(before); // no CodeView item update
+    const after = container.querySelector('textarea')!;
+    expect(after).toBe(ta);
+    expect(after.value).toBe('half a reply');
+    expect(document.activeElement).toBe(after);
+    expect(container.querySelector('.thread')!.getAttribute('data-thread-id')).toBe('7');
+
+    // Posting it replies to the server thread's first comment.
+    fetchMock.mockResolvedValue(json(201, { id: 100, node_id: 'PRRC_100' }));
+    await click(button('Reply')!);
+    await settle();
+    expect(fetchMock.mock.calls[0]![0]).toBe('https://api.github.com/repos/dangh/pierre-sandbox/pulls/1/comments/99/replies');
+    expect(usePr.getState().threads[0]!.comments.map((c) => c.databaseId)).toEqual([99, 100]);
   });
 });
 

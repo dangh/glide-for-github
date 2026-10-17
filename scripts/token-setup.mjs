@@ -2,7 +2,7 @@
 /**
  * One-time human step for the write e2e tests (`npm run e2e:token`): opens the e2e browser (the same Playwright
  * persistent context as tests/e2e/fixtures.ts: .e2e-profile + dist/) HEADED on DISPLAY (default :0), on the
- * sandbox PR's Pierre tab, opens Pierre's TokenPrompt, and waits until a token is saved in the extension's
+ * sandbox PR's Pierre tab, opens Pierre's TokenPrompt (no write: a no-op token-gated action), and waits until a token is saved in the extension's
  * chrome.storage.local (key `pierre.tokens`) or 10 minutes pass.
  *
  * The token is typed by the human into Pierre's own prompt. This script never reads, prints or stores it: it
@@ -36,6 +36,17 @@ function chromePath() {
   const newest = versions.at(-1);
   if (!newest) throw new Error('No Chrome for Testing found; set PIERRE_E2E_CHROME');
   return join(dir, newest, 'chrome');
+}
+
+/**
+ * Opens Pierre's token prompt WITHOUT any GitHub write: a no-op action through the e2e inspection hook
+ * (`window.__pierre.review.withApi`), which asks for a token when none is stored. Not awaited (it settles when the
+ * prompt is saved or cancelled).
+ */
+async function openPrompt(frame) {
+  await frame.evaluate(() => {
+    void window.__pierre.review.withApi('set up the e2e tests', async () => undefined).catch(() => undefined);
+  });
 }
 
 const viewerFrame = (page) => page.frames().find((f) => f.url().startsWith('chrome-extension://') && f.url().includes('/viewer.html'));
@@ -74,8 +85,7 @@ async function main() {
       console.log('token-setup: a token is already stored; nothing to do.');
       return;
     }
-    // Any token-gated action opens the prompt; the Viewed checkbox does not change anything when cancelled.
-    await frame.locator('.fh-viewed input').first().click();
+    await openPrompt(frame);
     console.log('token-setup: paste a GitHub token into the "Connect Pierre to GitHub" prompt and press Save (waiting up to 10 minutes).');
     while (Date.now() < deadline) {
       if (await tokenStored(page)) {
@@ -84,7 +94,7 @@ async function main() {
       }
       // The prompt was cancelled: open it again.
       const f = viewerFrame(page);
-      if (f && (await f.locator('[role="dialog"]').count()) === 0) await f.locator('.fh-viewed input').first().click().catch(() => undefined);
+      if (f && (await f.locator('[role="dialog"]').count()) === 0) await openPrompt(f).catch(() => undefined);
       await page.waitForTimeout(1000);
     }
     console.error('token-setup: timed out after 10 minutes without a saved token.');

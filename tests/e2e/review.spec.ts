@@ -7,7 +7,9 @@
  *   (also on failure), and a pending review it starts is discarded. Results are checked against GitHub's own
  *   data (`page_data/threads` + `thread_previews`, the endpoints GitHub's Files changed page reads) in a fresh
  *   github.com tab, and the first comment visually on GitHub's Files changed page.
- * The token is used only inside the extension (Pierre's own code); the test never reads its value.
+ * The token is used only inside the extension (Pierre's own code); the test never reads its value. Resolve runs twice:
+ * with the active (classic) token through the API, and with the fine-grained entries the setup saved in
+ * `pierre.e2e.fineGrainedTokens` swapped in (GitHub refuses those, so Pierre falls back to the GitHub session).
  */
 import type { Frame, Page } from '@playwright/test';
 import { expect, openPierre, prUrl, SANDBOX, test, type Viewer } from './fixtures';
@@ -119,6 +121,27 @@ async function githubPendingReview(
 }
 
 const threadWith = (threads: GhThread[], text: string) => threads.find((t) => t.comments.some((c) => c.body.includes(text)));
+
+/**
+ * Switches Pierre's active tokens inside the extension page, copying storage objects without ever returning or
+ * logging a value: 'fine-grained' backs up `pierre.tokens` and activates `pierre.e2e.fineGrainedTokens` (saved by the
+ * controller's setup); 'restore' puts the backup back (no-op without one).
+ */
+async function swapTokens(frame: Frame, to: 'fine-grained' | 'restore'): Promise<void> {
+  const ok = await frame.evaluate(async (mode) => {
+    const KEYS = ['pierre.tokens', 'pierre.e2e.fineGrainedTokens', 'pierre.e2e.activeBackup'];
+    const got = await chrome.storage.local.get(KEYS);
+    if (mode === 'fine-grained') {
+      if (!got['pierre.e2e.fineGrainedTokens'] || !got['pierre.tokens']) return false;
+      await chrome.storage.local.set({ 'pierre.e2e.activeBackup': got['pierre.tokens'], 'pierre.tokens': got['pierre.e2e.fineGrainedTokens'] });
+    } else if (got['pierre.e2e.activeBackup']) {
+      await chrome.storage.local.set({ 'pierre.tokens': got['pierre.e2e.activeBackup'] });
+      await chrome.storage.local.remove('pierre.e2e.activeBackup');
+    }
+    return true;
+  }, to);
+  expect(ok, 'pierre.e2e.fineGrainedTokens missing from the e2e profile').toBe(true);
+}
 
 async function tokenStored(frame: Frame): Promise<boolean> {
   return frame.evaluate(async () => (await chrome.storage.local.getKeys()).includes('pierre.tokens'));
@@ -369,33 +392,45 @@ test.describe('threads and the inline composer', () => {
         await expect.poll(async () => (await thumbs())?.totalCount ?? 0, { timeout: 30_000 }).toBe(0);
       });
 
-      await test.step('resolve and unresolve', async () => {
-        console.log('[e2e] step: resolve and unresolve');
-        await thread().getByRole('button', { name: 'Resolve conversation' }).click();
-        await expect(thread().locator('.label-resolved')).toBeVisible(); // optimistic
-        // GitHub either resolves it, or refuses the token (fine-grained tokens may lack the permission): then Pierre
-        // re-opens the token prompt with GitHub's message (auth error → re-prompt), and cancelling reverts.
+      await test.step('resolve and unresolve: classic token (GraphQL), then fine-grained token (session fallback)', async () => {
+        console.log('[e2e] step: resolve and unresolve (token, then session fallback)');
+        // Which path ran: Pierre's GraphQL call (iframe) and/or GitHub's own page_data endpoint (bridge, top page).
+        const seen: string[] = [];
+        const onRequest = (r: import('@playwright/test').Request) => {
+          if (r.url() === 'https://api.github.com/graphql') {
+            const q = (JSON.parse(r.postData() ?? '{}').query as string | undefined) ?? '';
+            const op = /\{\s*((?:un)?resolveReviewThread)\(/.exec(q)?.[1]; // the field call, not the input type name
+            if (op) seen.push(`graphql:${op}`);
+          } else if (/\/page_data\/(un)?resolve_thread$/.test(new URL(r.url()).pathname)) {
+            seen.push(`session:${new URL(r.url()).pathname.split('/').pop()}`);
+          }
+        };
+        page.on('request', onRequest);
         const dialog = viewer.locator.getByRole('dialog');
-        const outcome = await expect
-          .poll(async () => ((await dialog.count()) > 0 ? 'prompt' : threadWith(await githubThreads(page), single)!.isResolved ? 'resolved' : 'waiting'), {
-            timeout: 30_000,
-          })
-          .not.toBe('waiting')
-          .then(async () => ((await dialog.count()) > 0 ? 'prompt' : 'resolved'));
-        if (outcome === 'prompt') {
-          const text = await dialog.innerText();
-          console.log(`[e2e] resolve: GitHub refused the stored token; Pierre re-prompted: ${text.split('\n').find((l) => /not accessible|permission|token/i.test(l))}`);
-          test.info().annotations.push({ type: 'resolve-refused-for-token', description: text.slice(0, 300) });
-          await page.keyboard.press('Escape'); // cancel the prompt
-          await expect(dialog).toHaveCount(0);
-          await expect(thread().locator('.label-resolved')).toHaveCount(0); // reverted
-          await expect(thread().getByRole('button', { name: 'Resolve conversation' })).toBeVisible();
-          expect(threadWith(await githubThreads(page), single)!.isResolved).toBe(false);
-        } else {
+        const roundTrip = async () => {
+          await thread().getByRole('button', { name: 'Resolve conversation' }).click();
+          await expect(thread().locator('.label-resolved')).toBeVisible();
+          await expect.poll(async () => threadWith(await githubThreads(page), single)!.isResolved, { timeout: 30_000 }).toBe(true);
           await thread().locator('.thread-fold').click();
           await thread().getByRole('button', { name: 'Unresolve conversation' }).click();
           await expect(thread().locator('.label-resolved')).toHaveCount(0);
           await expect.poll(async () => threadWith(await githubThreads(page), single)!.isResolved, { timeout: 30_000 }).toBe(false);
+          await expect(thread().locator('.thread-error')).toHaveCount(0);
+          expect(await dialog.count()).toBe(0); // never prompted
+        };
+        try {
+          // 1. The active (classic) token: GitHub's API does it, no session call.
+          await roundTrip();
+          expect(seen).toEqual(['graphql:resolveReviewThread', 'graphql:unresolveReviewThread']);
+
+          // 2. The fine-grained entries active: GitHub refuses the token, Pierre falls back to the session.
+          seen.length = 0;
+          await swapTokens(viewer.frame(), 'fine-grained');
+          await roundTrip();
+          expect(seen).toEqual(['graphql:resolveReviewThread', 'session:resolve_thread', 'graphql:unresolveReviewThread', 'session:unresolve_thread']);
+        } finally {
+          page.off('request', onRequest);
+          await swapTokens(viewer.frame(), 'restore');
         }
       });
 

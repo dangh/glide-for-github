@@ -10,7 +10,7 @@ import { isNoTokenError } from '../auth/requireToken';
 import type { ReactionContent } from '../github/api';
 import type { CommentModel, ThreadModel } from '../github/threads';
 import { deleteComment, errorMessage, REACTIONS, setResolved, toggleReaction } from '../state/review';
-import { draftKey, threadById, usePr } from '../state/store';
+import { draftKey, threadByKey, usePr } from '../state/store';
 import { Composer, focusComposer } from './Composer';
 import { CommentBody } from './Markdown';
 
@@ -125,7 +125,7 @@ const Reactions = memo(function Reactions({ comment }: { comment: CommentModel }
   );
 });
 
-const Comment = memo(function Comment({ threadId, comment }: { threadId: string; comment: CommentModel }) {
+const Comment = memo(function Comment({ threadKey, comment }: { threadKey: string; comment: CommentModel }) {
   const editKey = draftKey.edit(comment.databaseId);
   const editing = usePr((s) => s.drafts.has(editKey));
   const [confirming, setConfirming] = useState(false);
@@ -178,7 +178,7 @@ const Comment = memo(function Comment({ threadId, comment }: { threadId: string;
         )}
       </div>
       {editing ? (
-        <Composer key={editKey} draftKey={editKey} mode="edit" threadId={threadId} comment={comment} />
+        <Composer key={editKey} draftKey={editKey} mode="edit" threadKey={threadKey} comment={comment} />
       ) : (
         <CommentBody html={comment.bodyHTML} text={comment.body} />
       )}
@@ -195,11 +195,15 @@ function lineLabel(t: ThreadModel): string {
   return `Lines ${t.startLine}–${t.line}${t.startSide !== t.side ? ` (${t.startSide === 'deletions' ? 'L' : 'R'}${t.startLine}–${end})` : ''}`;
 }
 
-export const Thread = memo(function Thread({ threadId }: { threadId: string }) {
-  const thread = usePr((s) => threadById(s.threads, threadId));
-  const replyKey = draftKey.reply(threadId);
+/**
+ * `threadKey` (first comment id) identifies the thread: it stays the same when the provisional thread is replaced by
+ * the server's copy, so this component, its reply composer (draft `reply:<threadKey>`) and its expansion survive.
+ */
+export const Thread = memo(function Thread({ threadKey }: { threadKey: string }) {
+  const thread = usePr((s) => threadByKey(s.threads, threadKey));
+  const replyKey = draftKey.reply(threadKey);
   const replying = usePr((s) => s.drafts.has(replyKey));
-  const open = useExpanded(threadId);
+  const open = useExpanded(threadKey);
   const { busy, error, run } = useAction();
 
   if (!thread || thread.comments.length === 0) return null;
@@ -209,7 +213,7 @@ export const Thread = memo(function Thread({ threadId }: { threadId: string }) {
 
   const reply = () => {
     const s = usePr.getState();
-    if (!s.drafts.has(replyKey)) s.setDraft(replyKey, { body: '', threadId, updatedAt: Date.now() });
+    if (!s.drafts.has(replyKey)) s.setDraft(replyKey, { body: '', threadId: threadKey, updatedAt: Date.now() });
     focusComposer(replyKey);
   };
 
@@ -221,7 +225,7 @@ export const Thread = memo(function Thread({ threadId }: { threadId: string }) {
       data-outdated={thread.isOutdated || undefined}
     >
       {foldable && (
-        <button type="button" className="thread-fold" aria-expanded={shown} onClick={() => setExpanded(threadId, !open)}>
+        <button type="button" className="thread-fold" aria-expanded={shown} onClick={() => setExpanded(threadKey, !open)}>
           <span className="thread-chevron">{shown ? '▾' : '▸'}</span>
           {thread.isOutdated && <span className="label label-outdated">Outdated</span>}
           {thread.isResolved && <span className="label label-resolved">Resolved</span>}
@@ -235,10 +239,10 @@ export const Thread = memo(function Thread({ threadId }: { threadId: string }) {
       {shown && (
         <>
           {thread.comments.map((c) => (
-            <Comment key={c.databaseId} threadId={threadId} comment={c} />
+            <Comment key={c.databaseId} threadKey={threadKey} comment={c} />
           ))}
           {replying ? (
-            <Composer key={replyKey} draftKey={replyKey} mode="reply" threadId={threadId} />
+            <Composer key={replyKey} draftKey={replyKey} mode="reply" threadKey={threadKey} />
           ) : (
             <div className="thread-actions">
               {thread.viewerCanReply && (
@@ -249,7 +253,7 @@ export const Thread = memo(function Thread({ threadId }: { threadId: string }) {
               <span className="grow" />
               {/* A thread in a pending (unsubmitted) review cannot be resolved yet. */}
               {thread.comments[0]!.state === 'submitted' ? (
-                <button type="button" className="btn" disabled={busy} onClick={() => run(() => setResolved(threadId, !thread.isResolved))}>
+                <button type="button" className="btn" disabled={busy} onClick={() => run(() => setResolved(threadKey, !thread.isResolved))}>
                   {thread.isResolved ? 'Unresolve conversation' : 'Resolve conversation'}
                 </button>
               ) : null}

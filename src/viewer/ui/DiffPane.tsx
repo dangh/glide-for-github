@@ -70,10 +70,10 @@ const INTERACTIONS: DiffViewOptions = Object.freeze({
 });
 
 /** Threads and open composers as line annotations; keyed so a slot never reuses another composer's textarea. */
-function renderAnnotation(annotation: DiffLineAnnotation<AnnotationMeta> | LineAnnotation<AnnotationMeta>) {
+export function renderAnnotation(annotation: DiffLineAnnotation<AnnotationMeta> | LineAnnotation<AnnotationMeta>) {
   const meta = annotation.metadata;
   return meta.kind === 'thread' ? (
-    <Thread key={`t:${meta.threadId}`} threadId={meta.threadId} />
+    <Thread key={`t:${meta.threadKey}`} threadKey={meta.threadKey} />
   ) : (
     <Composer key={`c:${meta.key}`} draftKey={meta.key} mode="new" />
   );

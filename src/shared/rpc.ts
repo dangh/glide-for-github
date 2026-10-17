@@ -95,6 +95,13 @@ export type BridgeMethods = {
   getText(url: string): string;
   preview(text: string, context: PreviewContext): string /* html */;
   applySuggestions(body: ApplySuggestionsBody, idempotencyKey: string): Json;
+  /**
+   * Resolve / unresolve a review thread with the user's GitHub session (R§4.6): `POST page_data/resolve_thread`
+   * (`unresolve_thread`) with `{threadId}`. `threadId` is the numeric thread id (`^\d+$`), not a `PRRT_` node id.
+   * The session fallback when a token cannot do it (fine-grained tokens are refused `resolveReviewThread`).
+   */
+  resolveThread(owner: string, repo: string, number: number, threadId: string): Json;
+  unresolveThread(owner: string, repo: string, number: number, threadId: string): Json;
 };
 
 /**

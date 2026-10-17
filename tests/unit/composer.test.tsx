@@ -215,6 +215,15 @@ describe('Composer', () => {
     expect(usePr.getState().drafts.has(key)).toBe(false);
   });
 
+  it('keeps text typed just before the composer unmounts (virtualized away), within the debounce', async () => {
+    const key = openComposer(targetFromRange('src/a.ts', { start: 2, side: 'additions', end: 2 }));
+    await renderComposer(key);
+    setValue(textarea(), 'typed, then scrolled away');
+    await act(async () => root.render(<TokenPromptHost />)); // unmount the composer at once (< 300 ms)
+    expect(container.querySelector('textarea')).toBeNull();
+    expect(usePr.getState().drafts.get(key)!.body).toBe('typed, then scrolled away');
+  });
+
   it('"Insert suggestion" for a 2-line selection produces the exact fenced block', async () => {
     const key = openComposer(targetFromRange('src/a.ts', { start: 2, side: 'additions', end: 3, endSide: 'additions' }));
     await renderComposer(key);

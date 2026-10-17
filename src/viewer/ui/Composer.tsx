@@ -21,7 +21,7 @@ import {
   type NewCommentMode,
 } from '../state/review';
 import { session } from '../state/session';
-import { isCollapsed, threadById, usePr, type DraftKey } from '../state/store';
+import { isCollapsed, threadByKey, usePr, type DraftKey } from '../state/store';
 import { BodyHtml } from './Markdown';
 
 export const DRAFT_DEBOUNCE_MS = 300;
@@ -30,8 +30,8 @@ export const DRAFT_MAX_WAIT_MS = 5000;
 export interface ComposerProps {
   draftKey: DraftKey;
   mode: 'new' | 'reply' | 'edit';
-  /** Reply / edit: the thread. */
-  threadId?: string;
+  /** Reply / edit: the thread's stable key (`threadKey`, first comment id). */
+  threadKey?: string;
   /** Edit: the comment being edited. */
   comment?: CommentModel;
 }
@@ -69,8 +69,8 @@ export function targetLabel(t: CommentTarget): string {
 }
 
 /** The thread's position as a comment target (reply suggestions). */
-function threadTarget(threadId: string | undefined): CommentTarget | undefined {
-  const t = threadId ? threadById(usePr.getState().threads, threadId) : undefined;
+function threadTarget(key: string | undefined): CommentTarget | undefined {
+  const t = key ? threadByKey(usePr.getState().threads, key) : undefined;
   if (!t || t.isOutdated) return undefined;
   return {
     path: t.path,
@@ -81,7 +81,7 @@ function threadTarget(threadId: string | undefined): CommentTarget | undefined {
   };
 }
 
-export const Composer = memo(function Composer({ draftKey, mode, threadId, comment }: ComposerProps) {
+export const Composer = memo(function Composer({ draftKey, mode, threadKey, comment }: ComposerProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const firstUnsaved = useRef(0);
@@ -102,22 +102,26 @@ export const Composer = memo(function Composer({ draftKey, mode, threadId, comme
   const [needsToken, setNeedsToken] = useState<Action | null>(null);
 
   const target = useMemo(
-    () => (mode === 'new' ? targetOfDraft(usePr.getState().drafts.get(draftKey)) : threadTarget(threadId)),
-    [mode, draftKey, threadId],
+    () => (mode === 'new' ? targetOfDraft(usePr.getState().drafts.get(draftKey)) : threadTarget(threadKey)),
+    [mode, draftKey, threadKey],
   );
 
-  const save = useCallback(() => {
-    clearTimeout(timer.current);
-    timer.current = undefined;
-    firstUnsaved.current = 0;
-    const el = ref.current;
-    if (!el || closed.current) return;
-    const s = usePr.getState();
-    const existing = s.drafts.get(draftKey);
-    // Opening a composer creates its draft; no draft means it was posted or cancelled: never recreate it.
-    if (!existing || existing.body === el.value) return;
-    s.setDraft(draftKey, { ...existing, body: el.value, updatedAt: Date.now() });
-  }, [draftKey]);
+  /** Writes the textarea's text to the draft now (cancelling the pending debounce). */
+  const saveFrom = useCallback(
+    (el: HTMLTextAreaElement | null) => {
+      clearTimeout(timer.current);
+      timer.current = undefined;
+      firstUnsaved.current = 0;
+      if (!el || closed.current) return;
+      const s = usePr.getState();
+      const existing = s.drafts.get(draftKey);
+      // Opening a composer creates its draft; no draft means it was posted or cancelled: never recreate it.
+      if (!existing || existing.body === el.value) return;
+      s.setDraft(draftKey, { ...existing, body: el.value, updatedAt: Date.now() });
+    },
+    [draftKey],
+  );
+  const save = useCallback(() => saveFrom(ref.current), [saveFrom]);
 
   const onInput = useCallback(() => {
     const now = Date.now();
@@ -129,8 +133,10 @@ export const Composer = memo(function Composer({ draftKey, mode, threadId, comme
   }, [save]);
 
   useEffect(() => {
+    // Captured now: React clears `ref.current` before passive effect cleanups run, so the unmount save must not
+    // read the ref.
+    const el = ref.current;
     const focus = () => {
-      const el = ref.current;
       if (!el) return;
       el.focus({ preventScroll: false });
       el.setSelectionRange(el.value.length, el.value.length);
@@ -142,9 +148,9 @@ export const Composer = memo(function Composer({ draftKey, mode, threadId, comme
     }
     return () => {
       if (focusers.get(draftKey) === focus) focusers.delete(draftKey);
-      save(); // unmount (virtualized away, file collapsed): keep what was typed
+      saveFrom(el); // unmount (virtualized away, file collapsed, slot moved): keep what was typed
     };
-  }, [draftKey, save]);
+  }, [draftKey, saveFrom]);
 
   /**
    * A new-thread composer done (posted or cancelled): drop Pierre's line selection too. Pierre's gutter "+" reuses
@@ -176,7 +182,7 @@ export const Composer = memo(function Composer({ draftKey, mode, threadId, comme
       setNeedsToken(null);
       try {
         if (action === 'single' || action === 'review') await submitNewComment(draftKey, body, action as NewCommentMode);
-        else if (action === 'reply') await submitReply(threadId!, body);
+        else if (action === 'reply') await submitReply(threadKey!, body);
         else await submitEdit(comment!.databaseId, body);
         closed.current = true;
         releaseSelection();
@@ -187,7 +193,7 @@ export const Composer = memo(function Composer({ draftKey, mode, threadId, comme
         setBusy(false);
       }
     },
-    [busy, save, draftKey, threadId, comment, releaseSelection],
+    [busy, save, draftKey, threadKey, comment, releaseSelection],
   );
 
   const actions: { action: Action; label: string; primary: boolean }[] =

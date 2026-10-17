@@ -404,6 +404,62 @@ describe('bridge applySuggestions', () => {
   });
 });
 
+describe('bridge resolveThread / unresolveThread (R§4.6, session fallback)', () => {
+  it.each([
+    ['resolveThread', 'resolve_thread'],
+    ['unresolveThread', 'unresolve_thread'],
+  ] as const)('%s POSTs {threadId} to page_data/%s with the verified-fetch headers', async (method, endpoint) => {
+    const { fn, calls } = fakeFetch(() => json({ ok: true }));
+    const out = await createBridgeImpl({ doc: document, fetch: fn })[method]('dangh', 'pierre-sandbox', 1, '2910292349');
+    expect(out).toEqual({ ok: true });
+    const c = calls[0]!;
+    expect(c.url).toBe(`https://github.com/dangh/pierre-sandbox/pull/1/page_data/${endpoint}`);
+    expect(c.init.method).toBe('POST');
+    expect(c.init.credentials).toBe('same-origin');
+    expect(headersOf(c)).toMatchObject({
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'GitHub-Verified-Fetch': 'true',
+      'X-Fetch-Nonce': 'nonce-1',
+    });
+    expect(JSON.parse(c.init.body as string)).toEqual({ threadId: '2910292349' });
+  });
+
+  it('tolerates an empty 2xx body', async () => {
+    const { fn } = fakeFetch(() => new Response(null, { status: 204 }));
+    await expect(createBridgeImpl({ doc: document, fetch: fn }).resolveThread('dangh', 'pierre-sandbox', 1, '7')).resolves.toBeNull();
+  });
+
+  it('rejects non-2xx with GitHub\'s error', async () => {
+    const { fn } = fakeFetch(() => json({ error: 'Not authorized' }, { status: 403 }));
+    await expect(createBridgeImpl({ doc: document, fetch: fn }).unresolveThread('dangh', 'pierre-sandbox', 1, '7')).rejects.toMatchObject({
+      status: 403,
+      message: 'Not authorized',
+    });
+  });
+
+  const good = ['dangh', 'pierre-sandbox', 1, '2910292349'] as const;
+  it.each([
+    ['owner', ['../x', good[1], good[2], good[3]]],
+    ['owner', ['..', good[1], good[2], good[3]]],
+    ['repo', [good[0], 'a/b', good[2], good[3]]],
+    ['number', [good[0], good[1], 0, good[3]]],
+    ['number', [good[0], good[1], 1.5, good[3]]],
+    ['number', [good[0], good[1], '1', good[3]]],
+    ['threadId', [good[0], good[1], good[2], 'PRRT_kwDO']],
+    ['threadId', [good[0], good[1], good[2], '12/../x']],
+    ['threadId', [good[0], good[1], good[2], '']],
+    ['threadId', [good[0], good[1], good[2], 12]],
+  ])('rejects a bad %s without calling fetch', async (_name, args) => {
+    for (const method of ['resolveThread', 'unresolveThread'] as const) {
+      const { fn } = fakeFetch();
+      const impl = createBridgeImpl({ doc: document, fetch: fn }) as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>;
+      await expect(impl[method]!(...args)).rejects.toMatchObject({ status: 0 });
+      expect(fn).not.toHaveBeenCalled();
+    }
+  });
+});
+
 describe('startBridge handshake', () => {
   const ports: MessagePort[] = [];
   const newChannel = () => {

@@ -84,7 +84,7 @@ describe('CodeView items', () => {
   });
 
   it('annotation sources re-render only files whose annotation array changed (Task 9 seam)', () => {
-    const forA: FileAnnotation[] = [{ side: 'additions', lineNumber: 3, metadata: { kind: 'thread', threadId: '1' } }];
+    const forA: FileAnnotation[] = [{ side: 'additions', lineNumber: 3, metadata: { kind: 'thread', threadKey: '1' } }];
     let current = forA;
     const annotations: AnnotationSource = (path) => (path === 'a.ts' ? current : []);
     const empty: FileAnnotation[] = [];

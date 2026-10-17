@@ -17,7 +17,8 @@ import type { FileSummary } from '../github/private';
 import type { DraftKey, PrState } from './store';
 import { isCollapsed } from './store';
 
-export type AnnotationMeta = { kind: 'thread'; threadId: string } | { kind: 'composer'; key: DraftKey };
+/** `threadKey`: the thread's stable key (`threadKey()` in store.ts, first comment id), not its id. */
+export type AnnotationMeta = { kind: 'thread'; threadKey: string } | { kind: 'composer'; key: DraftKey };
 export type FileAnnotation = DiffLineAnnotation<AnnotationMeta>;
 export type PierreItem = CodeViewDiffItem<AnnotationMeta>;
 

@@ -8,7 +8,7 @@
  * resolve state), then threads are refetched in the background and merged (`mergeThreads`) so a refetch that
  * does not have the new comment yet never makes it disappear.
  */
-import { requireToken } from '../auth/requireToken';
+import { requireToken, type RequireTokenOptions } from '../auth/requireToken';
 import { getToken } from '../auth/tokens';
 import { GithubApi, type ReactionContent } from '../github/api';
 import { isAuthError, WriteError } from '../github/errors';
@@ -17,7 +17,8 @@ import { toThreadModels, type CommentModel, type ThreadModel } from '../github/t
 import { targetOfDraft, type CommentTarget } from './compose';
 import { rangeOids } from './range';
 import { session } from './session';
-import { draftKey, threadById, usePr, type DraftKey } from './store';
+import { BridgeError } from '../../shared/rpc';
+import { draftKey, threadByKey, threadKey, usePr, type DraftKey } from './store';
 
 /**
  * Whether "Add single comment" stays available while the viewer has a pending review. Verified on the sandbox
@@ -52,10 +53,13 @@ export function shownHeadOid(): string {
   return rangeOids(currentPr(), s.range).newOid;
 }
 
-/** Runs `fn` with an API client; an auth failure re-opens the token prompt and retries with the new token. */
-export async function withApi<T>(reason: string, fn: (api: GithubApi) => Promise<T>): Promise<T> {
+/**
+ * Runs `fn` with an API client; an auth failure re-opens the token prompt and retries with the new token.
+ * `first`: options for the first `requireToken` (e.g. `force` when the stored token is known to be refused).
+ */
+export async function withApi<T>(reason: string, fn: (api: GithubApi) => Promise<T>, first: RequireTokenOptions = {}): Promise<T> {
   const owner = currentPr().ref.owner;
-  let api = await requireToken(owner, reason);
+  let api = await requireToken(owner, reason, first);
   for (let attempt = 1; ; attempt++) {
     try {
       return await fn(api);
@@ -170,8 +174,9 @@ function addProvisionalThread(target: CommentTarget, comment: CommentModel) {
   });
 }
 
-function updateThread(threadId: string, fn: (t: ThreadModel) => ThreadModel) {
-  const t = threadById(usePr.getState().threads, threadId);
+/** Updates the thread with stable key `key` (its current copy, provisional or server). */
+function updateThread(key: string, fn: (t: ThreadModel) => ThreadModel) {
+  const t = threadByKey(usePr.getState().threads, key);
   if (t) usePr.getState().upsertThread(fn(t));
 }
 
@@ -186,7 +191,7 @@ function findComment(databaseId: number): { thread: ThreadModel; comment: Commen
 function updateComment(databaseId: number, fn: (c: CommentModel) => CommentModel) {
   const found = findComment(databaseId);
   if (!found) return;
-  updateThread(found.thread.id, (t) => ({ ...t, comments: t.comments.map((c) => (c.databaseId === databaseId ? fn(c) : c)) }));
+  updateThread(threadKey(found.thread), (t) => ({ ...t, comments: t.comments.map((c) => (c.databaseId === databaseId ? fn(c) : c)) }));
 }
 
 /**
@@ -273,9 +278,9 @@ export async function submitNewComment(key: DraftKey, body: string, mode: NewCom
   scheduleRefresh();
 }
 
-/** Replies to a thread: REST reply, or a pending review reply while the viewer has a pending review. */
-export async function submitReply(threadId: string, body: string): Promise<void> {
-  const thread = threadById(usePr.getState().threads, threadId);
+/** Replies to a thread (by `threadKey`): REST reply, or a pending review reply while the viewer has a pending review. */
+export async function submitReply(key: string, body: string): Promise<void> {
+  const thread = threadByKey(usePr.getState().threads, key);
   const first = thread?.comments[0];
   if (!thread || !first) throw new WriteError('not-found', 'This thread is no longer available.', { owner: currentPr().ref.owner });
   let comment: CommentModel;
@@ -287,8 +292,8 @@ export async function submitReply(threadId: string, body: string): Promise<void>
     const res = await withApi('reply', (api) => api.reply(first.databaseId, body));
     comment = provisionalComment(res.id, res.nodeId, body, 'submitted');
   }
-  updateThread(threadId, (t) => ({ ...t, comments: [...t.comments, comment] }));
-  usePr.getState().clearDraft(draftKey.reply(threadId));
+  updateThread(key, (t) => ({ ...t, comments: [...t.comments, comment] }));
+  usePr.getState().clearDraft(draftKey.reply(key));
   scheduleRefresh();
 }
 
@@ -336,18 +341,98 @@ export async function toggleReaction(databaseId: number, content: ReactionConten
   }
 }
 
-/** Resolves or unresolves a thread, optimistically; reverted on failure. */
-export async function setResolved(threadId: string, resolved: boolean): Promise<void> {
-  const thread = threadById(usePr.getState().threads, threadId);
-  if (!thread || thread.isResolved === resolved) return;
-  updateThread(threadId, (t) => ({ ...t, isResolved: resolved }));
+// ---- token first, GitHub session second ------------------------------------------------------------
+
+/** A bridge (session) failure as a `WriteError` for inline display. */
+export function sessionError(err: unknown, owner: string): WriteError {
+  if (err instanceof WriteError) return err;
+  const status = err instanceof BridgeError ? err.status : 0;
+  const code = err instanceof BridgeError ? err.code : undefined;
+  const detail = err instanceof Error && err.message ? ` GitHub said: ${err.message}` : '';
+  const init = { owner, ...(status ? { status } : {}) };
+  if (status === 401 || status === 403) return new WriteError('forbidden', `GitHub refused this action for your session.${detail}`, init);
+  if (status === 404) return new WriteError('not-found', `GitHub did not find this conversation.${detail}`, init);
+  if (status === 409) return new WriteError('conflict', `GitHub reported a conflict.${detail}`, init);
+  if (status === 422) return new WriteError('validation', `GitHub rejected the request.${detail}`, init);
+  if (status === 429) return new WriteError('rate-limited', 'GitHub is rate limiting requests. Try again shortly.', init);
+  if (status === 0 && (code === 'network' || code === 'closed' || code === 'timeout'))
+    return new WriteError('network', 'Could not reach GitHub. Check your connection and retry.', init);
+  return new WriteError('unknown', `The action failed.${detail}`, init);
+}
+
+/** The session path was refused for lack of authorization (logged out, no permission). */
+const sessionRefused = (err: unknown) => err instanceof BridgeError && (err.status === 401 || err.status === 403);
+
+/**
+ * Token first, then the user's GitHub session (Ruling: option C). Runs `tokenAction` with the stored token, without
+ * prompting. If there is no token, or GitHub refuses the token for this action (an auth error, e.g. fine-grained
+ * tokens and `resolveReviewThread`), runs `sessionAction` (GitHub's own page_data endpoint through the bridge).
+ * Only when the session is refused too does it ask for a token (`withApi`, forced when the stored one was refused).
+ * Other failures of either path propagate (as `WriteError`). Reusable for Viewed (Task 10).
+ */
+export async function withSessionFallback<T>(reason: string, tokenAction: (api: GithubApi) => Promise<T>, sessionAction: () => Promise<T>): Promise<T> {
+  const pr = currentPr();
+  const owner = pr.ref.owner;
+  let refused: WriteError | undefined;
+  const token = await getToken(owner);
+  if (token) {
+    try {
+      return await tokenAction(new GithubApi(token, pr.ref));
+    } catch (err) {
+      if (!isAuthError(err)) throw err;
+      refused = err;
+    }
+  }
   try {
-    await withApi(resolved ? 'resolve a conversation' : 'unresolve a conversation', async (api) => {
-      const id = await threadNodeId(api, thread);
-      await (resolved ? api.resolve(id) : api.unresolve(id));
-    });
+    return await sessionAction();
   } catch (err) {
-    updateThread(threadId, (t) => ({ ...t, isResolved: !resolved }));
+    if (!sessionRefused(err)) throw sessionError(err, owner);
+    return withApi(reason, tokenAction, refused ? { force: true, problem: refused.message } : {});
+  }
+}
+
+/** The thread's numeric id (page_data endpoints); a just-posted provisional thread gets it from a refresh first. */
+async function numericThreadId(key: string): Promise<string> {
+  const numeric = () => {
+    const id = threadByKey(usePr.getState().threads, key)?.id;
+    return id && /^\d+$/.test(id) ? id : undefined;
+  };
+  let id = numeric();
+  if (!id) {
+    await refreshThreads();
+    id = numeric();
+  }
+  if (!id) throw new WriteError('conflict', 'This conversation is still being saved on GitHub. Try again in a moment.', { owner: currentPr().ref.owner });
+  return id;
+}
+
+/**
+ * Resolves or unresolves a thread (by `threadKey`), optimistically; reverted on failure. Token (GraphQL) first,
+ * then GitHub's session (`page_data/resolve_thread`), see `withSessionFallback`.
+ */
+export async function setResolved(key: string, resolved: boolean): Promise<void> {
+  const thread = threadByKey(usePr.getState().threads, key);
+  if (!thread || thread.isResolved === resolved) return;
+  const apply = (value: boolean) => updateThread(key, (t) => (t.isResolved === value ? t : { ...t, isResolved: value }));
+  apply(resolved);
+  const { owner, repo, number } = currentPr().ref;
+  try {
+    await withSessionFallback(
+      resolved ? 'resolve a conversation' : 'unresolve a conversation',
+      async (api) => {
+        const id = await threadNodeId(api, threadByKey(usePr.getState().threads, key) ?? thread);
+        await (resolved ? api.resolve(id) : api.unresolve(id));
+      },
+      async () => {
+        const rpc = session.rpc;
+        if (!rpc) throw new WriteError('network', 'Not connected to the GitHub page.', { owner });
+        const id = await numericThreadId(key);
+        await rpc.call(resolved ? 'resolveThread' : 'unresolveThread', owner, repo, number, id);
+      },
+    );
+    apply(resolved); // a refresh in between may have brought the old state back
+  } catch (err) {
+    apply(!resolved);
     throw err;
   }
 }

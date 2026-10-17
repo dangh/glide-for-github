@@ -89,10 +89,10 @@ describe('annotation source', () => {
     ]);
     const a = items.find((i) => i.id === 'a.ts')!;
     expect(a.annotations).toEqual([
-      { side: 'additions', lineNumber: 4, metadata: { kind: 'thread', threadId: '1' } },
-      { side: 'additions', lineNumber: 0, metadata: { kind: 'thread', threadId: '2' } },
-      { side: 'deletions', lineNumber: 0, metadata: { kind: 'thread', threadId: '3' } },
-      { side: 'deletions', lineNumber: 7, metadata: { kind: 'thread', threadId: '4' } },
+      { side: 'additions', lineNumber: 4, metadata: { kind: 'thread', threadKey: '10' } },
+      { side: 'additions', lineNumber: 0, metadata: { kind: 'thread', threadKey: '20' } },
+      { side: 'deletions', lineNumber: 0, metadata: { kind: 'thread', threadKey: '30' } },
+      { side: 'deletions', lineNumber: 7, metadata: { kind: 'thread', threadKey: '40' } },
     ]);
     expect(items.find((i) => i.id === 'b.ts')!.annotations).toEqual([]);
   });
@@ -106,13 +106,24 @@ describe('annotation source', () => {
     // added to the file later never shifts (remounts) an open composer.
     expect(updates[0]!.annotations).toEqual([
       { side: 'additions', lineNumber: 6, metadata: { kind: 'composer', key } },
-      { side: 'additions', lineNumber: 4, metadata: { kind: 'thread', threadId: '1' } },
+      { side: 'additions', lineNumber: 4, metadata: { kind: 'thread', threadKey: '10' } },
     ]);
     for (let i = 0; i < 20; i++) {
       store.getState().setDraft(key, { ...store.getState().drafts.get(key)!, body: 'x'.repeat(i), updatedAt: i });
       expect(sync.sync(store.getState(), sink)).toEqual([]);
     }
     expect(updates).toHaveLength(1);
+  });
+
+  it('threads are ordered by first comment id (stable across a provisional → server swap and refetch order)', () => {
+    const { store, sync, sink, items } = setup([thread('2', 'a.ts', 8), thread('1', 'a.ts', 4)]);
+    const a = items.find((i) => i.id === 'a.ts')!;
+    expect(a.annotations!.map((x) => (x.metadata.kind === 'thread' ? x.metadata.threadKey : ''))).toEqual(['10', '20']);
+    // The provisional thread of comment 30 becomes server thread '9': same key, same place, no item update.
+    store.getState().setThreads([thread('2', 'a.ts', 8), thread('1', 'a.ts', 4), thread('local:30', 'a.ts', 6, { comments: [comment(30)] })]);
+    expect(sync.sync(store.getState(), sink)).toEqual(['a.ts']);
+    store.getState().setThreads([thread('9', 'a.ts', 6, { comments: [comment(30)] }), thread('1', 'a.ts', 4), thread('2', 'a.ts', 8)]);
+    expect(sync.sync(store.getState(), sink)).toEqual([]);
   });
 
   it('opening the same composer twice is a no-op', () => {

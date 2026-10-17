@@ -29,6 +29,7 @@ const GET_PATH = new RegExp(
 const RAW_PATH = new RegExp(`^/(${NAME})/(${NAME})/raw/[0-9a-f]{7,64}/.*[^/]$`);
 const NAME_ONLY = new RegExp(`^${NAME}$`);
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{1,128}$/;
+const THREAD_ID = /^\d+$/;
 const OID = /^[0-9a-f]{40}([0-9a-f]{24})?$/;
 const DOT_NAMES = new Set(['.', '..']);
 
@@ -190,6 +191,13 @@ function applyRequest(body: unknown, key: unknown): { path: string; json: string
   };
 }
 
+/** `page_data/resolve_thread` / `unresolve_thread`: path from validated parts, body rebuilt field by field. */
+function threadRequest(endpoint: 'resolve_thread' | 'unresolve_thread', owner: unknown, repo: unknown, number: unknown, threadId: unknown) {
+  if (!isName(owner) || !isName(repo) || !isPosInt(number)) throw badRequest('Invalid pull request');
+  if (typeof threadId !== 'string' || !THREAD_ID.test(threadId)) throw badRequest('threadId must be a numeric thread id');
+  return { path: `/${owner}/${repo}/pull/${number}/page_data/${endpoint}`, json: JSON.stringify({ threadId }) };
+}
+
 export function createBridgeImpl(deps: BridgeDeps = {}): RpcImpl<BridgeMethods> {
   const doc = () => deps.doc ?? document;
   const origin = () => doc().location.origin;
@@ -232,7 +240,22 @@ export function createBridgeImpl(deps: BridgeDeps = {}): RpcImpl<BridgeMethods> 
       if (!res.ok) throw await errorFrom(res);
       return readJson(res);
     },
+
+    async resolveThread(owner, repo, number, threadId) {
+      return postJson(threadRequest('resolve_thread', owner, repo, number, threadId));
+    },
+
+    async unresolveThread(owner, repo, number, threadId) {
+      return postJson(threadRequest('unresolve_thread', owner, repo, number, threadId));
+    },
   };
+
+  async function postJson({ path, json }: { path: string; json: string }): Promise<Json> {
+    const headers = { ...githubHeaders(doc()), Accept: 'application/json', 'Content-Type': 'application/json' };
+    const res = await send(deps, origin() + path, { method: 'POST', headers, body: json, credentials: 'same-origin' });
+    if (!res.ok) throw await errorFrom(res);
+    return readJson(res);
+  }
 }
 
 /** Starts the handshake listener on `win`. Returns a stop function that also closes any active port. */
