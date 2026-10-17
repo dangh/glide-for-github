@@ -176,6 +176,69 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
       host.unmount();
       expect(window.postMessage).toHaveBeenLastCalledWith({ type: 'pierre:bridge-reset' }, window.location.origin);
     });
+
+    describe('bridge-ready handshake (bridge loaded after mount)', () => {
+      const bridgeCalls = () =>
+        vi.mocked(window.postMessage).mock.calls.filter(
+          (c) => (c[0] as { type?: string }).type === 'pierre:bridge-port',
+        ) as unknown as [unknown, string, MessagePort[]][];
+
+      it('re-creates the channel once and re-sends a fresh port to both the bridge and the viewer', () => {
+        document.documentElement.setAttribute('data-color-mode', 'light');
+        const host = mountViewer(document, ref);
+        const framePost = vi.spyOn(host.iframe.contentWindow!, 'postMessage').mockImplementation(() => {});
+        host.iframe.dispatchEvent(new Event('load'));
+        expect(bridgeCalls()).toHaveLength(1);
+        expect(framePost).toHaveBeenCalledTimes(1);
+
+        deliverMessage({ type: 'pierre:bridge-ready' });
+
+        expect(bridgeCalls()).toHaveLength(2);
+        expect(bridgeCalls()[1]![1]).toBe(window.location.origin);
+        expect(bridgeCalls()[1]![2]).toHaveLength(1);
+        expect(framePost).toHaveBeenCalledTimes(2);
+        const [msg, origin, transfer] = framePost.mock.calls[1] as unknown as [unknown, string, unknown[]];
+        expect(msg).toEqual({ type: 'pierre:port', colorMode: 'light' });
+        expect(origin).toBe('chrome-extension://abcdefghijklmnop');
+        expect(transfer).toHaveLength(1);
+        // The two sides got ends of the same new channel, distinct from the first handshake's.
+        expect(transfer[0]).not.toBe((framePost.mock.calls[0] as unknown as [unknown, string, unknown[]])[2][0]);
+        host.unmount();
+      });
+
+      it('before the iframe has loaded, re-sends only to the bridge; the load then delivers the newest port', () => {
+        const host = mountViewer(document, ref);
+        const framePost = vi.spyOn(host.iframe.contentWindow!, 'postMessage').mockImplementation(() => {});
+        deliverMessage({ type: 'pierre:bridge-ready' });
+        expect(bridgeCalls()).toHaveLength(2);
+        expect(framePost).not.toHaveBeenCalled();
+        host.iframe.dispatchEvent(new Event('load'));
+        expect(framePost).toHaveBeenCalledTimes(1);
+        host.unmount();
+      });
+
+      it.each([
+        ['foreign origin', { origin: 'https://evil.example' }],
+        ['another source', { source: {} }],
+      ])('ignores bridge-ready from a %s', (_n, opts) => {
+        const host = mountViewer(document, ref);
+        deliverMessage({ type: 'pierre:bridge-ready' }, opts);
+        expect(bridgeCalls()).toHaveLength(1);
+        host.unmount();
+      });
+
+      it('does nothing once unmounted', () => {
+        const host = mountViewer(document, ref);
+        host.unmount();
+        deliverMessage({ type: 'pierre:bridge-ready' });
+        expect(bridgeCalls()).toHaveLength(1);
+      });
+
+      it('does nothing when no viewer is mounted', () => {
+        deliverMessage({ type: 'pierre:bridge-ready' });
+        expect(bridgeCalls()).toHaveLength(0);
+      });
+    });
   });
 
   describe('lifecycle', () => {
@@ -283,6 +346,17 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
     });
   });
 });
+
+/** Delivers a `message` event to the window the way the browser does for window.postMessage. */
+function deliverMessage(data: unknown, opts: { source?: unknown; origin?: string } = {}): void {
+  const ev = new Event('message');
+  Object.defineProperties(ev, {
+    data: { value: data },
+    source: { value: 'source' in opts ? opts.source : window },
+    origin: { value: opts.origin ?? window.location.origin },
+  });
+  window.dispatchEvent(ev);
+}
 
 /** True when the node or any ancestor is display:none (jsdom computes inline styles). */
 function hiddenAncestor(el: Element): boolean {

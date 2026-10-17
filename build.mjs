@@ -32,7 +32,7 @@ await Promise.all([
   // Content script and MAIN-world bridge: self-contained IIFEs.
   build({
     ...common,
-    entryPoints: { content: r('src/content/index.ts'), bridge: r('src/page/bridge.ts') },
+    entryPoints: { content: r('src/content/index.ts'), bridge: r('src/page/main.ts') },
     outdir: dist,
     format: 'iife',
   }),

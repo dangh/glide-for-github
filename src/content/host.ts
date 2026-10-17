@@ -47,6 +47,7 @@ export function mountViewer(doc: Document, ref: PrRef): ViewerHost {
   const anchor = findContentAnchor(doc);
   if (!win || !anchor || !anchor.parentElement) throw new Error('Pierre: PR tab content container not found');
   const parent = anchor.parentElement;
+  let mounted = true;
 
   const iframe = doc.createElement('iframe');
   iframe.setAttribute('src', resolveExtensionUrl('viewer.html?pr=' + encodeURIComponent(prKey(ref))));
@@ -64,22 +65,43 @@ export function mountViewer(doc: Document, ref: PrRef): ViewerHost {
     }
   };
 
-  // port1 goes to the viewer on its load, port2 to the MAIN-world bridge.
-  const channel = new MessageChannel();
-  const onLoad = () => {
+  // One MessageChannel per handshake: port1 goes to the viewer, port2 to the MAIN-world bridge.
+  const extOrigin = originOf(resolveExtensionUrl(''));
+  let channel = new MessageChannel();
+  let loaded = false;
+  const sendToViewer = () => {
     iframe.contentWindow?.postMessage(
       { type: 'pierre:port', colorMode: doc.documentElement.getAttribute('data-color-mode') ?? undefined },
-      originOf(resolveExtensionUrl('')),
+      extOrigin,
       [channel.port1],
     );
   };
+  const sendToBridge = () => win.postMessage({ type: 'pierre:bridge-port' }, win.location.origin, [channel.port2]);
+  const onLoad = () => {
+    loaded = true;
+    sendToViewer();
+  };
   iframe.addEventListener('load', onLoad, { once: true });
+
+  // Both scripts run at document_idle in unspecified order. If the bridge starts after we mounted, our
+  // first port went nowhere; it announces itself with `pierre:bridge-ready` and we hand out a fresh
+  // channel to both sides. (The viewer accepts a replacement port at any time: see src/shared/rpc.ts.)
+  const onBridgeReady = (event: MessageEvent) => {
+    if (event.source !== win || event.origin !== win.location.origin) return;
+    if ((event.data as { type?: unknown } | null)?.type !== 'pierre:bridge-ready') return;
+    if (!mounted || !iframe.isConnected) return;
+    channel.port1.close();
+    channel.port2.close();
+    channel = new MessageChannel();
+    sendToBridge();
+    if (loaded) sendToViewer(); // otherwise onLoad sends the newest port1
+  };
+  win.addEventListener('message', onBridgeReady);
 
   hideContent();
   parent.append(iframe);
-  win.postMessage({ type: 'pierre:bridge-port' }, win.location.origin, [channel.port2]);
+  sendToBridge();
 
-  let mounted = true;
   return {
     iframe,
     refresh() {
@@ -93,6 +115,7 @@ export function mountViewer(doc: Document, ref: PrRef): ViewerHost {
       if (!mounted) return;
       mounted = false;
       iframe.removeEventListener('load', onLoad);
+      win.removeEventListener('message', onBridgeReady);
       iframe.remove();
       for (const [el, style] of hidden) {
         if (style === null) el.removeAttribute('style');
