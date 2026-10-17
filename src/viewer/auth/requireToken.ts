@@ -1,25 +1,86 @@
 /**
- * Token gate for every token write (Task 8 replaces this body with the TokenPrompt flow:
- * `requireToken(owner, reason?): Promise<GithubApi>` resolving after the user saved a token).
+ * Token gate for every token write: `requireToken(owner, reason?)` resolves a `GithubApi` for the owner, asking the
+ * user for a token first (TokenPrompt) when none is stored. Rejects with `WriteError` kind `'no-token'` on cancel.
  *
- * Stub for Task 7: there is no token support yet, so it always rejects with a `WriteError`-like
- * `{kind: 'no-token'}`. Callers must already handle that rejection (show a notice, revert optimistic UI).
+ * Callers (Tasks 9-10) on an auth failure (`isAuthError(err)`) call it again with `{ force: true, problem: err.message }`
+ * so the prompt re-opens even though a (bad) token is stored, then retry the action with the returned api.
  */
-export interface NoTokenError extends Error {
-  kind: 'no-token';
-  owner: string;
-}
+import { create } from 'zustand';
+import { GithubApi } from '../github/api';
+import { noTokenError, WriteError } from '../github/errors';
+import type { PrRef } from '../../shared/pr-url';
+import { usePr } from '../state/store';
+import { getToken } from './tokens';
+
+export type NoTokenError = WriteError & { kind: 'no-token' };
 
 export function isNoTokenError(err: unknown): err is NoTokenError {
-  return typeof err === 'object' && err !== null && (err as { kind?: unknown }).kind === 'no-token';
+  return err instanceof WriteError && err.kind === 'no-token';
 }
 
-export async function requireToken(owner: string, reason?: string): Promise<never> {
-  const err = new Error(
-    `A GitHub token for ${owner} is needed${reason ? ` to ${reason}` : ''}. Token setup is not available yet.`,
-  ) as NoTokenError;
-  err.name = 'WriteError';
-  err.kind = 'no-token';
-  err.owner = owner;
-  throw err;
+export interface RequireTokenOptions {
+  /** Open the prompt even if a token is stored (the stored one was rejected). */
+  force?: boolean;
+  /** Why the prompt is shown again, e.g. the classified error message. Shown at the top of the prompt. */
+  problem?: string;
+}
+
+export interface TokenPromptRequest {
+  owner: string;
+  reason?: string;
+  problem?: string;
+  ref: PrRef;
+  resolve(api: GithubApi): void;
+  reject(err: WriteError): void;
+}
+
+interface PromptState {
+  /** Pending requests; the first one is shown. */
+  queue: TokenPromptRequest[];
+}
+
+export const useTokenPrompt = create<PromptState>()(() => ({ queue: [] }));
+
+const dequeue = (request: TokenPromptRequest) => useTokenPrompt.setState((s) => ({ queue: s.queue.filter((r) => r !== request) }));
+
+/** Settles the prompt request and removes it from the queue (called by TokenPrompt). */
+export function completePrompt(request: TokenPromptRequest, api: GithubApi): void {
+  dequeue(request);
+  request.resolve(api);
+}
+
+export function cancelPrompt(request: TokenPromptRequest): void {
+  dequeue(request);
+  request.reject(noTokenError(request.owner));
+}
+
+/** One prompt per owner at a time: concurrent requests (several writes at once) share it. */
+const pending = new Map<string, Promise<GithubApi>>();
+
+export async function requireToken(owner: string, reason?: string, options: RequireTokenOptions = {}): Promise<GithubApi> {
+  const ref = usePr.getState().pr?.ref;
+  if (!ref) throw noTokenError(owner);
+
+  if (!options.force) {
+    const stored = await getToken(owner);
+    if (stored) return new GithubApi(stored, ref);
+  }
+
+  const key = owner.toLowerCase();
+  const existing = pending.get(key);
+  if (existing) return existing;
+
+  const promise = new Promise<GithubApi>((resolve, reject) => {
+    const request: TokenPromptRequest = {
+      owner,
+      ref,
+      ...(reason ? { reason } : {}),
+      ...(options.problem ? { problem: options.problem } : {}),
+      resolve,
+      reject,
+    };
+    useTokenPrompt.setState((s) => ({ queue: [...s.queue, request] }));
+  }).finally(() => pending.delete(key));
+  pending.set(key, promise);
+  return promise;
 }

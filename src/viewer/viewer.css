@@ -471,3 +471,108 @@ button {
   font-size: 16px;
   margin: 0 0 8px;
 }
+
+/* Token prompt (modal) */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  background: rgba(1, 4, 9, 0.5);
+}
+
+.modal {
+  width: min(440px, 92vw);
+  max-height: 84vh;
+  overflow: auto;
+  padding: 16px 20px;
+  background: var(--pierre-bg);
+  color: var(--pierre-fg);
+  border: 1px solid var(--pierre-border);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(1, 4, 9, 0.4);
+  font-size: 13px;
+}
+
+.modal h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.modal p {
+  margin: 0 0 8px;
+}
+
+.modal a {
+  color: var(--pierre-accent);
+}
+
+.modal-links {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+
+.modal-muted {
+  color: var(--pierre-muted);
+}
+
+.modal-problem {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--pierre-bg-subtle);
+  border: 1px solid var(--pierre-border);
+}
+
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 12px 0 8px;
+  font-weight: 600;
+}
+
+.modal-field input[type='password'] {
+  font: 13px var(--pierre-mono);
+  padding: 5px 8px;
+  color: var(--pierre-fg);
+  background: var(--pierre-bg);
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+}
+
+.modal-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.modal-error {
+  color: var(--pierre-danger);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.btn {
+  background: var(--pierre-bg-subtle);
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+  padding: 3px 12px;
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.modal :focus-visible {
+  outline: 2px solid var(--pierre-accent);
+  outline-offset: 1px;
+}

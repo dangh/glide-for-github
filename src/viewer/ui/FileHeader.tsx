@@ -107,12 +107,11 @@ export const FileHeader = memo(function FileHeader({ path }: { path: string }) {
   const onViewed = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       // Token-gated (Task 10 adds the optimistic toggle and the GraphQL mutation); keep the current state.
+      // Until then, saving a token here only stores it; cancelling leaves everything unchanged.
       event.preventDefault();
       requireToken(owner, 'mark files as viewed').catch((err: unknown) => {
-        usePr.getState().setNotice({
-          kind: 'info',
-          message: isNoTokenError(err) ? 'Marking files as viewed needs a GitHub token (coming soon).' : String(err),
-        });
+        if (isNoTokenError(err)) return; // cancelled: nothing to report
+        usePr.getState().setNotice({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
       });
     },
     [owner],

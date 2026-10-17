@@ -15,6 +15,7 @@ import { effectiveThemeType, useSettings } from './state/settings';
 import { usePr } from './state/store';
 import { DiffPane } from './ui/DiffPane';
 import { FatalError, Notice } from './ui/Notice';
+import { TokenPromptHost } from './ui/TokenPrompt';
 import { Toolbar } from './ui/Toolbar';
 import { TreePane } from './ui/TreePane';
 
@@ -107,6 +108,7 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
           <main className="pierre-main">{pr && settingsLoaded ? <DiffPane rpc={rpc} /> : <div className="pierre-loading">Loading pull request…</div>}</main>
         </div>
         <Notice />
+        <TokenPromptHost />
       </div>
     </WorkerPoolContext.Provider>
   );
