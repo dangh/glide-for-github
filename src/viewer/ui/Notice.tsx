@@ -1,6 +1,13 @@
 /** Transient notices (bottom toast), the "PR updated" banner (Task 11) and the full-pane error. */
 import { memo, useEffect } from 'react';
+import { reloadPr } from '../state/load';
+import { errorMessage } from '../state/review';
 import { usePr } from '../state/store';
+
+/** Soft reload (keeps the suggestion batch and drafts); a failure is shown as a notice. */
+export function reloadPullRequest(): Promise<void> {
+  return reloadPr().catch((err: unknown) => usePr.getState().setNotice({ kind: 'error', message: `Could not reload the pull request. ${errorMessage(err)}` }));
+}
 
 const INFO_TIMEOUT_MS = 6000;
 
@@ -20,7 +27,10 @@ export const Notice = memo(function Notice() {
     <>
       {headMoved && (
         <div className="banner" role="status">
-          This pull request was updated. <button className="fh-link" onClick={() => location.reload()}>Reload</button>
+          This pull request was updated.{' '}
+          <button className="fh-link" onClick={() => void reloadPullRequest()}>
+            Reload
+          </button>
         </div>
       )}
       {notice && (

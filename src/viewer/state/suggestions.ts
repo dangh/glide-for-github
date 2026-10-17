@@ -7,41 +7,30 @@
  *   is not applied twice; it is cleared after success and after a definite refusal (4xx), so the next commit (other
  *   suggestions, or after a reload) never collides with a finished request.
  * - 409 `HEAD_OID_MISMATCH` ("head moved"): the store's `headMoved` is set (the "This pull request was updated" banner)
- *   and the batch is kept.
+ *   and the batch is kept. Recovery is a soft reload (`reloadPr`: new PR data, `headMoved` reset, batch kept and
+ *   pruned); the batch also survives a real page reload (sessionStorage, see batch.ts).
  * - Success: the committed suggestions leave the batch and the PR data is reloaded (new head, threads marked applied).
  */
 import { prKey, type PrRef } from '../../shared/pr-url';
 import { BridgeError } from '../../shared/rpc';
 import { WriteError } from '../github/errors';
-import { applySuggestions, type PrData } from '../github/private';
-import type { CommentModel, ThreadModel } from '../github/threads';
+import { applySuggestions } from '../github/private';
+import { sessionStore } from './batch';
 import { loadPr } from './load';
 import { sessionError } from './review';
 import { session } from './session';
 import { usePr, type SuggestionRef } from './store';
+
+export { canApply, commentUrl, suggestionCount, suggestionRefs } from './batch';
 
 export const DEFAULT_COMMIT_MESSAGE = 'Apply suggestions from code review';
 
 /** `sessionStorage` key holding the PR's idempotency key. */
 export const applyKeyName = (ref: PrRef): string => `pierre.applySuggestions.key:${prKey(ref)}`;
 
-const memoryKeys = new Map<string, string>(); // when sessionStorage is unavailable
-function storage(): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> {
-  try {
-    if (typeof sessionStorage !== 'undefined') return sessionStorage;
-  } catch {
-    // blocked storage
-  }
-  return {
-    getItem: (k) => memoryKeys.get(k) ?? null,
-    setItem: (k, v) => void memoryKeys.set(k, v),
-    removeItem: (k) => void memoryKeys.delete(k),
-  };
-}
-
 function idempotencyKey(ref: PrRef): string {
   const name = applyKeyName(ref);
-  const store = storage();
+  const store = sessionStore();
   let key = store.getItem(name);
   if (!key) {
     key = crypto.randomUUID();
@@ -50,55 +39,7 @@ function idempotencyKey(ref: PrRef): string {
   return key;
 }
 
-const clearKey = (ref: PrRef) => storage().removeItem(applyKeyName(ref));
-
-/** Fence opener: up to 3 spaces, then ``` or ~~~ (3+), then the info string. */
-const FENCE = /^ {0,3}(`{3,}|~{3,})\s*([^`\s]*)[^`]*$/;
-
-/** Number of ```` ```suggestion ```` blocks in a comment body (fences inside other fences do not count). */
-export function suggestionCount(body: string): number {
-  let count = 0;
-  let open: string | null = null;
-  for (const line of body.split('\n')) {
-    const m = FENCE.exec(line.replace(/\r$/, ''));
-    if (open === null) {
-      if (!m) continue;
-      open = m[1]!;
-      if (m[2]!.toLowerCase() === 'suggestion') count++;
-    } else if (m && m[1]![0] === open[0] && m[1]!.length >= open.length && m[2] === '' && line.trim() === m[1]) {
-      open = null;
-    }
-  }
-  return count;
-}
-
-/**
- * Whether "Commit suggestion" / "Add suggestion to batch" apply to a comment: the viewer may apply suggestions
- * (`canApplySuggestion`, i.e. write access), the comment is published (not pending), its thread is a current
- * (not outdated) line thread on the new side, and the body has a suggestion block.
- */
-export function canApply(pr: Pick<PrData, 'viewer'> | null, thread: ThreadModel, comment: CommentModel): boolean {
-  return (
-    pr?.viewer.canApplySuggestion === true &&
-    comment.state === 'submitted' &&
-    !thread.isOutdated &&
-    thread.subject === 'line' &&
-    thread.side === 'additions' &&
-    suggestionCount(comment.body) > 0
-  );
-}
-
-/** The comment's URL on GitHub (GitHub's own, else the standard `#discussion_r<id>` anchor). */
-export function commentUrl(ref: PrRef, comment: Pick<CommentModel, 'databaseId' | 'url'>): string {
-  return comment.url ?? `https://github.com/${ref.owner}/${ref.repo}/pull/${ref.number}#discussion_r${comment.databaseId}`;
-}
-
-/** The suggestion refs of one comment, one per block (`suggestionIndex` 0, 1, …; GitHub requires it even for one). */
-export function suggestionRefs(ref: PrRef, path: string, comment: CommentModel): SuggestionRef[] {
-  const n = suggestionCount(comment.body);
-  const url = commentUrl(ref, comment);
-  return Array.from({ length: n }, (_, i) => ({ commentId: comment.databaseId, suggestionIndex: i, path, url }));
-}
+const clearKey = (ref: PrRef) => sessionStore().removeItem(applyKeyName(ref));
 
 /** A definite answer from GitHub (it handled the request and refused it): the idempotency key is finished. */
 const definite = (err: unknown) => err instanceof BridgeError && err.status >= 400 && err.status < 500;
@@ -132,7 +73,7 @@ export async function commitSuggestions(refs: readonly SuggestionRef[], message:
       usePr.getState().setHeadMoved(true);
       throw new WriteError(
         'conflict',
-        'The pull request has new commits (head moved). Reload to see them, then commit the suggestions again.',
+        'The pull request has new commits (head moved). Reload the pull request (your batch is kept), then commit again.',
         { owner, status: 409 },
       );
     }

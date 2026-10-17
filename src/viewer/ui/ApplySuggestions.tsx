@@ -9,6 +9,7 @@ import type { CommentModel } from '../github/threads';
 import { errorMessage } from '../state/review';
 import { commitSuggestions, DEFAULT_COMMIT_MESSAGE, suggestionRefs } from '../state/suggestions';
 import { sameSuggestion, usePr, type SuggestionRef } from '../state/store';
+import { reloadPullRequest } from './Notice';
 
 const useCommitDialog = create<{ refs: SuggestionRef[] | null }>(() => ({ refs: null }));
 
@@ -83,6 +84,15 @@ function CommitDialog({ refs }: { refs: SuggestionRef[] }) {
   const [busy, setBusy] = useState(false);
   const [hasTitle, setHasTitle] = useState(true);
   const [error, setError] = useState<{ message: string; url?: string } | null>(null);
+  const headMoved = usePr((s) => s.headMoved);
+  const [reloading, setReloading] = useState(false);
+  const reload = () => {
+    setReloading(true);
+    void reloadPullRequest().finally(() => {
+      setReloading(false);
+      if (!usePr.getState().headMoved) setError(null);
+    });
+  };
   const close = () => useCommitDialog.setState({ refs: null });
   const busyRef = useRef(false);
   busyRef.current = busy;
@@ -140,6 +150,14 @@ function CommitDialog({ refs }: { refs: SuggestionRef[] }) {
         {error && (
           <p className="modal-error" role="alert">
             {error.message}
+            {headMoved && (
+              <>
+                {' '}
+                <button type="button" className="fh-link" onClick={reload} disabled={reloading}>
+                  {reloading ? 'Reloading…' : 'Reload pull request'}
+                </button>
+              </>
+            )}
             {error.url && (
               <>
                 {' '}
@@ -154,7 +172,7 @@ function CommitDialog({ refs }: { refs: SuggestionRef[] }) {
           <button type="button" className="btn" onClick={close} disabled={busy}>
             Cancel
           </button>
-          <button type="submit" className="btn-primary" disabled={busy || !hasTitle}>
+          <button type="submit" className="btn-primary" disabled={busy || !hasTitle || headMoved}>
             {busy ? 'Committing…' : 'Commit changes'}
           </button>
         </div>

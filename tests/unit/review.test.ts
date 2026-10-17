@@ -23,6 +23,8 @@ import { ItemSync, type PierreItem } from '../../src/viewer/state/items';
 import { discardReview, mergeThreads, resetReviewCaches, setFileViewed, submitNewComment, submitReview } from '../../src/viewer/state/review';
 import { session } from '../../src/viewer/state/session';
 import { createPrStore, draftKey, isCollapsed, usePr } from '../../src/viewer/state/store';
+import { batchKeyName, initBatchPersistence } from '../../src/viewer/state/batch';
+import { reloadPr } from '../../src/viewer/state/load';
 import { applyKeyName, commitSuggestions, suggestionCount } from '../../src/viewer/state/suggestions';
 
 const file = (path: string): FileSummary => ({
@@ -462,6 +464,110 @@ describe('review submission, viewed, apply suggestion (global store)', () => {
       await expect(commitSuggestions([ref(7)], 'm')).rejects.toThrow(/Suggestion is outdated/);
       expect(usePr.getState().headMoved).toBe(false);
       expect(usePr.getState().suggestionBatch).toHaveLength(1);
+    });
+
+    /** GitHub's route JSON for `o/r#1` at `head`, with suggestion comments 7 (R4) and 8 (R6, outdated later) on a.ts. */
+    function routeAt(head: string, comments: { id: number; marker: string }[]) {
+      const thread = (c: { id: number }) => ({
+        id: String(c.id * 10),
+        subjectType: 'LINE',
+        isResolved: false,
+        viewerCanReply: true,
+        commentsData: {
+          comments: [
+            { id: `PRRC_${c.id}`, databaseId: c.id, author: { login: 'octo', avatarUrl: '' }, body: '```suggestion\nx\n```', bodyHTML: '', bodyVersion: 'v', createdAt: '2026-10-17T00:00:00Z', state: 'submitted' },
+          ],
+        },
+      });
+      return {
+        payload: {
+          pullRequestsChangesRoute: {
+            pullRequest: { globalRelayId: 'PR_node', author: { login: 'me' } },
+            comparison: { fullDiff: { baseOid: 'b'.repeat(40), headOid: head } },
+            user: { currentUserLogin: 'me', canApplySuggestion: true, canComment: true },
+            diffSummaries: [
+              {
+                path: 'a.ts',
+                pathDigest: 'd',
+                changeType: 'MODIFIED',
+                linesAdded: 1,
+                linesDeleted: 0,
+                markedAsViewed: false,
+                markersMap: Object.fromEntries(comments.map((c) => [c.marker, { threads: [{ id: String(c.id * 10) }] }])),
+              },
+            ],
+            markers: { threads: Object.fromEntries(comments.map((c) => [String(c.id * 10), thread(c)])) },
+          },
+        },
+      };
+    }
+
+    it('head moved → "Reload" (soft, loadPr) keeps the batch, drops refs that no longer apply, and the commit sends the new head', async () => {
+      const NEW = 'e'.repeat(40);
+      let head = HEAD;
+      let applied = 0;
+      const calls = fakeRpc(async (method, path) => {
+        if (method === 'applySuggestions') {
+          if (applied++ === 0) throw new BridgeError({ status: 409, code: 'HEAD_OID_MISMATCH', message: 'HTTP 409' });
+          return {};
+        }
+        if (method === 'get' && String(path).endsWith('/changes')) return { data: routeAt(head, [{ id: 7, marker: 'R4' }]), link: null };
+        if (method === 'get' && String(path).endsWith('/page_data/threads')) return { data: { threads: [] }, link: null };
+        if (method === 'get') return { data: [], link: null };
+        throw new Error(`unexpected ${method}`);
+      });
+      // 8's comment is gone after the reload (its suggestion was applied / deleted elsewhere).
+      usePr.getState().addToBatch(ref(7));
+      usePr.getState().addToBatch(ref(8));
+      await expect(commitSuggestions(usePr.getState().suggestionBatch, 'm')).rejects.toThrow(/head moved/i);
+      expect(usePr.getState().headMoved).toBe(true);
+
+      head = NEW; // the PR has a new commit
+      await reloadPr();
+      const s = usePr.getState();
+      expect(s.headMoved).toBe(false);
+      expect(s.pr!.headOid).toBe(NEW);
+      expect(s.suggestionBatch.map((r) => r.commentId)).toEqual([7]); // kept; 8 no longer applies
+      await commitSuggestions(s.suggestionBatch, 'm');
+      const applies = calls.filter((c) => c[0] === 'applySuggestions');
+      expect((applies[0]![1] as { expectedHeadOid: string }).expectedHeadOid).toBe(HEAD);
+      expect((applies[1]![1] as { expectedHeadOid: string }).expectedHeadOid).toBe(NEW);
+    });
+
+    it('persists the batch per PR in sessionStorage and restores it in a fresh viewer (page reload)', () => {
+      const first = createPrStore();
+      const stop = initBatchPersistence(first);
+      first.getState().setPr(livePr);
+      first.getState().addToBatch(ref(7));
+      first.getState().addToBatch(ref(9, 1));
+      stop();
+      expect(JSON.parse(sessionStorage.getItem(batchKeyName(livePr.ref))!)).toHaveLength(2);
+
+      const second = createPrStore(); // the reloaded viewer
+      const stop2 = initBatchPersistence(second);
+      second.getState().setPr(livePr);
+      expect(second.getState().suggestionBatch).toEqual([ref(7), ref(9, 1)]);
+      second.getState().removeFromBatch([ref(7)]);
+      expect(JSON.parse(sessionStorage.getItem(batchKeyName(livePr.ref))!)).toEqual([ref(9, 1)]);
+      stop2();
+    });
+
+    it('ignores a malformed or foreign stored batch', () => {
+      sessionStorage.setItem(
+        batchKeyName(livePr.ref),
+        JSON.stringify([ref(7), { commentId: 'x' }, { ...ref(8), url: 'javascript:alert(1)' }, { ...ref(9), suggestionIndex: -1 }]),
+      );
+      const store = createPrStore();
+      const stop = initBatchPersistence(store);
+      store.getState().setPr(livePr);
+      expect(store.getState().suggestionBatch).toEqual([ref(7)]);
+      stop();
+      sessionStorage.setItem(batchKeyName(livePr.ref), '{not json');
+      const other = createPrStore();
+      const stop2 = initBatchPersistence(other);
+      other.getState().setPr(livePr);
+      expect(other.getState().suggestionBatch).toEqual([]);
+      stop2();
     });
 
     it('counts suggestion blocks in a comment body (fenced ```suggestion, not inside other fences)', () => {

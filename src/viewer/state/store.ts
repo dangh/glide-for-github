@@ -132,6 +132,7 @@ export interface PrState {
   setHeadMoved(moved: boolean): void;
   addToBatch(ref: SuggestionRef): void;
   removeFromBatch(refs: readonly Pick<SuggestionRef, 'commentId' | 'suggestionIndex'>[]): void;
+  setBatch(refs: SuggestionRef[]): void;
   setNotice(notice: Notice | null): void;
 }
 
@@ -267,6 +268,7 @@ export const createPrStore = () =>
     setPendingReview: (pendingReview) => set({ pendingReview }),
     setHeadMoved: (headMoved) => set((s) => (s.headMoved === headMoved ? s : { headMoved })),
     addToBatch: (ref) => set((s) => (s.suggestionBatch.some((r) => sameSuggestion(r, ref)) ? s : { suggestionBatch: [...s.suggestionBatch, ref] })),
+    setBatch: (suggestionBatch) => set({ suggestionBatch }),
     removeFromBatch: (refs) =>
       set((s) => {
         const next = s.suggestionBatch.filter((r) => !refs.some((x) => sameSuggestion(r, x)));

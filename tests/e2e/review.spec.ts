@@ -576,13 +576,20 @@ function ghFileAt(sha: string, path: string): string[] {
   return Buffer.from(f!.content, 'base64').toString('utf8').split('\n');
 }
 
-/** Force-pushes the sandbox branch back to `sha` from a throwaway /tmp clone (sandbox only). */
-function restoreBranch(sha: string) {
+/**
+ * Moves the sandbox branch back to `sha` from a throwaway /tmp clone, ONLY on dangh/pierre-sandbox `review-me`, and only
+ * if the branch is still at `observed` (`--force-with-lease`): a push that landed meanwhile is never overwritten.
+ */
+function restoreBranch(sha: string, observed: string) {
+  if (SANDBOX.owner !== 'dangh' || SANDBOX.repo !== 'pierre-sandbox' || BRANCH !== 'review-me') {
+    throw new Error(`refusing to force-push outside dangh/pierre-sandbox review-me (${SANDBOX.owner}/${SANDBOX.repo} ${BRANCH})`);
+  }
   expect(sha).toMatch(/^[0-9a-f]{40}$/);
+  expect(observed).toMatch(/^[0-9a-f]{40}$/);
   const dir = mkdtempSync(join(tmpdir(), 'pierre-sandbox-'));
   try {
-    execFileSync('git', ['clone', '-q', '--no-checkout', `https://github.com/${SANDBOX.owner}/${SANDBOX.repo}`, dir], { stdio: 'pipe' });
-    execFileSync('git', ['-C', dir, 'push', '-q', '--force', 'origin', `${sha}:refs/heads/${BRANCH}`], { stdio: 'pipe' });
+    execFileSync('git', ['clone', '-q', '--no-checkout', 'https://github.com/dangh/pierre-sandbox', dir], { stdio: 'pipe' });
+    execFileSync('git', ['-C', dir, 'push', '-q', `--force-with-lease=refs/heads/review-me:${observed}`, 'origin', `${sha}:refs/heads/review-me`], { stdio: 'pipe' });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -962,7 +969,8 @@ test.describe('apply suggestion (Task 10)', () => {
       });
     } finally {
       await cleanup(page, viewer.frame());
-      if (ghHead() !== before) restoreBranch(before);
+      const observed = ghHead();
+      if (observed !== before) restoreBranch(before, observed);
       await expect.poll(() => ghHead(), { timeout: 30_000 }).toBe(before);
       console.log(`[e2e] ${BRANCH} restored to: ${ghHead()}`);
     }

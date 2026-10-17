@@ -5,22 +5,41 @@
 import type { PrRef } from '../../shared/pr-url';
 import { fetchPrData, fetchThreads, type Rpc } from '../github/private';
 import { toThreadModels } from '../github/threads';
+import { pruneBatch } from './batch';
 import { initPendingReview, resetReviewCaches } from './review';
+import { session } from './session';
 import { usePr } from './store';
 
 /**
- * Fetches the PR and puts it in the store (diffs reload, viewed state and pending review come fresh from GitHub).
- * `isCurrent` lets a caller drop a result that arrives after it moved on. Thread failures are not fatal.
+ * Fetches the PR and puts it in the store (diffs reload, viewed state and pending review come fresh from GitHub;
+ * `headMoved` resets; drafts and the suggestion batch stay). `isCurrent` lets a caller drop a result that arrives
+ * after it moved on. Resolves once the PR data is set, with `threads`: settles when the threads are in (then the
+ * batch is pruned of refs that no longer apply). Thread failures are not fatal.
  */
-export async function loadPr(rpc: Rpc, ref: PrRef, isCurrent: () => boolean = () => true): Promise<void> {
+export async function loadPr(rpc: Rpc, ref: PrRef, isCurrent: () => boolean = () => true): Promise<{ threads: Promise<void> }> {
   const data = await fetchPrData(rpc, ref);
-  if (!isCurrent()) return;
+  if (!isCurrent()) return { threads: Promise.resolve() };
   resetReviewCaches();
   usePr.getState().setPr(data);
   void initPendingReview(data);
-  fetchThreads(rpc, ref, { markers: data.threadMarkers })
+  const threads = fetchThreads(rpc, ref, { markers: data.threadMarkers })
     .then((raw) => {
-      if (isCurrent() && usePr.getState().pr === data) usePr.getState().setThreads(toThreadModels(raw));
+      if (!isCurrent() || usePr.getState().pr !== data) return;
+      usePr.getState().setThreads(toThreadModels(raw));
+      pruneBatch();
     })
     .catch((err: unknown) => console.warn('[pierre] threads', err));
+  return { threads };
+}
+
+/**
+ * Soft reload of the current PR (the "This pull request was updated" banner, and after a head move): new PR data and
+ * threads without reloading the page, so the suggestion batch, drafts and open composers are kept.
+ */
+export async function reloadPr(): Promise<void> {
+  const pr = usePr.getState().pr;
+  const rpc = session.rpc;
+  if (!pr || !rpc) return;
+  const { threads } = await loadPr(rpc, pr.ref, () => usePr.getState().pr?.ref === pr.ref);
+  await threads;
 }
