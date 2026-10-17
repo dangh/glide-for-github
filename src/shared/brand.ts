@@ -6,11 +6,11 @@
  */
 export const BRAND = {
   /** Full product name, as in the Chrome Web Store, the manifest and page titles. */
-  name: 'Pierre for GitHub',
-  /** Short name used in prose and on the PR tab ("Pierre needs a GitHub token"). */
-  short: 'Pierre',
+  name: 'Glide for GitHub',
+  /** Short name used in prose and on the PR tab ("Glide needs a GitHub token"). */
+  short: 'Glide',
   /** File-name form of the name (zip file). */
-  slug: 'pierre-for-github',
-  /** Manifest description. */
-  description: 'Adds a Pierre tab to GitHub pull requests and renders the PR with @pierre/diffs and @pierre/trees.',
+  slug: 'glide-for-github',
+  /** Manifest description (Chrome Web Store limit: 132 characters). */
+  description: 'Adds a Glide tab to GitHub pull requests: fast diffs, a file tree and review tools, powered by Pierre (@pierre/diffs).',
 } as const;

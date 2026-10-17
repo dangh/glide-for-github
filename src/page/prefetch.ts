@@ -1,9 +1,9 @@
 /**
- * Route prefetch (Task 12, performance). Opening `…/pull/N#pierre` used to request GitHub's route JSON
+ * Route prefetch (Task 12, performance). Opening `…/pull/N#glide` used to request GitHub's route JSON
  * (`GET /o/r/pull/N/changes`, ~1 s server time on large PRs) only once the viewer iframe had booted, i.e. after
  * GitHub's page load, and once more when GitHub's React app re-rendered the layout and the iframe was remounted.
  *
- * The bridge now starts at document_start and, on a `#pierre` PR URL, issues that request as soon as the page's
+ * The bridge now starts at document_start and, on a `#glide` PR URL, issues that request as soon as the page's
  * `<head>` is in (the request needs GitHub's meta tags), in parallel with GitHub's own page load. The viewer's
  * first load (`get(<that path>, {}, {dataRouter: true, prefetched: true})`, which only the viewer's initial
  * `loadPr` sends) is answered from it while it is fresh:
@@ -20,7 +20,7 @@
  * the query pins `range` to commit oids, so the answer cannot change) share one request while in flight and for
  * `ttlMs` after it succeeded. Failures are not shared.
  */
-import { isPierreActive, parsePrUrl } from '../shared/pr-url';
+import { isGlideActive, parsePrUrl } from '../shared/pr-url';
 import type { BridgeMethods, RpcImpl } from '../shared/rpc';
 
 export const PREFETCH_TTL_MS = 10_000;
@@ -28,10 +28,10 @@ export const PREFETCH_TTL_MS = 10_000;
 /** Bridge methods that only read: everything else may change the PR and drops the prefetched route. */
 const READS: ReadonlySet<keyof BridgeMethods> = new Set<keyof BridgeMethods>(['get', 'getText', 'preview']);
 
-/** The route path to prefetch for `url`, or null when the URL is not a PR page showing Pierre. */
+/** The route path to prefetch for `url`, or null when the URL is not a PR page showing Glide. */
 export function prefetchPath(url: string): string | null {
   const ref = parsePrUrl(url);
-  if (!ref || !isPierreActive(url)) return null;
+  if (!ref || !isGlideActive(url)) return null;
   return `/${ref.owner}/${ref.repo}/pull/${ref.number}/changes`;
 }
 

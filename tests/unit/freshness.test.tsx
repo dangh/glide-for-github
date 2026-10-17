@@ -546,7 +546,7 @@ describe('port timeout', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it('reports "Reload the page to use Pierre" when no port arrives within 5 s', async () => {
+  it('reports "Reload the page to use Glide" when no port arrives within 5 s', async () => {
     const onTimeout = vi.fn();
     watchPort(new Promise(() => undefined), onTimeout);
     expect(PORT_TIMEOUT_MS).toBe(5000);
@@ -554,7 +554,7 @@ describe('port timeout', () => {
     expect(onTimeout).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(onTimeout).toHaveBeenCalledWith(PORT_TIMEOUT_MESSAGE);
-    expect(PORT_TIMEOUT_MESSAGE).toMatch(/^Reload the page to use Pierre/);
+    expect(PORT_TIMEOUT_MESSAGE).toMatch(/^Reload the page to use Glide/);
   });
 
   it('stays quiet when the port arrives in time', async () => {

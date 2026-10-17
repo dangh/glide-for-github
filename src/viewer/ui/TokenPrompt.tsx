@@ -1,5 +1,5 @@
 /**
- * "Connect Pierre to GitHub" modal: asks for a personal access token for one repo owner, validates it with
+ * "Connect Glide to GitHub" modal: asks for a personal access token for one repo owner, validates it with
  * `GET /user` (api.github.com only), saves it and hands back a `GithubApi`. Opened through `requireToken`;
  * `TokenPromptHost` (mounted once in App) renders the first queued request.
  *

@@ -3,7 +3,7 @@
  * (898 files). Run with `npm run perf` (headed on DISPLAY, like the other e2e suites; not part of `npm run e2e`).
  *
  * Per run (a fresh tab, `PIERRE_PERF_RUNS` runs per PR, default 3):
- * 1. Load: navigate to `…/pull/N#pierre`; times are measured from the GitHub document's navigation start
+ * 1. Load: navigate to `…/pull/N#glide`; times are measured from the GitHub document's navigation start
  *    (`performance.timeOrigin`) to (a) the first frame with a rendered diff line in the viewer, (b) the first frame in
  *    which every file has a result in the store (lazy line loads of collapsed / too-large files excluded). Watched
  *    with a requestAnimationFrame loop inside the viewer frame (frame-accurate, no poll granularity); epoch times
@@ -78,7 +78,7 @@ async function measureLoad(page: Page, pr: PrId): Promise<LoadResult> {
     const t = req.timing();
     routeRequests.push(req.sizes().then((s) => ({ startEpoch: t.startTime, endEpoch: t.startTime + t.responseEnd, bytes: s.responseBodySize })));
   });
-  await page.goto(prUrl(pr, '#pierre'), { waitUntil: 'commit' });
+  await page.goto(prUrl(pr, '#glide'), { waitUntil: 'commit' });
   const navStart = await page.evaluate(() => performance.timeOrigin);
 
   const deadline = Date.now() + 120_000;

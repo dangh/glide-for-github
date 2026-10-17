@@ -96,7 +96,7 @@ export class Viewer {
 
   frame(): Frame {
     const frame = this.page.frames().find((f) => f.url().startsWith('chrome-extension://') && f.url().includes('/viewer.html'));
-    if (!frame) throw new Error('Pierre viewer frame not found');
+    if (!frame) throw new Error('Glide viewer frame not found');
     return frame;
   }
 
@@ -115,7 +115,7 @@ export class Viewer {
       await this.page.waitForTimeout(1500);
       if (!frame.isDetached() && this.frame() === frame) return;
     }
-    throw new Error('Pierre viewer frame did not settle');
+    throw new Error('Glide viewer frame did not settle');
   }
 
   order(): Promise<string[]> {
@@ -187,21 +187,21 @@ export class Viewer {
   }
 }
 
-/** Opens a PR page and switches to the Pierre tab by clicking it (or with `#pierre`). */
+/** Opens a PR page and switches to the Glide tab by clicking it (or with `#glide`). */
 export async function openPierre(page: Page, pr: PrId, how: 'click' | 'hash' = 'click'): Promise<Viewer> {
   if (how === 'hash') {
     // Already there: `goto` would be a same-document hash navigation (no reload), so reload to get fresh data.
-    if (page.url() === prUrl(pr, '#pierre')) await page.reload({ waitUntil: 'domcontentloaded' });
-    else await page.goto(prUrl(pr, '#pierre'), { waitUntil: 'domcontentloaded' });
+    if (page.url() === prUrl(pr, '#glide')) await page.reload({ waitUntil: 'domcontentloaded' });
+    else await page.goto(prUrl(pr, '#glide'), { waitUntil: 'domcontentloaded' });
   } else {
     await page.goto(prUrl(pr), { waitUntil: 'load' });
     const tab = page.locator('a[data-pierre-tab]');
     await expect(tab).toBeVisible({ timeout: 30_000 });
     // A click while GitHub is still hydrating its tab strip can be lost (the strip is re-rendered and the
-    // tab re-injected), so click until the URL switches to #pierre.
+    // tab re-injected), so click until the URL switches to #glide.
     await expect(async () => {
-      if (!page.url().endsWith('#pierre')) await tab.click({ timeout: 5_000 });
-      expect(page.url()).toMatch(/#pierre$/);
+      if (!page.url().endsWith('#glide')) await tab.click({ timeout: 5_000 });
+      expect(page.url()).toMatch(/#glide$/);
     }).toPass({ timeout: 30_000, intervals: [1_000, 2_000] });
   }
   const viewer = new Viewer(page);

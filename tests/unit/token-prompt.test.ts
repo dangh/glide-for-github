@@ -81,11 +81,11 @@ describe('requireToken', () => {
     const d = dialog()!;
     expect(d).not.toBeNull();
     expect(d.getAttribute('aria-modal')).toBe('true');
-    expect(d.querySelector('h2')!.textContent).toBe('Connect Pierre to GitHub');
-    expect(d.textContent).toContain('To comment on dangh/pierre-sandbox, Pierre needs a GitHub token for dangh.');
+    expect(d.querySelector('h2')!.textContent).toBe('Connect Glide to GitHub');
+    expect(d.textContent).toContain('To comment on dangh/pierre-sandbox, Glide needs a GitHub token for dangh.');
     const hrefs = [...d.querySelectorAll('a')].map((a) => a.getAttribute('href')!);
     expect(hrefs.some((h) => h.startsWith('https://github.com/settings/personal-access-tokens/new'))).toBe(true);
-    expect(hrefs).toContain('https://github.com/settings/tokens/new?scopes=repo&description=Pierre%20for%20GitHub');
+    expect(hrefs).toContain('https://github.com/settings/tokens/new?scopes=repo&description=Glide%20for%20GitHub');
     const fine = new URL(hrefs.find((h) => h.includes('personal-access-tokens'))!);
     expect(fine.searchParams.get('pull_requests')).toBe('write');
     expect(fine.searchParams.get('contents')).toBe('read');

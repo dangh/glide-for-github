@@ -19,7 +19,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PROFILE = join(ROOT, '.e2e-profile');
 const DIST = join(ROOT, 'dist');
 const SANDBOX = JSON.parse(readFileSync(join(ROOT, 'tests/sandbox.json'), 'utf8'));
-const URL = `https://github.com/${SANDBOX.owner}/${SANDBOX.repo}/pull/${SANDBOX.number}#pierre`;
+const URL = `https://github.com/${SANDBOX.owner}/${SANDBOX.repo}/pull/${SANDBOX.number}#glide`;
 const KEY = 'pierre.tokens';
 const TIMEOUT_MS = 10 * 60_000;
 
@@ -78,7 +78,7 @@ async function main() {
     const deadline = Date.now() + TIMEOUT_MS;
     while (!viewerFrame(page) && Date.now() < deadline) await page.waitForTimeout(500);
     const frame = viewerFrame(page);
-    if (!frame) throw new Error('Pierre viewer did not open');
+    if (!frame) throw new Error('Glide viewer did not open');
     await frame.waitForSelector('.fh', { timeout: 60_000 });
 
     if (await tokenStored(page)) {

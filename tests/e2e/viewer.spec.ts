@@ -22,18 +22,18 @@ async function resetSettings(viewer: Viewer) {
 }
 
 test.describe('sandbox PR', () => {
-  test('Pierre tab is visible right after Files changed', async ({ page }) => {
+  test('Glide tab is visible right after Files changed', async ({ page }) => {
     await page.goto(prUrl(SANDBOX), { waitUntil: 'domcontentloaded' });
     const tab = page.locator('a[data-pierre-tab]');
     await expect(tab).toBeVisible({ timeout: 30_000 });
-    await expect(tab).toHaveText(/Pierre/);
+    await expect(tab).toHaveText(/Glide/);
     const previous = await tab.evaluate((el) => el.previousElementSibling?.textContent ?? '');
     expect(previous).toMatch(/Files changed/);
   });
 
   test('clicking it shows the tree with all files', async ({ page }) => {
     const viewer = await openPierre(page, SANDBOX, 'click');
-    expect(page.url()).toMatch(/#pierre$/);
+    expect(page.url()).toMatch(/#glide$/);
     const order = await viewer.order();
     expect(order).toHaveLength(20);
 
@@ -223,15 +223,15 @@ test.describe('sandbox PR', () => {
 });
 
 test.describe('react/react#37778 (read-only)', () => {
-  test('one early click on the Pierre tab opens Pierre while GitHub is still loading', async ({ page }) => {
+  test('one early click on the Glide tab opens Glide while GitHub is still loading', async ({ page }) => {
     // GitHub re-renders its tab strip during load, re-injecting our tab between pointerdown and pointerup; a single
-    // press as soon as the tab exists must still open Pierre (no retry).
+    // press as soon as the tab exists must still open Glide (no retry).
     await page.goto(prUrl(REACT), { waitUntil: 'commit' });
     const tab = page.locator('a[data-pierre-tab]');
     await tab.waitFor({ timeout: 30_000 });
     const box = (await tab.boundingBox())!;
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await expect.poll(() => page.url(), { timeout: 10_000 }).toMatch(/#pierre$/);
+    await expect.poll(() => page.url(), { timeout: 10_000 }).toMatch(/#glide$/);
     await new Viewer(page).ready();
   });
 

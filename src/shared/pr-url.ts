@@ -7,7 +7,9 @@ export interface PrRef {
   page: PrPage;
 }
 
-const PIERRE_HASH = '#pierre';
+const GLIDE_HASH = '#glide';
+/** Hash of links made before the rename to Glide; still opens the viewer. */
+const LEGACY_HASH = '#pierre';
 const POSITIVE_INT = /^[1-9]\d*$/;
 
 /**
@@ -51,18 +53,19 @@ function pageFor(rest: string[]): PrPage | null {
   return null;
 }
 
-/** True when the URL's hash is exactly `#pierre`. */
-export function isPierreActive(url: string): boolean {
+/** True when the URL's hash is exactly `#glide` (or its old name `#pierre`). */
+export function isGlideActive(url: string): boolean {
   try {
-    return new URL(url).hash === PIERRE_HASH;
+    const { hash } = new URL(url);
+    return hash === GLIDE_HASH || hash === LEGACY_HASH;
   } catch {
     return false;
   }
 }
 
-/** Base PR URL on the Conversation page, the lightest page to load, with the Pierre hash. */
-export function pierreUrl(ref: PrRef): string {
-  return `https://github.com/${ref.owner}/${ref.repo}/pull/${ref.number}${PIERRE_HASH}`;
+/** Base PR URL on the Conversation page, the lightest page to load, with the Glide hash. */
+export function glideUrl(ref: PrRef): string {
+  return `https://github.com/${ref.owner}/${ref.repo}/pull/${ref.number}${GLIDE_HASH}`;
 }
 
 /** Stable identifier for a PR, independent of page: `owner/repo#n`. */

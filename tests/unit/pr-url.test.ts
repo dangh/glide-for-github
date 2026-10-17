@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isPierreActive, parsePrUrl, pierreUrl, prKey } from '../../src/shared/pr-url';
+import { glideUrl, isGlideActive, parsePrUrl, prKey } from '../../src/shared/pr-url';
 
 describe('parsePrUrl', () => {
   it('maps the base PR URL to the conversation page', () => {
@@ -44,7 +44,7 @@ describe('parsePrUrl', () => {
 
   it('ignores query strings and hashes', () => {
     expect(parsePrUrl('https://github.com/o/r/pull/12/files?w=1#diff-abc')?.page).toBe('files');
-    expect(parsePrUrl('https://github.com/o/r/pull/12?tab=x#pierre')).toEqual({
+    expect(parsePrUrl('https://github.com/o/r/pull/12?tab=x#glide')).toEqual({
       owner: 'o',
       repo: 'r',
       number: 12,
@@ -71,25 +71,31 @@ describe('parsePrUrl', () => {
   });
 });
 
-describe('isPierreActive', () => {
-  it('is true only when the hash is exactly #pierre', () => {
-    expect(isPierreActive('https://github.com/o/r/pull/1#pierre')).toBe(true);
-    expect(isPierreActive('https://github.com/o/r/pull/1#pierre-x')).toBe(false);
-    expect(isPierreActive('https://github.com/o/r/pull/1#pierre/')).toBe(false);
-    expect(isPierreActive('https://github.com/o/r/pull/1')).toBe(false);
-    expect(isPierreActive('https://github.com/o/r/pull/1#')).toBe(false);
+describe('isGlideActive', () => {
+  it('is true only when the hash is exactly #glide', () => {
+    expect(isGlideActive('https://github.com/o/r/pull/1#glide')).toBe(true);
+    expect(isGlideActive('https://github.com/o/r/pull/1#glide-x')).toBe(false);
+    expect(isGlideActive('https://github.com/o/r/pull/1#glide/')).toBe(false);
+    expect(isGlideActive('https://github.com/o/r/pull/1')).toBe(false);
+    expect(isGlideActive('https://github.com/o/r/pull/1#')).toBe(false);
+  });
+
+  it('still accepts #pierre, the hash of links made before the rename', () => {
+    expect(isGlideActive('https://github.com/o/r/pull/1#pierre')).toBe(true);
+    expect(isGlideActive('https://github.com/o/r/pull/1/files#pierre')).toBe(true);
+    expect(isGlideActive('https://github.com/o/r/pull/1#pierre-x')).toBe(false);
+    expect(isGlideActive('https://github.com/o/r/pull/1#pierre/')).toBe(false);
   });
 
   it('is false for strings that are not URLs', () => {
-    expect(isPierreActive('#pierre')).toBe(false);
+    expect(isGlideActive('#glide')).toBe(false);
+    expect(isGlideActive('#pierre')).toBe(false);
   });
 });
 
-describe('pierreUrl', () => {
-  it('builds the base PR URL with the #pierre hash', () => {
-    expect(pierreUrl({ owner: 'o', repo: 'r', number: 12, page: 'files' })).toBe(
-      'https://github.com/o/r/pull/12#pierre',
-    );
+describe('glideUrl', () => {
+  it('builds the base PR URL with the #glide hash', () => {
+    expect(glideUrl({ owner: 'o', repo: 'r', number: 12, page: 'files' })).toBe('https://github.com/o/r/pull/12#glide');
   });
 });
 

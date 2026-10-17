@@ -1,4 +1,4 @@
-import { isPierreActive, parsePrUrl, prKey } from '../shared/pr-url';
+import { isGlideActive, parsePrUrl, prKey } from '../shared/pr-url';
 import { findContentAnchor, mountViewer, type ViewerHost } from './host';
 import { injectTab, removeTab, setTabActive } from './tab';
 
@@ -41,7 +41,7 @@ export function createLifecycle(win: Window & typeof globalThis = window): Lifec
     // The strip may not be rendered yet (or is mid re-render); the observer will call us again.
     const tab = injectTab(doc, ref);
 
-    if (!isPierreActive(href)) {
+    if (!isGlideActive(href)) {
       unmountViewer();
       setTabActive(doc, false);
       return;
@@ -69,8 +69,8 @@ export function createLifecycle(win: Window & typeof globalThis = window): Lifec
     return !!here && !!there && prKey(here) === prKey(there);
   };
   function activate(): void {
-    if (!isPierreActive(win.location.href)) {
-      win.history.pushState(win.history.state, '', win.location.pathname + win.location.search + '#pierre');
+    if (!isGlideActive(win.location.href)) {
+      win.history.pushState(win.history.state, '', win.location.pathname + win.location.search + '#glide');
     }
     sync();
   }
@@ -79,7 +79,7 @@ export function createLifecycle(win: Window & typeof globalThis = window): Lifec
    * A press on the tab that may lose its click. While GitHub is still loading it re-renders the tab strip, and the
    * tab is re-injected (a new element) between pointerdown and pointerup: the browser then fires no click on it, so
    * the press was simply lost (Task 7 concern 1; seen in Task 12 as pointerdown on the tab, mousedown on a DIV).
-   * A release inside the rectangle that was pressed, shortly after, opens Pierre unless a click on the tab did.
+   * A release inside the rectangle that was pressed, shortly after, opens Glide unless a click on the tab did.
    */
   const PRESS_MS = 1500;
   let press: { at: number; rect: DOMRect } | null = null;
@@ -108,7 +108,7 @@ export function createLifecycle(win: Window & typeof globalThis = window): Lifec
     }, 0);
   }
 
-  /** Clicking Pierre on any page of the same PR stays on that page and only adds `#pierre`. */
+  /** Clicking Glide on any page of the same PR stays on that page and only adds `#glide`. */
   function onClick(event: MouseEvent): void {
     if (event.defaultPrevented || !plainPress(event)) return;
     const tab = pierreTabOf(event.target);

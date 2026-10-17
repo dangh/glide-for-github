@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { injectTab, setTabActive } from '../../src/content/tab';
 import { mountViewer, setExtensionUrlResolver } from '../../src/content/host';
 import { createLifecycle } from '../../src/content/lifecycle';
-import { pierreUrl, type PrRef } from '../../src/shared/pr-url';
+import { glideUrl, type PrRef } from '../../src/shared/pr-url';
 
 const ref: PrRef = { owner: 'dangh', repo: 'pierre-sandbox', number: 1, page: 'changes' };
 const EXT = 'chrome-extension://abcdefghijklmnop/';
@@ -52,13 +52,13 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
   });
 
   describe('injectTab', () => {
-    it('inserts the Pierre tab directly after Files changed', () => {
+    it('inserts the Glide tab directly after Files changed', () => {
       const tab = injectTab(document, ref);
       const files = document.querySelector(filesTab)!;
       expect(tab).not.toBeNull();
       expect(files.nextElementSibling).toBe(tab);
-      expect(tab!.textContent).toContain('Pierre');
-      expect(tab!.getAttribute('href')).toBe(pierreUrl(ref));
+      expect(tab!.textContent).toContain('Glide');
+      expect(tab!.getAttribute('href')).toBe(glideUrl(ref));
       expect(tab!.hasAttribute('data-pierre-tab')).toBe(true);
     });
 
@@ -92,7 +92,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
   });
 
   describe('setTabActive', () => {
-    it('moves the selected styling to Pierre and restores it exactly', () => {
+    it('moves the selected styling to Glide and restores it exactly', () => {
       const tab = injectTab(document, ref)!;
       const files = document.querySelector(filesTab)!;
       expect(files.getAttribute('aria-current')).toBe('page');
@@ -112,7 +112,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
       expect(bodyWithoutPierre()).toBe(original);
     });
 
-    it('does not re-select a tab GitHub already moved away from while Pierre was active', () => {
+    it('does not re-select a tab GitHub already moved away from while Glide was active', () => {
       const tab = injectTab(document, ref)!;
       const files = document.querySelector(filesTab)!;
       const other = [...files.parentElement!.children].find((c) => c !== files && c !== tab)! as HTMLElement;
@@ -262,7 +262,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
   });
 
   describe('lifecycle', () => {
-    it('does nothing visible to the page while Pierre is inactive, except adding the tab', () => {
+    it('does nothing visible to the page while Glide is inactive, except adding the tab', () => {
       createLifecycle(window).sync();
       expect(pierreTabs()).toHaveLength(1);
       expect(viewers()).toHaveLength(0);
@@ -272,7 +272,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
     it('mounts on #pierre, selects the tab, and unmounts when the hash goes', () => {
       const life = createLifecycle(window);
       life.sync();
-      go('/dangh/pierre-sandbox/pull/1/changes#pierre');
+      go('/dangh/pierre-sandbox/pull/1/changes#glide');
       life.sync();
       expect(viewers()).toHaveLength(1);
       expect(pierreTabs()[0]!.getAttribute('aria-current')).toBe('page');
@@ -285,9 +285,17 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
       expect(bodyWithoutPierre()).toBe(original);
     });
 
-    it('idempotent across soft-nav', () => {
+    it('still mounts on the old #pierre hash (links made before the rename)', () => {
       const life = createLifecycle(window);
       go('/dangh/pierre-sandbox/pull/1/changes#pierre');
+      life.sync();
+      expect(viewers()).toHaveLength(1);
+      expect(pierreTabs()[0]!.getAttribute('aria-current')).toBe('page');
+    });
+
+    it('idempotent across soft-nav', () => {
+      const life = createLifecycle(window);
+      go('/dangh/pierre-sandbox/pull/1/changes#glide');
       life.sync();
       // GitHub re-renders the tab nav: a fresh node without our tab.
       const nav = document.querySelector('nav')!;
@@ -304,7 +312,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
 
     it('removes the tab and viewer when navigating away from the PR', () => {
       const life = createLifecycle(window);
-      go('/dangh/pierre-sandbox/pull/1/changes#pierre');
+      go('/dangh/pierre-sandbox/pull/1/changes#glide');
       life.sync();
       expect(pierreTabs()).toHaveLength(1);
       go('/dangh/pierre-sandbox/issues/1');
@@ -316,9 +324,9 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
 
     it('remounts when the PR changes', () => {
       const life = createLifecycle(window);
-      go('/dangh/pierre-sandbox/pull/1/changes#pierre');
+      go('/dangh/pierre-sandbox/pull/1/changes#glide');
       life.sync();
-      go('/dangh/pierre-sandbox/pull/2/changes#pierre');
+      go('/dangh/pierre-sandbox/pull/2/changes#glide');
       life.sync();
       expect(viewers()).toHaveLength(1);
       expect(viewers()[0]!.getAttribute('src')).toContain('pr=dangh%2Fpierre-sandbox%232');
@@ -350,7 +358,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
       life.stop();
       expect(ev.defaultPrevented).toBe(true);
       expect(window.location.pathname).toBe('/dangh/pierre-sandbox/pull/1/changes');
-      expect(window.location.hash).toBe('#pierre');
+      expect(window.location.hash).toBe('#glide');
       expect(viewers()).toHaveLength(1);
     });
 
@@ -367,7 +375,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
         return Object.assign(tab, { pressedAt: down.timeStamp });
       };
 
-      it('opens Pierre when the tab was re-injected between pointerdown and pointerup (no click on it)', async () => {
+      it('opens Glide when the tab was re-injected between pointerdown and pointerup (no click on it)', async () => {
         const life = createLifecycle(window);
         life.start();
         const tab = pressTab();
@@ -378,7 +386,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
         document.body.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })); // lands elsewhere
         expect(window.location.hash).toBe('');
         await tick();
-        expect(window.location.hash).toBe('#pierre');
+        expect(window.location.hash).toBe('#glide');
         expect(window.location.pathname).toBe('/dangh/pierre-sandbox/pull/1/changes');
         expect(viewers()).toHaveLength(1);
         life.stop();
@@ -393,7 +401,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
         tab.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
         await tick();
         expect(push).toHaveBeenCalledTimes(1);
-        expect(window.location.hash).toBe('#pierre');
+        expect(window.location.hash).toBe('#glide');
         expect(viewers()).toHaveLength(1);
         life.stop();
       });

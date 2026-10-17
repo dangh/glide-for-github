@@ -2,7 +2,7 @@
 import { createBridgeImpl, startBridge } from './bridge';
 import { createRoutePrefetch, prefetchPath, startWhenHeadReady } from './prefetch';
 
-// On `…/pull/N#pierre`, GitHub's route JSON is requested while GitHub's page is still loading (see prefetch.ts).
+// On `…/pull/N#glide`, GitHub's route JSON is requested while GitHub's page is still loading (see prefetch.ts).
 const path = prefetchPath(location.href);
 if (path) {
   const prefetch = createRoutePrefetch(createBridgeImpl({ doc: document }), path);

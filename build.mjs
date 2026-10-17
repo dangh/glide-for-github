@@ -2,6 +2,7 @@ import { build, transform } from 'esbuild';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { renderNotices } from './scripts/notices.mjs';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const dist = resolve(root, 'dist');
@@ -71,4 +72,6 @@ await Promise.all([
   copyBranded(r('src/options/options.html'), resolve(dist, 'options.html'), htmlText),
   cp(r('src/options/options.css'), resolve(dist, 'options.css')),
   cp(r('icons'), resolve(dist, 'icons'), { recursive: true }),
+  // Licenses of the bundled production dependencies (Pierre's packages are Apache-2.0 and must travel with the zip).
+  writeFile(resolve(dist, 'THIRD_PARTY_NOTICES.txt'), renderNotices(root)),
 ]);

@@ -36,17 +36,21 @@ function setup() {
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe('prefetchPath', () => {
-  it('is the route path of a PR page showing Pierre, on any PR page', () => {
+  it('is the route path of a PR page showing Glide, on any PR page', () => {
+    expect(prefetchPath('https://github.com/react/react/pull/37778#glide')).toBe(ROUTE);
+    expect(prefetchPath('https://github.com/react/react/pull/37778/files#glide')).toBe(ROUTE);
+    expect(prefetchPath('https://github.com/react/react/pull/37778/changes?w=1#glide')).toBe(ROUTE);
+    // #pierre: links made before the rename.
     expect(prefetchPath('https://github.com/react/react/pull/37778#pierre')).toBe(ROUTE);
     expect(prefetchPath('https://github.com/react/react/pull/37778/files#pierre')).toBe(ROUTE);
     expect(prefetchPath('https://github.com/react/react/pull/37778/changes?w=1#pierre')).toBe(ROUTE);
   });
 
-  it('is null without #pierre or off a PR page', () => {
+  it('is null without #glide or off a PR page', () => {
     expect(prefetchPath('https://github.com/react/react/pull/37778')).toBeNull();
     expect(prefetchPath('https://github.com/react/react/pull/37778#discussion')).toBeNull();
-    expect(prefetchPath('https://github.com/react/react/issues/1#pierre')).toBeNull();
-    expect(prefetchPath('https://gist.github.com/react/react/pull/1#pierre')).toBeNull();
+    expect(prefetchPath('https://github.com/react/react/issues/1#glide')).toBeNull();
+    expect(prefetchPath('https://gist.github.com/react/react/pull/1#glide')).toBeNull();
   });
 });
 

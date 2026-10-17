@@ -1,5 +1,5 @@
 import { BRAND } from '../shared/brand';
-import { pierreUrl, type PrRef } from '../shared/pr-url';
+import { glideUrl, type PrRef } from '../shared/pr-url';
 
 /**
  * The PR tab strip. The new React PR UI labels it "Pull request navigation"; the classic
@@ -36,7 +36,7 @@ export function findTabNav(doc: Document): HTMLElement | null {
 function createTab(doc: Document, files: HTMLAnchorElement, ref: PrRef): HTMLAnchorElement {
   const tab = doc.createElement('a');
   tab.className = [...files.classList].filter((c) => !SELECTED_CLASS.test(c)).join(' ');
-  tab.setAttribute('href', pierreUrl(ref));
+  tab.setAttribute('href', glideUrl(ref));
   tab.setAttribute('data-pierre-tab', '');
 
   // Reuse the sibling icon's classes (spacing, muted color, responsive display) with our own glyph.
@@ -61,7 +61,7 @@ function createTab(doc: Document, files: HTMLAnchorElement, ref: PrRef): HTMLAnc
 }
 
 /**
- * Inserts the Pierre tab directly after "Files changed". Idempotent: returns the existing tab
+ * Inserts the Glide tab directly after "Files changed". Idempotent: returns the existing tab
  * (repositioning it if GitHub re-rendered the strip around it). Null if the strip is not rendered.
  */
 export function injectTab(doc: Document, ref: PrRef): HTMLAnchorElement | null {
@@ -74,19 +74,19 @@ export function injectTab(doc: Document, ref: PrRef): HTMLAnchorElement | null {
     tab = null;
   }
   if (!tab) tab = createTab(doc, files, ref);
-  if (tab.getAttribute('href') !== pierreUrl(ref)) tab.setAttribute('href', pierreUrl(ref));
+  if (tab.getAttribute('href') !== glideUrl(ref)) tab.setAttribute('href', glideUrl(ref));
   if (files.nextElementSibling !== tab) files.after(tab);
   return tab;
 }
 
-/** Removes the Pierre tab (restoring GitHub's selected styling first). */
+/** Removes the Glide tab (restoring GitHub's selected styling first). */
 export function removeTab(doc: Document): void {
   setTabActive(doc, false);
   doc.querySelectorAll('a[data-pierre-tab]').forEach((t) => t.remove());
 }
 
 /**
- * Mirrors GitHub's selected-tab styling onto the Pierre tab while active, taking it off the other
+ * Mirrors GitHub's selected-tab styling onto the Glide tab while active, taking it off the other
  * tabs; restores their exact original attributes when inactive. Idempotent.
  */
 export function setTabActive(doc: Document, active: boolean): void {
