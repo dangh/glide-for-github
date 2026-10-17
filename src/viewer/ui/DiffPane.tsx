@@ -13,7 +13,7 @@ import { rangeOids } from '../state/range';
 import { session } from '../state/session';
 import { useSettings } from '../state/settings';
 import { usePr } from '../state/store';
-import { createDiffOptionsBuilder, HEADER_HEIGHT, visibleFiles, type DiffViewOptions } from '../state/view';
+import { createDiffOptionsBuilder, createSettle, HEADER_HEIGHT, visibleFiles, type DiffViewOptions } from '../state/view';
 import { Composer, openComposerAt } from './Composer';
 import { FileHeader } from './FileHeader';
 import { Thread } from './Thread';
@@ -117,6 +117,17 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
   const lastCurrent = useRef<string | undefined>(undefined);
   /** After a programmatic scroll (tree click), the tree keeps the clicked file until scrolling settles. */
   const quietUntil = useRef(0);
+  /** Tree selection follows the diff only once scrolling pauses, off the scroll frames (see `createSettle`). */
+  const treeSync = useMemo(
+    () =>
+      createSettle<string>((path) => {
+        if (path === lastCurrent.current || performance.now() < quietUntil.current) return;
+        lastCurrent.current = path;
+        session.revealInTree?.(path);
+      }),
+    [],
+  );
+  useEffect(() => () => treeSync.cancel(), [treeSync]);
   const onViewport = useCallback(() => {
     if (frame.current) return;
     frame.current = requestAnimationFrame(() => {
@@ -131,12 +142,10 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
         session.viewport = [...ids, ...order.slice(next, next + PRIORITY_AHEAD)];
         session.loader?.prioritize(session.viewport);
       }
-      if (current && current !== lastCurrent.current && performance.now() >= quietUntil.current) {
-        lastCurrent.current = current;
-        session.revealInTree?.(current);
-      }
+      // Every scroll frame restarts the quiet period, so the tree only updates once scrolling pauses.
+      if (current && performance.now() >= quietUntil.current) treeSync.push(current);
     });
-  }, []);
+  }, [treeSync]);
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
   // The first viewport once items exist. (Loader restarts replay `session.viewport` themselves.)
@@ -152,10 +161,11 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
       ? (path: string) => {
           lastCurrent.current = path;
           quietUntil.current = performance.now() + SCROLL_QUIET_MS;
+          treeSync.cancel();
           handle.scrollTo({ type: 'item', id: path, align: 'start' });
         }
       : undefined;
-  }, []);
+  }, [treeSync]);
 
   const renderCustomHeader = useCallback((item: PierreItem) => <FileHeader path={item.id} />, []);
 

@@ -101,3 +101,65 @@ export function decorationFor(state: Pick<PrState, 'files' | 'viewed' | 'threads
   if (parts.length === 0 && titles.length === 0) return null;
   return { text: parts.map((p) => p.text).join(''), title: titles.join(' · '), parts };
 }
+
+/** The diff scroll position is mirrored into the tree only once scrolling has paused this long. */
+export const TREE_SYNC_QUIET_MS = 150;
+
+export interface SettleOptions {
+  quietMs?: number;
+  /** Runs `fn` when the main thread is idle (default `requestIdleCallback`, at most `IDLE_TIMEOUT_MS` later). */
+  idle?: (fn: () => void) => () => void;
+  setTimer?: (fn: () => void, ms: number) => unknown;
+  clearTimer?: (id: unknown) => void;
+}
+
+const IDLE_TIMEOUT_MS = 500;
+const defaultIdle = (fn: () => void): (() => void) => {
+  if (typeof requestIdleCallback === 'function') {
+    const id = requestIdleCallback(() => fn(), { timeout: IDLE_TIMEOUT_MS });
+    return () => cancelIdleCallback(id);
+  }
+  const id = setTimeout(fn, 0);
+  return () => clearTimeout(id);
+};
+
+/**
+ * Calls `run` with the last pushed value once pushes have stopped for `quietMs`, in an idle callback (Task 12).
+ * Used for diff scroll → tree selection: revealing a file in the tree (select, expand folders, scroll the tree) made
+ * the tree re-render and re-lay out inside scroll frames; on microsoft/vscode#151512 it raised the viewer's p99 task
+ * from ~11 ms to ~20 ms while scrolling. The tree now catches up when scrolling pauses.
+ */
+export function createSettle<T>(run: (value: T) => void, options: SettleOptions = {}) {
+  const quietMs = options.quietMs ?? TREE_SYNC_QUIET_MS;
+  const idle = options.idle ?? defaultIdle;
+  const setTimer = options.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
+  const clearTimer = options.clearTimer ?? ((id) => clearTimeout(id as ReturnType<typeof setTimeout>));
+  let timer: unknown;
+  let cancelIdle: (() => void) | undefined;
+  let pending: { value: T } | undefined;
+  const cancel = () => {
+    if (timer !== undefined) clearTimer(timer);
+    timer = undefined;
+    cancelIdle?.();
+    cancelIdle = undefined;
+  };
+  return {
+    push(value: T) {
+      pending = { value };
+      cancel();
+      timer = setTimer(() => {
+        timer = undefined;
+        cancelIdle = idle(() => {
+          cancelIdle = undefined;
+          const p = pending;
+          pending = undefined;
+          if (p) run(p.value);
+        });
+      }, quietMs);
+    },
+    cancel() {
+      pending = undefined;
+      cancel();
+    },
+  };
+}
