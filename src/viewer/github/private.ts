@@ -379,6 +379,17 @@ const rangeOf = (opts: DiffOptions) => opts.range || opts.headOid;
 // Reading
 
 /**
+ * The PR's current head commit: the freshness poll's request (Task 11). The same single route request as
+ * `fetchPrData` (the cheapest source of the head), but nothing is built from it and no diff loading is triggered.
+ */
+export async function fetchHeadOid(rpc: Rpc, ref: PrRef): Promise<string> {
+  const route = await fetchRoute(rpc, ref);
+  const full = route.comparison?.fullDiff ?? route.pullRequest.comparison;
+  if (!full) throw badPayload('route comparison');
+  return full.headOid;
+}
+
+/**
  * PR metadata and file list from the route JSON (`GET /o/r/pull/n/changes`, R§1.1). Field sources, all
  * under `payload.pullRequestsChangesRoute`:
  * - `nodeId`  ← `pullRequest.globalRelayId` ("PR_…")

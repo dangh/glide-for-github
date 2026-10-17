@@ -142,12 +142,17 @@ export const Composer = memo(function Composer({ draftKey, mode, threadKey, comm
       el.setSelectionRange(el.value.length, el.value.length);
     };
     focusers.set(draftKey, focus);
+    // A real reload or navigation may come before the debounce fires: write the text now (the draft is then in
+    // sessionStorage, see state/drafts.ts).
+    const flush = () => saveFrom(el);
+    window.addEventListener('pagehide', flush);
     if (focusOnMount === draftKey) {
       focusOnMount = null;
       focus();
     }
     return () => {
       if (focusers.get(draftKey) === focus) focusers.delete(draftKey);
+      window.removeEventListener('pagehide', flush);
       saveFrom(el); // unmount (virtualized away, file collapsed, slot moved): keep what was typed
     };
   }, [draftKey, saveFrom]);

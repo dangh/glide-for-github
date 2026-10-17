@@ -106,3 +106,27 @@ export function parsePrParam(search: string): PrRef | null {
   const m = /^([^/#\s]+)\/([^/#\s]+)#([1-9]\d*)$/.exec(key);
   return m ? { owner: m[1]!, repo: m[2]!, number: Number(m[3]), page: 'changes' } : null;
 }
+
+/** How long the viewer waits for the content script's port before telling the user to reload the page. */
+export const PORT_TIMEOUT_MS = 5000;
+/** Shown when no port ever arrives: the extension was updated (or reloaded) and this page's content script is gone. */
+export const PORT_TIMEOUT_MESSAGE = 'Reload the page to use Pierre. The extension was updated, so this page can no longer talk to it.';
+
+/**
+ * Calls `onTimeout(PORT_TIMEOUT_MESSAGE)` when `ready` (the first port) has not resolved within `ms`. A port that
+ * arrives later still connects (the caller clears the message by loading the PR). Returns a cancel function.
+ */
+export function watchPort(ready: Promise<unknown>, onTimeout: (message: string) => void, ms = PORT_TIMEOUT_MS): () => void {
+  let settled = false;
+  const timer = setTimeout(() => {
+    if (!settled) onTimeout(PORT_TIMEOUT_MESSAGE);
+  }, ms);
+  void ready.then(() => {
+    settled = true;
+    clearTimeout(timer);
+  });
+  return () => {
+    settled = true;
+    clearTimeout(timer);
+  };
+}

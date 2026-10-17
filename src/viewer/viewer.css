@@ -467,6 +467,12 @@ button {
   max-width: 640px;
 }
 
+.fatal-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .fatal h2 {
   font-size: 16px;
   margin: 0 0 8px;

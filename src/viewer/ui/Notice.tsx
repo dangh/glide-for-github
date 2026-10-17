@@ -45,18 +45,24 @@ export const Notice = memo(function Notice() {
   );
 });
 
-export function FatalError({ message, filesUrl }: { message: string; filesUrl?: string }) {
+/** Full-pane error: what went wrong, GitHub's own Files changed page as the way out, and Try again when it can help. */
+export function FatalError({ message, filesUrl, onRetry }: { message: string; filesUrl?: string; onRetry?: () => void }) {
   return (
     <div className="fatal" role="alert">
       <h2>Pierre could not load this pull request</h2>
       <p>{message}</p>
-      {filesUrl && (
-        <p>
-          <a href={filesUrl} target="_top">
+      <p className="fatal-actions">
+        {onRetry && (
+          <button type="button" className="btn-primary" onClick={onRetry}>
+            Try again
+          </button>
+        )}
+        {filesUrl && (
+          <a className="fh-link" href={filesUrl} target="_top">
             Open Files changed
           </a>
-        </p>
-      )}
+        )}
+      </p>
     </div>
   );
 }

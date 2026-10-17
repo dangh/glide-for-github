@@ -4,15 +4,17 @@
  */
 import { WorkerPoolContext } from '@pierre/diffs/react';
 import { getOrCreateWorkerPoolSingleton, type WorkerPoolManager } from '@pierre/diffs/worker';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { PrRef } from '../shared/pr-url';
 import type { DisplaySettings } from '../shared/settings';
+import { PORT_TIMEOUT_MESSAGE } from './connection';
 import type { Rpc } from './github/private';
 import { startLoader } from './state/controller';
 import { loadPr } from './state/load';
 import { session } from './state/session';
 import { effectiveThemeType, useSettings } from './state/settings';
 import { usePr } from './state/store';
+import { filesChangedUrl } from './state/view';
 import { BatchBar, CommitDialogHost } from './ui/ApplySuggestions';
 import { DiffPane } from './ui/DiffPane';
 import { FatalError, Notice } from './ui/Notice';
@@ -62,6 +64,13 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
     pool.setRenderOptions(workerRenderOptions(diffSettings)).catch(() => undefined);
   }, [pool, diffSettings]);
 
+  // "Try again" after a failed load: bumping `attempt` re-runs the load.
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => {
+    usePr.getState().setFatal(null);
+    setAttempt((n) => n + 1);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     // Threads render inline (annotations) and feed the comment counts; their failure is not fatal.
@@ -72,7 +81,7 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
     return () => {
       cancelled = true;
     };
-  }, [rpc, prRef]);
+  }, [rpc, prRef, attempt]);
 
   useEffect(() => {
     if (!pr || !settingsLoaded) return;
@@ -87,8 +96,8 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
   }, [themeType]);
 
   if (fatal) {
-    const filesUrl = `https://github.com/${prRef.owner}/${prRef.repo}/pull/${prRef.number}/files`;
-    return <FatalError message={fatal} filesUrl={filesUrl} />;
+    // No port (extension updated): only a page reload helps, so no Try again.
+    return <FatalError message={fatal} filesUrl={filesChangedUrl(prRef)} onRetry={fatal === PORT_TIMEOUT_MESSAGE ? undefined : retry} />;
   }
 
   return (
