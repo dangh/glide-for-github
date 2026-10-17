@@ -147,7 +147,7 @@ describe('release workflow', () => {
     expect(workflow).toContain('"v$version"');
     expect(workflow).toContain('npx --no-install chrome-webstore-upload ');
     expect(workflow).not.toMatch(/npx --yes|chrome-webstore-upload-cli@/);
-    for (const secret of ['CWS_EXTENSION_ID', 'CWS_CLIENT_ID', 'CWS_CLIENT_SECRET', 'CWS_REFRESH_TOKEN']) {
+    for (const secret of ['CWS_EXTENSION_ID', 'CWS_CLIENT_ID', 'CWS_CLIENT_SECRET', 'CWS_REFRESH_TOKEN', 'CWS_PUBLISHER_ID']) {
       expect(workflow).toContain(`secrets.${secret}`);
     }
   });
