@@ -145,9 +145,12 @@ export const GITHUB_CHANGE_CSS = `[data-background] [data-line-type^='change-'] 
  * files of different lengths would not line up). Wrapped files end on their last line like GitHub's: Pierre
  * otherwise keeps 8 px under every file, a 6 px horizontal scrollbar strip plus padding, though a wrapped line can't
  * scroll sideways. Scrolling files keep it (it holds their scrollbar). Must match `filePaddingBottom`.
+ * The gutter "+" (add a comment) is GitHub's blue (bgColor-accent-emphasis) instead of the theme's "modified" color,
+ * which GitHub's Shiki themes make brown.
  */
 export const DIFF_CSS = `[data-diff] { --diffs-min-number-column-width: 4ch; }
-[data-overflow='wrap'], [data-overflow='wrap'] [data-code] { --diffs-scrollbar-gutter: 0px; padding-bottom: 0; }`;
+[data-overflow='wrap'], [data-overflow='wrap'] [data-code] { --diffs-scrollbar-gutter: 0px; padding-bottom: 0; }
+[data-utility-button] { background-color: light-dark(#0969da, #1f6feb); color: #fff; }`;
 
 /** CodeView `itemMetrics.paddingBottom` (its height estimate for the space under a file) matching DIFF_CSS. */
 export const filePaddingBottom = (overflow: 'wrap' | 'scroll'): number => (overflow === 'wrap' ? 0 : 8);
