@@ -5,6 +5,8 @@
  *   request one chunk (`chunkPaths` limits; the first request is small so the first diff shows fast).
  * - `prioritize(paths)` (the files in or near the viewport, top first) moves those paths to the front, and
  *   lazily loads the lines of collapsed entries (`needsLines`, e.g. deleted files) among them.
+ * - `prefer(paths)` (the open file group's files) loads those next, before the rest of the PR: Sift's "load the open
+ *   tab first". The rest still loads, so a group switch afterwards needs no request.
  * - Too-large files only load on `loadLines(path)` ("Load diff").
  * - Conversion to Pierre metadata is time-sliced (`sliceMs`), results are delivered in batches through
  *   `onResults`, so the main thread never runs one long task per chunk.
@@ -67,6 +69,8 @@ export interface LoaderStats {
 export interface Loader {
   start(): void;
   prioritize(paths: readonly string[]): void;
+  /** Queues `paths` (the open file group's files, in the order shown) ahead of the rest of the PR, after `prioritize`'s. */
+  prefer(paths: readonly string[]): void;
   /** Loads the full lines of a collapsed or too-large file. */
   loadLines(path: string): Promise<void>;
   /** Re-queues a file that failed. */
@@ -100,6 +104,8 @@ export function createLoader(opts: LoaderOptions): Loader {
   const queued = new Set(order);
   let cursor = 0;
   let priority: string[] = [];
+  let preferred: readonly string[] = [];
+  let preferredCursor = 0;
   /** Entries waiting for lines; requested lazily (`needsLines`) or on demand (too large). */
   const entries = new Map<string, DiffEntry>();
   const linesQueue: string[] = [];
@@ -134,10 +140,12 @@ export function createLoader(opts: LoaderOptions): Loader {
       if (candidates.length >= limit) break;
       take(p);
     }
+    for (let i = preferredCursor; candidates.length < limit && i < preferred.length; i++) take(preferred[i]!);
     for (let i = cursor; candidates.length < limit && i < order.length; i++) take(order[i]!);
     if (candidates.length === 0) return [];
     const chunk = chunkPaths(candidates)[0]!;
     for (const p of chunk) queued.delete(p);
+    while (preferredCursor < preferred.length && !queued.has(preferred[preferredCursor]!)) preferredCursor++;
     while (cursor < order.length && !queued.has(order[cursor]!)) cursor++;
     return chunk;
   }
@@ -305,6 +313,10 @@ export function createLoader(opts: LoaderOptions): Loader {
         if (entry && entry.needsLines && !entry.tooLarge) queueLines(p);
       }
       pump();
+    },
+    prefer(paths) {
+      preferred = paths;
+      preferredCursor = 0;
     },
     loadLines(path) {
       if (!entries.has(path)) return Promise.resolve();

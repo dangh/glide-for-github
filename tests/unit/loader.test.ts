@@ -83,6 +83,38 @@ describe('diff loader', () => {
     expect(new Set(fake.requests.flat()).size).toBe(order.length);
   });
 
+  it('loads the open file group first, then the rest; visible files still come before both', async () => {
+    const { fake, pr, loader } = await setup({ concurrency: 1, firstChunkSize: 1 });
+    const order = pr.files.map((f) => f.path);
+    const group = order.filter((p) => p.startsWith('src/')).reverse();
+    const rest = order.filter((p) => !group.includes(p));
+    loader.prefer(group);
+    loader.start();
+    await loader.done;
+    // The group in its own order (the order the list shows it), then everything else in file order.
+    expect(fake.requests.flat()).toEqual([...group, ...rest]);
+
+    const second = await setup({ concurrency: 1, firstChunkSize: 1 });
+    second.loader.prefer(group);
+    second.loader.start();
+    second.loader.prioritize([rest[0]!]);
+    await second.loader.done;
+    expect(second.fake.requests.flat().slice(0, 2)).toEqual([group[0], rest[0]]);
+    expect(new Set(second.fake.requests.flat()).size).toBe(order.length);
+  });
+
+  it('a group switch while loading moves the new group ahead of what is still queued', async () => {
+    const { fake, pr, loader } = await setup({ concurrency: 1, firstChunkSize: 1 });
+    const order = pr.files.map((f) => f.path);
+    const last = order.slice(-2);
+    loader.start(); // the first file is in flight
+    loader.prefer(last);
+    await loader.done;
+    expect(fake.requests[0]).toEqual([order[0]]);
+    expect(fake.requests[1]!.slice(0, 2)).toEqual(last);
+    expect(fake.requests.flat()).toHaveLength(order.length);
+  });
+
   it('classifies binary, too large, collapsed (deleted), renamed and normal files', async () => {
     const { loader, results } = await setup();
     loader.start();
