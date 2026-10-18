@@ -1,15 +1,45 @@
 /**
- * Toolbar: commit range, Split/Unified, Wrap, Hide whitespace, Display menu, viewed counter, Review button.
+ * Toolbar: commit range, Split/Unified, Wrap, Hide whitespace, Display menu, viewed counter, Review button; with the
+ * merged bar (page-scrolling experiment), the PR's state, title and number while GitHub's own title is scrolled away.
  * Each control subscribes to its own slice, so diff loading never re-renders the toolbar.
  */
 import { memo } from 'react';
 import { resolveDiffChoice } from '../../shared/github-defaults';
+import type { PrState } from '../github/private';
+import { usePageScroll } from '../pageScroll';
 import { useSettings } from '../state/settings';
 import { usePr } from '../state/store';
 import { CommitRangePicker } from './CommitRangePicker';
 import { DisplayMenu } from './DisplayMenu';
 import { ProgressRing } from './icons';
 import { ReviewMenu } from './ReviewMenu';
+
+const STATE_LABELS: Record<PrState, string> = { open: 'Open', closed: 'Closed', merged: 'Merged' };
+
+/** A PR title with its `code spans` (the only markup GitHub renders in titles); unbalanced backticks stay text. */
+function titleParts(title: string) {
+  const parts = title.split('`');
+  if (parts.length % 2 === 0) return title;
+  return parts.map((part, i) => (i % 2 === 1 ? <code key={i}>{part}</code> : part));
+}
+
+/** GitHub's sticky PR header, folded into the toolbar like on GitHub's Files changed page. */
+const PrTitle = memo(function PrTitle() {
+  const show = usePageScroll((s) => s.layout === 'merged' && s.stuck);
+  const title = usePr((s) => s.pr?.title);
+  const number = usePr((s) => s.pr?.ref.number);
+  const state = usePr((s) => s.pr?.state);
+  if (!show || !title) return null;
+  return (
+    <span className="pr-title" data-testid="pr-title">
+      {state && <span className={`pr-state pr-state-${state}`}>{STATE_LABELS[state]}</span>}
+      <span className="pr-title-text" title={title}>
+        {titleParts(title)}
+      </span>
+      <span className="pr-number">#{number}</span>
+    </span>
+  );
+});
 
 const DiffStyleToggle = memo(function DiffStyleToggle() {
   // 'default' shows as the layout it resolves to (GitHub's: unified).
@@ -67,6 +97,7 @@ const ViewedCounter = memo(function ViewedCounter() {
 export const Toolbar = memo(function Toolbar() {
   return (
     <div className="pierre-toolbar" role="toolbar">
+      <PrTitle />
       <CommitRangePicker />
       <DiffStyleToggle />
       <WrapToggle />

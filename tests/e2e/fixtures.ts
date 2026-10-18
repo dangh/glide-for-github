@@ -3,7 +3,8 @@
  * copied logged-in profile with dist/ loaded, and helpers to drive the Pierre viewer iframe.
  */
 import { test as base, chromium, expect, type BrowserContext, type Frame, type FrameLocator, type Page } from '@playwright/test';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +12,12 @@ import { fileURLToPath } from 'node:url';
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export const PROFILE = join(ROOT, '.e2e-profile');
 export const DIST = join(ROOT, 'dist');
+
+/** Chrome derives an unpacked extension's id from its path: sha256, first 32 hex digits mapped to a-p. */
+export function extensionId(): string {
+  const hex = createHash('sha256').update(realpathSync(DIST)).digest('hex').slice(0, 32);
+  return [...hex].map((c) => String.fromCharCode('a'.charCodeAt(0) + parseInt(c, 16))).join('');
+}
 
 export interface PrId {
   owner: string;

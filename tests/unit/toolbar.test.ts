@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FileSummary, PrData } from '../../src/viewer/github/private';
 import { useSettings } from '../../src/viewer/state/settings';
+import { usePageScroll } from '../../src/viewer/pageScroll';
 import { usePr } from '../../src/viewer/state/store';
 import { Toolbar } from '../../src/viewer/ui/Toolbar';
 
@@ -77,5 +78,30 @@ describe('Toolbar', () => {
     expect(pressed('Split')).toBe('false');
     expect(pressed('Wrap')).toBe('true');
     await act(async () => root.unmount());
+  });
+
+  it("with the merged bar, shows the PR's state, title and number while the page has the viewer stuck", async () => {
+    usePr.getState().setPr({ ...pr, title: 'Use `foo` in `bar', state: 'merged' });
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    const title = () => container.querySelector('[data-testid="pr-title"]');
+    await act(async () => root.render(createElement(Toolbar)));
+    expect(title()).toBeNull();
+
+    await act(async () => usePageScroll.setState({ layout: 'page', stuck: true }));
+    expect(title()).toBeNull();
+
+    await act(async () => usePageScroll.setState({ layout: 'merged', stuck: true }));
+    expect(title()!.textContent).toBe('MergedUse `foo` in `bar#1');
+
+    await act(async () => usePr.getState().setPr({ ...pr, title: 'Use `foo` and `bar`', state: 'open' }));
+    expect(title()!.querySelector('.pr-state-open')!.textContent).toBe('Open');
+    expect([...title()!.querySelectorAll('code')].map((c) => c.textContent)).toEqual(['foo', 'bar']);
+
+    await act(async () => usePageScroll.setState({ stuck: false }));
+    expect(title()).toBeNull();
+    await act(async () => root.unmount());
+    usePageScroll.setState({ layout: 'frame', stuck: false });
   });
 });

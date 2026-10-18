@@ -40,6 +40,8 @@ describe('fetchPrData', () => {
     expect(typeof pr.databaseId).toBe('number');
     expect(pr.pendingReviewComments).toBeUndefined();
     expect(pr.author).toBe('dangh');
+    expect(pr.title).toBe('review-me: sandbox fixture PR');
+    expect(pr.state).toBe('open');
     expect(pr.baseOid).toBe(route.comparison.fullDiff.baseOid);
     expect(pr.headOid).toBe(route.comparison.fullDiff.headOid);
     expect(pr.headOid).toBe(fixture('meta.json').headOid);

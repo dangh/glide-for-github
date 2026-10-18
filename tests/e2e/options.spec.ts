@@ -4,21 +4,13 @@
  * `pierre-e2e-owner` with a dummy string GitHub rejects (nothing is saved), and the 'dangh' and '*' entries
  * are never touched. Settings are restored to what they were.
  */
-import { createHash } from 'node:crypto';
-import { realpathSync } from 'node:fs';
-import { DIST, expect, openPierre, SANDBOX, test, type Viewer } from './fixtures';
+import { expect, extensionId, openPierre, SANDBOX, test, type Viewer } from './fixtures';
 import type { BrowserContext, Page } from '@playwright/test';
 
 test.describe.configure({ mode: 'serial' });
 
 const FAKE_OWNER = 'pierre-e2e-owner';
 const TOKENS_KEY = 'pierre.tokens';
-
-/** Chrome derives an unpacked extension's id from its path: sha256, first 32 hex digits mapped to a-p. */
-function extensionId(): string {
-  const hex = createHash('sha256').update(realpathSync(DIST)).digest('hex').slice(0, 32);
-  return [...hex].map((c) => String.fromCharCode('a'.charCodeAt(0) + parseInt(c, 16))).join('');
-}
 
 async function openOptions(context: BrowserContext): Promise<Page> {
   const page = await context.newPage();

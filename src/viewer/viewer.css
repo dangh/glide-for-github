@@ -73,6 +73,57 @@ button {
   flex: 1;
 }
 
+/* Merged bar (page-scrolling experiment): GitHub's sticky PR header, state label + title + number, shrinks first. */
+.pr-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 0 1 auto;
+  font-size: 14px;
+}
+
+.pr-state {
+  flex: none;
+  padding: 0 10px;
+  border-radius: 2em;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 24px;
+  color: #fff;
+}
+
+.pr-state-open {
+  background: var(--pierre-primary-bg);
+}
+
+.pr-state-merged {
+  background: light-dark(#8250df, #8957e5);
+}
+
+.pr-state-closed {
+  background: light-dark(#cf222e, #da3633);
+}
+
+.pr-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.pr-title-text code {
+  padding: 0.2em 0.4em;
+  border-radius: 6px;
+  background: var(--pierre-bg-subtle);
+  font: 85% var(--pierre-mono);
+}
+
+.pr-number {
+  flex: none;
+  color: var(--pierre-muted);
+}
+
 /* Primer small buttons: 28 px, 12px/500. */
 .pill {
   display: inline-flex;

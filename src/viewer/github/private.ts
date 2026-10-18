@@ -35,6 +35,9 @@ export interface FileSummary {
   binary: boolean;
 }
 
+export type PrState = 'open' | 'closed' | 'merged';
+const PR_STATES: Record<string, PrState> = { OPEN: 'open', CLOSED: 'closed', MERGED: 'merged' };
+
 export interface PrData {
   ref: PrRef;
   nodeId?: string;
@@ -46,6 +49,10 @@ export interface PrData {
   pendingReviewComments?: number;
   /** PR author login (Ruling 2). */
   author: string;
+  /** `pullRequest.title`. */
+  title?: string;
+  /** `pullRequest.state`, when it is one GitHub's header shows. */
+  state?: PrState;
   baseOid: string;
   headOid: string;
   commits: CommitInfo[];
@@ -225,6 +232,8 @@ interface ChangesRoute {
     id?: number;
     globalRelayId?: string;
     author?: { login: string } | null;
+    title?: string;
+    state?: string;
     comparison?: { baseOid: string; headOid: string };
   };
   repository?: { id?: number };
@@ -456,6 +465,10 @@ export async function fetchPrData(rpc: Rpc, ref: PrRef, opts: { prefetched?: boo
     ...(typeof route.repository?.id === 'number' ? { repositoryId: route.repository.id } : {}),
     ...(route.viewerPendingReview?.id != null ? { pendingReviewComments: route.viewerPendingReview.comments?.length ?? 0 } : {}),
     author: route.pullRequest.author?.login ?? '',
+    ...(typeof route.pullRequest.title === 'string' ? { title: route.pullRequest.title } : {}),
+    ...(typeof route.pullRequest.state === 'string' && Object.hasOwn(PR_STATES, route.pullRequest.state)
+      ? { state: PR_STATES[route.pullRequest.state] }
+      : {}),
     baseOid: full.baseOid,
     headOid: full.headOid,
     commits: (route.commits ?? []).map((c) => ({ oid: c.oid, shortOid: c.shortOid, message: c.messageHeadline })),
