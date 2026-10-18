@@ -117,6 +117,7 @@ describe('DEFAULT_SETTINGS', () => {
       review: { hideWhitespace: false },
       experiments: { pageScroll: false, mergedBar: false },
       github: { replaceFilesTab: false },
+      fileGroups: { enabled: true, defaultGroup: '', hideEmpty: true },
     } satisfies DisplaySettings);
   });
 
@@ -217,6 +218,23 @@ describe('experiments', () => {
   });
 });
 
+describe('fileGroups', () => {
+  it('default on, opening on All, hiding empty groups; invalid stored values fall back', async () => {
+    expect((await loadSettings()).fileGroups).toEqual({ enabled: true, defaultGroup: '', hideEmpty: true });
+    fake.data[SETTINGS_STORAGE_KEY] = { fileGroups: { enabled: 'no', defaultGroup: 7, hideEmpty: 0, extra: true } };
+    expect((await loadSettings()).fileGroups).toEqual({ enabled: true, defaultGroup: '', hideEmpty: true });
+    fake.data[SETTINGS_STORAGE_KEY] = { fileGroups: { defaultGroup: 'x'.repeat(61) } };
+    expect((await loadSettings()).fileGroups.defaultGroup).toBe('');
+    fake.data[SETTINGS_STORAGE_KEY] = { fileGroups: { enabled: false, defaultGroup: 'Tests', hideEmpty: false } };
+    expect((await loadSettings()).fileGroups).toEqual({ enabled: false, defaultGroup: 'Tests', hideEmpty: false });
+  });
+
+  it('saves only what changed', async () => {
+    await saveSettings({ fileGroups: { defaultGroup: 'Source' } });
+    expect(fake.data[SETTINGS_STORAGE_KEY]).toEqual({ fileGroups: { defaultGroup: 'Source' } });
+  });
+});
+
 describe('github', () => {
   it('replaces Files changed only when stored as true, read the same by the content script', async () => {
     for (const stored of [undefined, { github: { replaceFilesTab: 'yes' } }, { github: { replaceFilesTab: 1, extra: true } }]) {
@@ -263,7 +281,7 @@ describe('loadSettings', () => {
       review: { hideWhitespace: true, other: 1 },
     };
     const s = await loadSettings();
-    expect(Object.keys(s).sort()).toEqual(['diff', 'experiments', 'fonts', 'github', 'layout', 'review', 'tree']);
+    expect(Object.keys(s).sort()).toEqual(['diff', 'experiments', 'fileGroups', 'fonts', 'github', 'layout', 'review', 'tree']);
     expect(Object.keys(s.diff).sort()).toEqual(Object.keys(DEFAULT_SETTINGS.diff).sort());
     expect(Object.keys(s.tree).sort()).toEqual(Object.keys(DEFAULT_SETTINGS.tree).sort());
     expect(Object.keys(s.review)).toEqual(['hideWhitespace']);

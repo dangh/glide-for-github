@@ -72,6 +72,8 @@
  *   experiments.pageScroll    boolean, false: GitHub's page scrolls the diffs (src/shared/page-scroll.ts), not the viewer
  *   experiments.mergedBar     boolean, false: GitHub's sticky PR header folds into Glide's toolbar (only with pageScroll)
  *   github.replaceFilesTab    boolean, false: GitHub's Files changed tab is hidden and its page opens Glide instead
+ *   fileGroups.*              enabled (true), defaultGroup ('' = All; else a group label), hideEmpty (true): the file
+ *                             group tabs (./file-groups.ts). The groups themselves are stored apart (./file-groups-storage.ts).
  *
  * EXCLUDED, with reasons:
  *   preferredHighlighter        not a user option: toDiffOptions always sets 'shiki-js' (global no-WASM constraint)
@@ -106,6 +108,7 @@ import type {
 import { DIFF_CSS, GITHUB_CHANGE_CSS, GITHUB_HUNK_CSS, GITHUB_TREE, GITHUB_TREE_ROW_HEIGHT, resolveDiff } from './github-defaults';
 import { GITHUB_TREE_CSS, GITHUB_TREE_ICONS, HIDE_GIT_STATUS_CSS } from './github-tree-icons';
 import { SETTINGS_STORAGE_KEY, type ExperimentSettings } from './experiments';
+import { ALL_GROUP, GROUP_LABEL_MAX } from './file-groups';
 import type { GithubSettings } from './github-settings';
 
 export { SETTINGS_STORAGE_KEY, type ExperimentSettings, type GithubSettings };
@@ -188,6 +191,15 @@ export interface ReviewSettings {
   hideWhitespace: boolean;
 }
 
+export interface FileGroupSettings {
+  /** The file group tabs show (Source, Tests, …); off, every file shows as without them. */
+  enabled: boolean;
+  /** The group a pull request opens on: a group label, or '' (ALL_GROUP) for every file. */
+  defaultGroup: string;
+  /** Groups with no files in the open pull request are left out of the tabs (All and the open group always show). */
+  hideEmpty: boolean;
+}
+
 export interface DisplaySettings {
   diff: DiffSettings;
   tree: TreeSettings;
@@ -196,10 +208,11 @@ export interface DisplaySettings {
   review: ReviewSettings;
   experiments: ExperimentSettings;
   github: GithubSettings;
+  fileGroups: FileGroupSettings;
 }
 
 /** The sections of `DisplaySettings`, in storage order. */
-export const SETTINGS_SECTIONS = ['diff', 'tree', 'fonts', 'layout', 'review', 'experiments', 'github'] as const;
+export const SETTINGS_SECTIONS = ['diff', 'tree', 'fonts', 'layout', 'review', 'experiments', 'github', 'fileGroups'] as const;
 
 export type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] };
 
@@ -355,6 +368,7 @@ export const DEFAULT_SETTINGS: DisplaySettings = deepFreeze({
   review: { hideWhitespace: false },
   experiments: { pageScroll: false, mergedBar: false },
   github: { replaceFilesTab: false },
+  fileGroups: { enabled: true, defaultGroup: ALL_GROUP, hideEmpty: true },
 });
 
 // ---------------------------------------------------------------------------------------------------------
@@ -435,6 +449,12 @@ const EXPERIMENTS_SCHEMA: Schema<ExperimentSettings> = { pageScroll: isBool, mer
 
 const GITHUB_SCHEMA: Schema<GithubSettings> = { replaceFilesTab: isBool };
 
+const FILE_GROUPS_SCHEMA: Schema<FileGroupSettings> = {
+  enabled: isBool,
+  defaultGroup: (v): v is string => typeof v === 'string' && v.length <= GROUP_LABEL_MAX,
+  hideEmpty: isBool,
+};
+
 const SCHEMAS = {
   diff: DIFF_SCHEMA,
   tree: TREE_SCHEMA,
@@ -443,6 +463,7 @@ const SCHEMAS = {
   review: REVIEW_SCHEMA,
   experiments: EXPERIMENTS_SCHEMA,
   github: GITHUB_SCHEMA,
+  fileGroups: FILE_GROUPS_SCHEMA,
 } as const;
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -491,6 +512,7 @@ function resolve(raw: unknown): DisplaySettings {
     review: { ...DEFAULT_SETTINGS.review, ...o.review },
     experiments: { ...DEFAULT_SETTINGS.experiments, ...o.experiments },
     github: { ...DEFAULT_SETTINGS.github, ...o.github },
+    fileGroups: { ...DEFAULT_SETTINGS.fileGroups, ...o.fileGroups },
   };
 }
 
