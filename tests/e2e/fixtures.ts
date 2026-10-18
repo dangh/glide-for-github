@@ -116,7 +116,17 @@ export class Viewer {
     for (let attempt = 0; attempt < 4; attempt++) {
       await expect(this.locator.locator('.fh').first()).toBeVisible({ timeout });
       await expect
-        .poll(() => this.frame().evaluate(() => window.__pierre?.store.getState().pr !== null).catch(() => false), { timeout })
+        .poll(
+          async () => {
+            // Between the old frame's removal and the new one's arrival `frame()` throws: not ready yet.
+            try {
+              return await this.frame().evaluate(() => window.__pierre?.store.getState().pr !== null);
+            } catch {
+              return false;
+            }
+          },
+          { timeout },
+        )
         .toBe(true);
       const frame = this.frame();
       await this.page.waitForTimeout(1500);
