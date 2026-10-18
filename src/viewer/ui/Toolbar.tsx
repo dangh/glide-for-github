@@ -8,6 +8,7 @@ import { useSettings } from '../state/settings';
 import { usePr } from '../state/store';
 import { CommitRangePicker } from './CommitRangePicker';
 import { DisplayMenu } from './DisplayMenu';
+import { ProgressRing } from './icons';
 import { ReviewMenu } from './ReviewMenu';
 
 const DiffStyleToggle = memo(function DiffStyleToggle() {
@@ -55,7 +56,10 @@ const ViewedCounter = memo(function ViewedCounter() {
   const total = usePr((s) => s.order.length);
   return (
     <span className="viewed-counter" data-testid="viewed-counter">
-      {viewed} / {total} viewed
+      <ProgressRing done={total > 0 ? viewed / total : 0} />
+      <span>
+        <span className="viewed-count">{viewed}</span> / <span className="viewed-count">{total}</span> viewed
+      </span>
     </span>
   );
 });

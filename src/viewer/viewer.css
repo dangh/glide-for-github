@@ -1,10 +1,12 @@
 /* Pierre for GitHub viewer. Colors follow GitHub's Primer palette; light/dark via color-scheme (set by App). */
 :root {
   color-scheme: light dark;
-  --pierre-fg: light-dark(#1f2328, #e6edf3);
+  --pierre-fg: light-dark(#1f2328, #f0f6fc);
   --pierre-muted: light-dark(#59636e, #9198a1);
   --pierre-bg: light-dark(#ffffff, #0d1117);
   --pierre-bg-subtle: light-dark(#f6f8fa, #151b23);
+  /* Primer overlay bgColor: menus and dialogs. */
+  --pierre-overlay-bg: light-dark(#ffffff, #010409);
   --pierre-border: light-dark(#d1d9e0, #3d444d);
   --pierre-accent: light-dark(#0969da, #4493f8);
   --pierre-accent-bg: light-dark(#ddf4ff, #121d2f);
@@ -55,12 +57,12 @@ button {
   height: 100%;
 }
 
-/* Toolbar */
+/* Toolbar: GitHub's /changes toolbar is 60 px, 28 px controls with 16 px above and below, flush with the content edges. */
 .pierre-toolbar {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 16px 0 15px;
   border-bottom: 1px solid var(--pierre-border);
   font-size: 12px;
   flex: none;
@@ -71,15 +73,31 @@ button {
   flex: 1;
 }
 
+/* Primer small buttons: 28 px, 12px/500. */
 .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
   border: 1px solid var(--pierre-border);
   border-radius: 6px;
-  padding: 3px 10px;
+  padding: 0 8px;
   background: var(--pierre-bg-subtle);
   cursor: pointer;
   font-size: 12px;
+  font-weight: 500;
   line-height: 18px;
   white-space: nowrap;
+}
+
+.pill .icon,
+.btn-primary .icon {
+  color: var(--pierre-muted);
+  flex: none;
+}
+
+.btn-primary .icon {
+  color: inherit;
 }
 
 .pill:hover {
@@ -112,19 +130,41 @@ button {
 }
 
 .viewed-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--pierre-muted);
   white-space: nowrap;
 }
 
+.viewed-count {
+  color: var(--pierre-fg);
+  font-weight: 500;
+}
+
+.viewed-ring-track {
+  stroke: var(--pierre-border);
+}
+
+.viewed-ring-done {
+  stroke: var(--pierre-success);
+}
+
 .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 28px;
   background: var(--pierre-primary-bg);
   color: #fff;
   border: 1px solid rgba(31, 35, 40, 0.15);
   border-radius: 6px;
-  padding: 3px 12px;
-  font-weight: 600;
+  padding: 0 12px;
+  font-weight: 500;
   font-size: 12px;
   line-height: 18px;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -138,6 +178,7 @@ button {
   position: relative;
 }
 
+/* GitHub's ActionMenu overlay: 14 px text, 12 px radius, overlay background, 32 px rows. */
 .popover-panel {
   position: absolute;
   top: calc(100% + 4px);
@@ -145,12 +186,14 @@ button {
   z-index: 20;
   min-width: 260px;
   max-height: min(70vh, 560px);
-  overflow: auto;
-  background: var(--pierre-bg);
+  overflow: hidden auto;
+  background: var(--pierre-overlay-bg);
   border: 1px solid var(--pierre-border);
-  border-radius: 8px;
+  border-radius: 12px;
   box-shadow: 0 8px 24px rgba(66, 74, 83, 0.2);
-  padding: 4px;
+  padding: 8px;
+  font-size: 14px;
+  font-weight: 400;
 }
 
 .menu {
@@ -163,6 +206,7 @@ button {
   display: flex;
   gap: 6px;
   align-items: baseline;
+  min-height: 32px;
   text-align: left;
   border: 0;
   background: none;
@@ -182,7 +226,7 @@ button {
 .menu-sub,
 .menu-sep {
   color: var(--pierre-muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .menu-sep {
@@ -198,8 +242,8 @@ button {
 }
 
 .settings-form {
-  width: 340px;
-  padding: 4px 6px;
+  width: 400px;
+  padding: 0 6px;
 }
 
 .settings-form fieldset {
@@ -229,7 +273,7 @@ button {
 .field select,
 .field input[type='number'],
 .field input[type='text'] {
-  width: 160px;
+  width: 180px;
   font: inherit;
   padding: 2px 4px;
   border: 1px solid var(--pierre-border);
@@ -626,11 +670,16 @@ button {
 }
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 28px;
   background: var(--pierre-bg-subtle);
   border: 1px solid var(--pierre-border);
   border-radius: 6px;
-  padding: 3px 12px;
-  font-weight: 600;
+  padding: 0 12px;
+  font-weight: 500;
   font-size: 12px;
   line-height: 18px;
   cursor: pointer;
@@ -661,14 +710,15 @@ button {
   color: var(--pierre-fg);
 }
 
+/* GitHub's inline threads: at most 738 px wide, 14px/21px text, 12 px inside. */
 .thread,
 .composer-new {
   margin: 6px 8px;
-  max-width: 880px;
+  max-width: 738px;
   border: 1px solid var(--pierre-border);
   border-radius: 6px;
   background: var(--pierre-bg);
-  font: 13px/1.5 var(--pierre-font);
+  font: 14px/1.5 var(--pierre-font);
   color: var(--pierre-fg);
   white-space: normal;
 }
@@ -725,7 +775,7 @@ button {
 }
 
 .comment {
-  padding: 8px 10px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--pierre-border);
 }
 
@@ -733,8 +783,8 @@ button {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  margin-bottom: 2px;
+  font-size: 14px;
+  margin-bottom: 4px;
 }
 
 .comment-head .fh-link {
@@ -753,6 +803,7 @@ button {
 
 .comment-time {
   color: var(--pierre-muted);
+  font-size: 12px;
 }
 
 .comment-confirm {
@@ -893,18 +944,19 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 8px;
 }
 
 .thread-reply {
   flex: 1;
   max-width: 480px;
+  height: 32px;
   text-align: left;
   border: 1px solid var(--pierre-border);
   border-radius: 6px;
   background: var(--pierre-bg-subtle);
   color: var(--pierre-muted);
-  padding: 3px 8px;
+  padding: 0 8px;
   cursor: text;
 }
 
@@ -942,12 +994,15 @@ button {
   margin-bottom: 6px;
 }
 
+/* GitHub's comment box (measured): 39 px 14px/20px tabs, a 14px/21px monospace textarea at least
+ * 121 px tall with 8 px padding, 32 px 14px/500 actions. CSS only, nothing runs per keystroke. */
 .composer-tabs [role='tab'] {
   border: 1px solid transparent;
   border-radius: 6px;
   background: none;
-  padding: 2px 10px;
-  font-size: 12px;
+  padding: 9px 16px 8px;
+  font-size: 14px;
+  line-height: 20px;
   cursor: pointer;
   color: var(--pierre-muted);
 }
@@ -970,10 +1025,10 @@ button {
 .composer-input {
   display: block;
   width: 100%;
-  min-height: 72px;
+  min-height: 121px;
   resize: vertical;
-  padding: 6px 8px;
-  font: 13px/1.5 var(--pierre-font);
+  padding: 8px;
+  font: 14px/21px var(--pierre-mono);
   color: var(--pierre-fg);
   background: var(--pierre-bg);
   border: 1px solid var(--pierre-border);
@@ -991,8 +1046,8 @@ button {
 }
 
 .composer-preview {
-  min-height: 72px;
-  padding: 6px 8px;
+  min-height: 121px;
+  padding: 8px;
   border: 1px solid var(--pierre-border);
   border-radius: 6px;
 }
@@ -1009,6 +1064,14 @@ button {
 .composer-actions button,
 .thread-actions .btn {
   white-space: nowrap;
+}
+
+.composer-actions .btn,
+.composer-actions .btn-primary,
+.thread-actions .btn {
+  height: 32px;
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .muted {
@@ -1036,7 +1099,6 @@ button {
   right: 0;
   width: min(440px, 92vw);
   padding: 12px;
-  font-size: 13px;
 }
 
 .review-title {

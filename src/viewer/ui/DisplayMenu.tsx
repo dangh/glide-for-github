@@ -5,13 +5,14 @@
 import { memo } from 'react';
 import { useSettings } from '../state/settings';
 import { DisplaySettingsForm } from './DisplaySettingsForm';
+import { GearIcon } from './icons';
 import { Popover } from './Popover';
 
 export const DisplayMenu = memo(function DisplayMenu() {
   const settings = useSettings((s) => s.settings);
   const update = useSettings((s) => s.update);
   return (
-    <Popover label="⚙ Display" title="Display options" testId="display-menu" className="display-menu">
+    <Popover label={<><GearIcon />Display</>} title="Display options" testId="display-menu" className="display-menu">
       {() => <DisplaySettingsForm settings={settings} update={update} />}
     </Popover>
   );

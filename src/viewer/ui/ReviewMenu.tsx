@@ -12,6 +12,7 @@ import type { ReviewEvent } from '../github/api';
 import { discardReview, errorMessage, submitReview } from '../state/review';
 import { draftKey, usePr } from '../state/store';
 import { useDismiss } from './dismiss';
+import { TriangleDownIcon } from './icons';
 
 /** A mousedown in a dialog (the token prompt opened by Submit) keeps the menu open. */
 const inDialog = (target: Element) => target.closest?.('[role="dialog"]') != null;
@@ -46,7 +47,8 @@ export const ReviewMenu = memo(function ReviewMenu() {
   return (
     <div className="popover review-menu" ref={root}>
       <button type="button" className="btn-primary" aria-haspopup="dialog" aria-expanded={open} data-testid="review-button" onClick={() => setOpen((o) => !o)}>
-        {pending > 0 ? `Review (${pending} pending)` : 'Review'} ▾
+        {pending > 0 ? `Review (${pending} pending)` : 'Review'}
+        <TriangleDownIcon />
       </button>
       {open && <ReviewPanel close={close} />}
     </div>

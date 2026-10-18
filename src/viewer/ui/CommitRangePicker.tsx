@@ -5,6 +5,7 @@
 import { memo, useRef } from 'react';
 import { commitIndexes, rangeForCommits, rangeLabel } from '../state/range';
 import { usePr } from '../state/store';
+import { TriangleDownIcon } from './icons';
 import { Popover } from './Popover';
 
 export const CommitRangePicker = memo(function CommitRangePicker() {
@@ -15,7 +16,7 @@ export const CommitRangePicker = memo(function CommitRangePicker() {
   const selected = commitIndexes(commits, range);
 
   return (
-    <Popover label={<>{rangeLabel(commits, range)} ▾</>} testId="range-picker" className="range-picker">
+    <Popover label={<>{rangeLabel(commits, range)}<TriangleDownIcon /></>} testId="range-picker" className="range-picker">
       {(close) => (
         <div className="menu" role="menu">
           <button
