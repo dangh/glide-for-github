@@ -157,6 +157,31 @@ describe('page layout', () => {
     host.unmount();
   });
 
+  it('measures once per frame of resizes, and again only when the width changed', () => {
+    const header = addStickyHeader();
+    let width = 1280;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, get: () => width });
+    const measure = vi.fn(() => rect(0, header.style.display === 'flex' ? (width < 800 ? 100 : 60) : 0));
+    header.getBoundingClientRect = measure;
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => frames.push(cb));
+    const host = mountViewer(document, ref, 'page');
+    expect(host.iframe.style.top).toBe('60px');
+    const measured = measure.mock.calls.length;
+
+    for (let i = 0; i < 3; i++) window.dispatchEvent(new Event('resize'));
+    expect(frames).toHaveLength(1);
+    frames.shift()!(0);
+    expect(measure.mock.calls.length).toBe(measured);
+
+    width = 600;
+    window.dispatchEvent(new Event('resize'));
+    window.dispatchEvent(new Event('resize'));
+    frames.splice(0).forEach((f) => f(0));
+    expect(host.iframe.style.top).toBe('100px');
+    host.unmount();
+  });
+
   it('sticks at the top when GitHub has no sticky header (no hiding, nothing to measure)', () => {
     const host = mountViewer(document, ref, 'page');
     expect(host.iframe.style.top).toBe('0px');

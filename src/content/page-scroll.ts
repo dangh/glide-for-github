@@ -40,8 +40,12 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
   /** `scrollY` after the page's last scroll, and when it last moved other than at the viewer's request. */
   let lastY = win.scrollY;
   let movedByItselfAt = -Infinity;
-  /** GitHub's header and its height when shown, measured once per element and window size. */
-  let measured: { header: HTMLElement; height: number } | null = null;
+  /**
+   * GitHub's header and its height when shown, or the bottom of the bar found without it: both force a layout, so
+   * they are measured once per element and viewport width.
+   */
+  let measured: { header: HTMLElement | null; width: number; height: number } | null = null;
+  let resizeFrame = 0;
   /** Headers hidden in `merged`, with their inline style to restore. */
   const hidden = new Map<HTMLElement, string | null>();
 
@@ -74,11 +78,11 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
       hide(header);
       return 0;
     }
-    if (header) {
-      if (measured?.header !== header) measured = { header, height: stickyHeaderHeight(header) };
-      return measured.height;
+    const width = win.innerWidth;
+    if (measured?.header !== header || measured.width !== width) {
+      measured = { header, width, height: header ? stickyHeaderHeight(header) : topBarBottom(doc, wrapper) };
     }
-    return topBarBottom(doc, wrapper);
+    return measured.height;
   };
 
   const remeasure = () => {
@@ -90,8 +94,11 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
   };
 
   const onResize = () => {
-    measured = null;
-    remeasure();
+    if (resizeFrame) return;
+    resizeFrame = win.requestAnimationFrame(() => {
+      resizeFrame = 0;
+      remeasure();
+    });
   };
 
   const onScroll = () => {
@@ -146,6 +153,7 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
     dispose() {
       win.removeEventListener('scroll', onScroll);
       win.removeEventListener('resize', onResize);
+      win.cancelAnimationFrame(resizeFrame);
       if (port) {
         port.onmessage = null;
         port.close();
