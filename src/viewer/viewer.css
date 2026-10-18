@@ -402,10 +402,23 @@ html[data-scroll-layout] .pierre-body[data-tree-hidden] .pierre-diffs {
   min-height: 0;
 }
 
-/* Tree on the right (layout.treePosition; App renders it after the diffs): the divider moves to its left. */
+/*
+ * Tree on the right (layout.treePosition; App renders it after the diffs): the divider moves to its left, the tree's
+ * inner spacing mirrors (GITHUB_TREE_CSS: 16 px toward the divider, 1 px toward the page edge), and the diffs start
+ * where the toolbar does.
+ */
 .pierre-body[data-tree-position='right'] .pierre-tree-pane {
   border-right: 0;
   border-left: 1px solid var(--pierre-border);
+}
+
+.pierre-body[data-tree-position='right'] .pierre-tree {
+  --glide-tree-start: 16px;
+  --glide-tree-end: 1px;
+}
+
+.pierre-body[data-tree-position='right'] .pierre-diffs {
+  padding-left: 0;
 }
 
 .pierre-tree {
@@ -445,9 +458,6 @@ html[data-scroll-layout] .pierre-body[data-tree-position='left'] .pierre-diffs {
   padding-right: 0;
 }
 
-html[data-scroll-layout] .pierre-body[data-tree-position='right'] .pierre-diffs {
-  padding-left: 0;
-}
 
 .pierre-loading {
   padding: 24px;

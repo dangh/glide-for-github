@@ -113,7 +113,9 @@ const searchMask = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000
  * bgColor-default (#ffffff / #0d1117); hover and selection control-transparent-bgColor-hover (#818b981a / #656c7633)
  * and -selected (#818b981f light, proposed; #656c7633 dark, measured). Spacing as measured there: rows flush with
  * the pane, chevron + 8 + folder + 8 before the name, 8 px indent per level (indent guides under the parent's
- * chevron), the "Filter files…" box 32 px tall with a 16 px search icon, 16 px above and below it.
+ * chevron), the "Filter files…" box 32 px tall with a 16 px search icon, 16 px above and below it. The 1 px side faces
+ * the page edge and the 16 px side the divider: `--glide-tree-start` / `--glide-tree-end` (viewer.css) swap them when
+ * the tree sits on the right.
  */
 export const GITHUB_TREE_CSS = `
 :host {
@@ -131,17 +133,17 @@ export const GITHUB_TREE_CSS = `
   --trees-item-row-gap-override: 8px;
 }
 [data-file-tree-virtualized-scroll="true"] {
-  padding-inline: 1px 16px;
+  padding-inline: var(--glide-tree-start, 1px) var(--glide-tree-end, 16px);
 }
 [data-file-tree-search-container] {
   position: relative;
-  padding: 16px 16px 0 1px;
+  padding: 16px var(--glide-tree-end, 16px) 0 var(--glide-tree-start, 1px);
   margin-bottom: 16px;
 }
 [data-file-tree-search-container]::before {
   content: "";
   position: absolute;
-  left: 10px;
+  left: calc(var(--glide-tree-start, 1px) + 9px);
   top: 24px;
   width: 16px;
   height: 16px;
