@@ -43,6 +43,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   document.body.innerHTML = '';
+  document.documentElement.removeAttribute('style');
 });
 
 /** Loads the iframe and returns the viewer's end of the scroll channel and the messages the page sent on it. */
@@ -208,12 +209,22 @@ describe('page layout', () => {
     expect(document.body.innerHTML).toBe(before);
   });
 
-  it("leaves GitHub's footer alone in the default layout", () => {
+  it("keeps GitHub's page from rubber-banding while mounted, and restores its root's style exactly", () => {
+    const root = document.documentElement;
+    root.setAttribute('style', 'color-scheme: dark;');
+    const host = mountViewer(document, ref, 'page');
+    expect(getComputedStyle(root).overscrollBehaviorY).toBe('none');
+    host.unmount();
+    expect(root.getAttribute('style')).toBe('color-scheme: dark;');
+  });
+
+  it("leaves GitHub's footer and page overscroll alone in the default layout", () => {
     const footer = document.createElement('footer');
     footer.setAttribute('role', 'contentinfo');
     document.body.append(footer);
     const host = mountViewer(document, ref);
     expect(footer.hasAttribute('style')).toBe(false);
+    expect(document.documentElement.hasAttribute('style')).toBe(false);
     host.unmount();
   });
 

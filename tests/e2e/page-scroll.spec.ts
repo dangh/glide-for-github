@@ -47,6 +47,7 @@ async function positions(page: Page, viewer: Viewer) {
       sticky: sticky ? { display: getComputedStyle(sticky).display, height: sticky.getBoundingClientRect().height, style: sticky.getAttribute('style') } : null,
       footerDisplay: (() => { const f = document.querySelector('footer[role="contentinfo"]'); return f ? getComputedStyle(f).display : null; })(),
       wrapperBottom: wrapper ? wrapper.getBoundingClientRect().bottom : null,
+      overscrollY: getComputedStyle(document.documentElement).overscrollBehaviorY,
     };
   });
   const inner = await viewer.frame().evaluate(() => {
@@ -74,6 +75,52 @@ async function wheel(page: Page, dy: number, steps: number) {
     await page.waitForTimeout(25);
   }
   await page.waitForTimeout(800);
+}
+
+/**
+ * macOS Chrome rubber-bands a page flicked past its end; Linux Chrome does not, so this models it after Chromium's
+ * ElasticOverscrollControllerExponential. While the bounce animates (kStateMomentumAnimated) the stretch follows
+ * s(t) = (s0 + 0.31 v0 t) e^(-12.5 t) whatever else moves the page, and ReconcileStretchAndScroll scrolls the page back
+ * to its end by up to s(t), before the main thread sees its next scroll event. A root with `overscroll-behavior-y: none`
+ * does not stretch. Returns whether the page bounces.
+ */
+function bounceAtEnd(page: Page, s0 = 30, v0 = 2000) {
+  return page.evaluate(([s0, v0]) => {
+    if (getComputedStyle(document.documentElement).overscrollBehaviorY === 'none') return false;
+    const start = performance.now();
+    const reconcile = () => {
+      const t = (performance.now() - start) / 1000;
+      const stretch = Math.round((s0 + 0.31 * v0 * t) * Math.exp(-12.5 * t));
+      if (stretch < 1) return removeEventListener('scroll', reconcile, { capture: true });
+      const back = Math.min(stretch, document.scrollingElement!.scrollHeight - innerHeight - scrollY);
+      if (back >= 1) scrollBy({ top: back, behavior: 'instant' });
+    };
+    addEventListener('scroll', reconcile, { capture: true });
+    return true;
+  }, [s0, v0]);
+}
+
+/** How far the list moved down, frame by frame, while `run` scrolls it up. */
+async function downwardMoves(viewer: Viewer, run: () => Promise<void>) {
+  await viewer.frame().evaluate(() => {
+    const root = document.querySelector<HTMLElement>('.pierre-diffs')!;
+    const w = window as unknown as { glideTops: number[] | null };
+    w.glideTops = [root.scrollTop];
+    const frame = () => {
+      if (!w.glideTops) return;
+      w.glideTops.push(root.scrollTop);
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  });
+  await run();
+  const tops = await viewer.frame().evaluate(() => {
+    const w = window as unknown as { glideTops: number[] | null };
+    const tops = w.glideTops!;
+    w.glideTops = null;
+    return tops;
+  });
+  return { up: tops[0]! - tops.at(-1)!, down: tops.slice(1).map((t, i) => t - tops[i]!).filter((d) => d > 0.5) };
 }
 
 test.afterAll(async ({ extContext }) => setExperiments(extContext, null));
@@ -109,6 +156,7 @@ test("both off: today's layout, and turning page scrolling on switches an open t
   expect(off.overflowY).toBe('auto');
   expect(off.scrollbar).not.toBe('none');
   expect(Math.abs(off.iframeBottom - off.innerHeight)).toBeLessThanOrEqual(1);
+  expect(off.overscrollY).toBe('auto');
   await page.screenshot({ path: `${SHOTS}/off.png` });
 
   await setExperiments(extContext, { pageScroll: true, mergedBar: false }, page);
@@ -169,6 +217,33 @@ test("page scrolling: GitHub's header scrolls away, the tree and file headers st
   expect(end.footerDisplay).toBe('none');
   expect(Math.abs(end.wrapperBottom! - end.innerHeight)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: `${SHOTS}/page-end.png` });
+});
+
+test('page scrolling: flicking past the end and straight back up does not pull the list back down', async ({ page, extContext }) => {
+  await setExperiments(extContext, { pageScroll: true, mergedBar: false }, page);
+  const viewer = await openPierre(page, REACT);
+  await viewer.scrollToFile((await viewer.order()).at(-1)!);
+  await page.waitForTimeout(1000);
+  await wheel(page, 300, 10);
+  // Up and back first: Pierre measures the files above the end, which moves the list without moving the diffs.
+  await wheel(page, -300, 10);
+  await wheel(page, 300, 30);
+  expect((await positions(page, viewer)).atBottom).toBe(true);
+
+  await page.mouse.wheel(0, 600);
+  await page.waitForTimeout(50);
+  const cdp = await page.context().newCDPSession(page);
+  const moves = await downwardMoves(viewer, async () => {
+    await bounceAtEnd(page);
+    // A trackpad flick: decaying deltas at half the display's frame rate (a 120 Hz MacBook Pro screen).
+    for (let i = 0; i < 30; i++) {
+      void cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 900, y: 650, deltaX: 0, deltaY: -Math.max(1, Math.round(90 * 0.92 ** i)) });
+      await page.waitForTimeout(33);
+    }
+    await page.waitForTimeout(500);
+  });
+  expect(moves.up).toBeGreaterThan(500);
+  expect(moves.down).toEqual([]);
 });
 
 test('page scrolling: a reload comes back to the same file', async ({ page, extContext }) => {
