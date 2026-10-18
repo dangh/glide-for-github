@@ -128,36 +128,31 @@ body {
   }
 }
 
-.experiments,
 .options-checks {
   display: grid;
   gap: 10px;
   max-width: 720px;
 }
 
-.experiment,
 .options-check {
   display: flex;
   align-items: flex-start;
   gap: 8px;
 }
 
-.experiment input,
 .options-check input {
   margin: 3px 0 0;
 }
 
-.experiment[aria-disabled] {
+.options-check[aria-disabled] {
   color: var(--pierre-muted);
 }
 
-.experiment-label,
 .options-check-label {
   display: block;
   font-weight: 600;
 }
 
-.experiment-description,
 .options-check-description {
   display: block;
   color: var(--pierre-muted);

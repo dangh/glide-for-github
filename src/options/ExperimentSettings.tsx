@@ -16,11 +16,11 @@ function Experiment({
   onChange(v: boolean): void;
 }) {
   return (
-    <label className="experiment" aria-disabled={disabled || undefined}>
+    <label className="options-check" aria-disabled={disabled || undefined}>
       <input type="checkbox" checked={value} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
       <span>
-        <span className="experiment-label">{label}</span>
-        <span className="experiment-description">{description}</span>
+        <span className="options-check-label">{label}</span>
+        <span className="options-check-description">{description}</span>
       </span>
     </label>
   );
@@ -29,7 +29,7 @@ function Experiment({
 export function ExperimentSettingsForm({ experiments, update }: { experiments: ExperimentSettings; update: Update }) {
   const set = (patch: Partial<ExperimentSettings>) => update({ experiments: patch });
   return (
-    <div className="experiments">
+    <div className="options-checks">
       <Experiment
         label="Scroll with the page"
         description="GitHub's page scrolls the diffs, so its header scrolls away and the footer is reachable, like GitHub's own Files changed page."
