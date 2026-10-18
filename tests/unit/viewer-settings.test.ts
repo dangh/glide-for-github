@@ -1,5 +1,7 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, SETTINGS_STORAGE_KEY, setSettingsStorage, type DisplaySettings, type SettingsStorage } from '../../src/shared/settings';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_SETTINGS, saveSettings, SETTINGS_STORAGE_KEY, setSettingsStorage, type DisplaySettings, type SettingsStorage } from '../../src/shared/settings';
+import { PORT_TIMEOUT_MESSAGE } from '../../src/viewer/connection';
+import { usePr } from '../../src/viewer/state/store';
 import { initSettings, reconcileSettings, useSettings } from '../../src/viewer/state/settings';
 import { createDiffOptionsBuilder, ITEM_METRICS, itemMetricsFor } from '../../src/viewer/state/view';
 
@@ -29,6 +31,46 @@ function echoingStorage(): SettingsStorage & { writes: number } {
 const settle = () => new Promise((r) => setTimeout(r, 10));
 
 afterEach(() => setSettingsStorage(undefined));
+
+/** Chrome's storage once the extension was reloaded or updated under the page: calls throw at once. */
+function invalidatedStorage(): SettingsStorage {
+  const lost = () => {
+    throw new Error('Extension context invalidated.');
+  };
+  return { area: { get: lost, set: lost }, subscribe: () => () => undefined } as unknown as SettingsStorage;
+}
+
+describe('after the extension was reloaded or updated under the page', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    usePr.getState().setNotice(null);
+  });
+
+  it('saveSettings returns a failed save instead of throwing, also on the fast path of a followed, loaded store', async () => {
+    // Loaded and followed first (the viewer's normal state), so the write skips the read and calls set() directly.
+    const storage = echoingStorage();
+    setSettingsStorage(storage);
+    const unsubscribe = initSettings();
+    await settle();
+    storage.area.set = () => {
+      throw new Error('Extension context invalidated.');
+    };
+    let save: Promise<unknown> | undefined;
+    expect(() => (save = saveSettings({ layout: { showTree: false } }))).not.toThrow();
+    await expect(save).rejects.toThrow('Extension context invalidated.');
+    unsubscribe();
+  });
+
+  it("a settings change still applies on screen and tells the user to reload, without an uncaught error", async () => {
+    setSettingsStorage(invalidatedStorage());
+    vi.stubGlobal('chrome', { runtime: {} });
+    useSettings.getState().update({ layout: { showTree: false } });
+    expect(useSettings.getState().settings.layout.showTree).toBe(false);
+    await settle();
+    expect(usePr.getState().notice).toEqual({ kind: 'error', message: PORT_TIMEOUT_MESSAGE });
+    useSettings.setState({ settings: structuredClone(DEFAULT_SETTINGS) as DisplaySettings });
+  });
+});
 
 describe('viewer settings identity', () => {
   it('a tree-only change, a review toggle and the storage echo produce no new diff-options object', async () => {

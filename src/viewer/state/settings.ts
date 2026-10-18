@@ -15,6 +15,8 @@ import {
   type DiffSettings,
   type DisplaySettings,
 } from '../../shared/settings';
+import { PORT_TIMEOUT_MESSAGE } from '../connection';
+import { usePr } from './store';
 
 export interface SettingsState {
   settings: DisplaySettings;
@@ -59,7 +61,11 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   update(patch) {
     const next = merge(get().settings, patch);
     if (next !== get().settings) set({ settings: next });
-    saveSettings(patch).catch((err: unknown) => console.warn('[pierre] saving settings failed', err));
+    saveSettings(patch).catch((err: unknown) => {
+      // The extension was reloaded or updated under this page: nothing it does can persist until a reload.
+      if (!globalThis.chrome?.runtime?.id) usePr.getState().setNotice({ kind: 'error', message: PORT_TIMEOUT_MESSAGE });
+      else console.warn('[pierre] saving settings failed', err);
+    });
   },
   setColorMode: (colorMode) => set({ colorMode }),
 }));

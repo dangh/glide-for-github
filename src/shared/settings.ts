@@ -598,7 +598,14 @@ export function saveSettings(patch: DeepPartial<DisplaySettings>): Promise<Displ
   const write = (next: DeepPartial<DisplaySettings>): Promise<DisplaySettings> => {
     known = next;
     outstanding.push(fingerprint(next));
-    return area.set({ [SETTINGS_STORAGE_KEY]: next }).then(
+    let saved: Promise<void>;
+    try {
+      saved = area.set({ [SETTINGS_STORAGE_KEY]: next });
+    } catch (err) {
+      // Chrome throws here, not in the promise, once the extension was reloaded or updated under this page.
+      saved = Promise.reject(err);
+    }
+    return saved.then(
       () => resolve(next),
       (err: unknown) => {
         forgetKnown();
