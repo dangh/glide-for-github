@@ -21,6 +21,7 @@ review features: comments, suggestions, resolving threads, viewed files and revi
 - Apply a suggestion, or a batch of suggestions, as a commit (see the caveat below).
 - Viewed checkboxes stay in sync with GitHub's own viewed state, in both directions.
 - Commit range picker (all commits, one commit, a range) and hide-whitespace.
+- File groups: tabs above the tree and the diffs show one kind of file at a time (see [File groups](#file-groups)).
 - Reading needs no token. Posting comments, replies, reviews, edits and reactions needs one (next section). Applying
   suggestions, resolving threads and marking files viewed use your signed-in GitHub session, so they work without a
   token.
@@ -34,6 +35,27 @@ review features: comments, suggestions, resolving threads, viewed files and revi
 - Experimental, off by default, on the options page only: scroll the diffs with GitHub's page (its header scrolls
   away and the footer is reachable), and fold GitHub's sticky pull request header into Glide's toolbar, with the
   stack button of a stacked pull request (its menu opens the other pull requests of the stack in Glide).
+
+## File groups
+
+Tabs under the toolbar split a pull request by kind of file: **All**, **Source**, **Tests**, **Docs**, **Infra**,
+**Manifest** and **Artifacts**, each with its file count. A tab filters the file tree and the diff list together, and
+switching is instant: diffs that already loaded stay loaded, and collapsed files stay collapsed. The viewed counter
+still counts the whole pull request. Arrow keys, Home and End move between the tabs.
+
+- **Smart defaults.** Source is code and business logic only. Lock files, readmes, changelogs and tool config go to
+  Manifest; Dockerfiles, Terraform, CDK, serverless and CI config to Infra; `dist/`, minified and generated code and
+  archives to Artifacts; test cases, mocks and fixtures to Tests.
+- **Your groups.** On the options page, rename, reorder, add or delete groups, each with
+  [gitignore-style patterns](https://git-scm.com/docs/gitignore#_pattern_format) (case-insensitive, a later line
+  overrides an earlier one, `!Manifest` excludes what the Manifest group holds, a group whose first line is a `!`
+  starts from every file). A "Try a path" box shows where a path lands.
+- **Where a pull request opens.** All by default, or any group. The group you pick on a pull request is remembered
+  for it across reloads. Groups with no files are hidden (an option). Turn the tabs off, and Glide shows every file
+  as before.
+
+The groups, their patterns and the pattern engine come from [Sift for GitHub](https://github.com/dangh/sift-for-github),
+which adds the same tabs to GitHub's own Files changed page. Already use Sift? The options page imports its tabs.
 
 ## Install
 
@@ -130,5 +152,8 @@ Store. See [store/README.md](store/README.md) for the store listing and release 
 Glide's diff viewer and file tree are Pierre's: [@pierre/diffs](https://www.npmjs.com/package/@pierre/diffs) and
 [@pierre/trees](https://www.npmjs.com/package/@pierre/trees), both Apache-2.0. Their licenses and those of the other
 bundled packages ship in the extension as `THIRD_PARTY_NOTICES.txt`. Glide is not affiliated with Pierre or GitHub.
+
+File groups are ported from [Sift for GitHub](https://github.com/dangh/sift-for-github) (MIT, same author): its default
+tabs, gitignore-style patterns and classifier.
 
 Glide's own code is released under the [MIT license](LICENSE). Privacy policy: [store/PRIVACY.md](store/PRIVACY.md).
