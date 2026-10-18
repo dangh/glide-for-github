@@ -106,6 +106,24 @@ describe('wheel hand-off', () => {
     expect(s.handOffs().at(-1)).toEqual({ type: 'scrollBy', dy: 100 });
   });
 
+  it("the list's position goes to the page before a hand-off, even when its scroll event is still to come", async () => {
+    const s = setup();
+    s.page(300, true);
+    await flush();
+    s.wheel(-100);
+    s.scrollList(200);
+    s.wheel(-200);
+    s.root.scrollTop = 0; // the list reached its top; its scroll event comes with the next frame
+    s.wheel(-100);
+    s.root.dispatchEvent(new Event('scroll'));
+    await flush();
+    // Otherwise the page would apply the hand-off, then go back to where the list's top puts it.
+    expect(s.sent.filter((m) => m.type !== 'extent').slice(-2)).toEqual([
+      { type: 'scrollTo', top: 0, seq: 2 },
+      { type: 'scrollBy', dy: -100 },
+    ]);
+  });
+
   it('a gesture that began at the list edge is left to the browser (it chains it to the page)', async () => {
     const s = setup();
     s.page(EXTENT, true);
