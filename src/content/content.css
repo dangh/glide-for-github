@@ -5,6 +5,11 @@ iframe[data-pierre-viewer] {
   border: 0;
 }
 
+/* GitHub's Files changed page spans the window (32 px side padding); other PR tabs cap .container-xl at 1280 px. */
+.container-xl:has(iframe[data-pierre-viewer]) {
+  max-width: none;
+}
+
 a[data-pierre-tab] {
   cursor: pointer;
 }
