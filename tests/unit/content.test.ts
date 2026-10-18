@@ -173,6 +173,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
       expect(host.iframe.src).toContain('pr=dangh%2Fpierre-sandbox%231');
       expect(host.iframe.style.height).toMatch(/^calc\(100vh - \d+px\)$/);
       expect(host.iframe.style.minHeight).toBe('320px');
+      expect(host.iframe.getAttribute('allow')).toBe('clipboard-write');
       expect(hiddenAncestor(content)).toBe(true);
 
       host.unmount();

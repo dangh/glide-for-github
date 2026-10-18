@@ -69,6 +69,8 @@ export function mountViewer(doc: Document, ref: PrRef, layout: ScrollLayout = 'f
   iframe.setAttribute('src', resolveExtensionUrl('viewer.html?pr=' + encodeURIComponent(prKey(ref)) + layoutParam));
   iframe.setAttribute('title', BRAND.short);
   iframe.setAttribute('data-pierre-viewer', '');
+  // A cross-origin frame may write the clipboard (copy branch name, copy path) only when its embedder delegates it.
+  iframe.setAttribute('allow', 'clipboard-write');
   iframe.style.cssText = `display:block;width:100%;border:0;min-height:${MIN_VIEWER_HEIGHT_PX}px;`;
   const pageScroll = layout === 'frame' ? null : createPageScroll(doc, anchor, iframe, layout);
   /** What sits in the page: the iframe, or the page-scroll wrapper holding it. */
