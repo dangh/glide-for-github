@@ -117,8 +117,12 @@ const radio = (value: string) => document.querySelector<HTMLInputElement>(`input
 const gql = () => fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init.body)) as { query: string; variables: { input: Record<string, unknown> } });
 
 describe('ReviewMenu', () => {
-  it('labels the button "Submit review" like GitHub, or "Review (N pending)"', async () => {
+  it('labels the button "Submit review" like GitHub ("Submit comments" on a closed PR), or "Review (N pending)"', async () => {
     await render(<ReviewMenu />);
+    expect(reviewButton().textContent).toBe('Submit review');
+    await act(async () => usePr.getState().setPr({ ...usePr.getState().pr!, state: 'closed' }));
+    expect(reviewButton().textContent).toBe('Submit comments');
+    await act(async () => usePr.getState().setPr({ ...usePr.getState().pr!, state: 'merged' }));
     expect(reviewButton().textContent).toBe('Submit review');
     await act(async () => usePr.getState().setPendingReview({ nodeId: 'PRR_1', count: 2 }));
     expect(reviewButton().textContent).toContain('Review (2 pending)');

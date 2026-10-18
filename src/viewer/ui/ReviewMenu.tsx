@@ -36,12 +36,13 @@ export const REVIEW_EVENTS: { event: ReviewEvent; label: string; description: st
   },
 ];
 
-/** GitHub's label; a narrow toolbar shows the noun alone. */
+/** GitHub's label: "Submit comments" on a closed PR, else "Submit review"; a narrow toolbar shows the noun alone. */
 function SubmitLabel() {
+  const closed = usePr((s) => s.pr?.state === 'closed');
   return (
     <span>
       <span className="submit-verb">Submit </span>
-      <span className="submit-noun">review</span>
+      <span className="submit-noun">{closed ? 'comments' : 'review'}</span>
     </span>
   );
 }
