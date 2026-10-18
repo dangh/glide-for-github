@@ -73,28 +73,66 @@ button {
   flex: 1;
 }
 
-/* Merged bar (page-scrolling experiment): GitHub's sticky PR header, state label + title + number, shrinks first. */
-.pr-title {
-  display: inline-flex;
+/*
+ * Merged bar (page-scrolling experiment): the iframe spans the viewport (src/content/page-scroll.ts), so GitHub's page
+ * gutters (Primer's container: 16 px, 24 px from 768 px, 32 px from 1012 px) move inside it.
+ */
+html[data-scroll-layout='merged'] {
+  --gutter: 16px;
+}
+
+@media (width >= 768px) {
+  html[data-scroll-layout='merged'] {
+    --gutter: 24px;
+  }
+}
+
+@media (width >= 1012px) {
+  html[data-scroll-layout='merged'] {
+    --gutter: 32px;
+  }
+}
+
+html[data-scroll-layout='merged'] .pierre-app {
+  padding-inline: var(--gutter);
+}
+
+/* Stuck, GitHub's bar spans the viewport with the gutters inside it; 8 px above and below its two-row summary. */
+.pierre-toolbar[data-stuck] {
+  height: 60px;
+  margin-inline: calc(-1 * var(--gutter));
+  padding: 8px var(--gutter);
+}
+
+/* GitHub's sticky PR header in the toolbar: state label, then title + number above the commit range and branches. */
+.pr-header {
+  display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  flex: 0 1 auto;
-  font-size: 14px;
 }
 
+/* Primer's large StateLabel (measured on /changes: 32 px, 14px/600, 8 px 12 px, 16 px icon 4 px from the text). */
 .pr-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   flex: none;
-  padding: 0 10px;
+  padding: 8px 12px;
   border-radius: 2em;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 24px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
   color: #fff;
 }
 
 .pr-state-open {
   background: var(--pierre-primary-bg);
+}
+
+.pr-state-draft {
+  background: light-dark(#59636e, #656c76);
 }
 
 .pr-state-merged {
@@ -105,6 +143,20 @@ button {
   background: light-dark(#cf222e, #da3633);
 }
 
+/* 45 px: the 21 px title row overlaps the 28 px row below it by 4 px, as on GitHub. */
+.pr-summary {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pr-title-row {
+  display: flex;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 21px;
+}
+
 .pr-title-text {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -112,16 +164,120 @@ button {
   font-weight: 600;
 }
 
-.pr-title-text code {
-  padding: 0.2em 0.4em;
-  border-radius: 6px;
-  background: var(--pierre-bg-subtle);
-  font: 85% var(--pierre-mono);
-}
-
 .pr-number {
   flex: none;
+  padding-left: 8px;
   color: var(--pierre-muted);
+}
+
+/* The commit range button's text lines up with the title above it (GitHub's invisible button, 8 px padding). */
+.pr-summary-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 28px;
+  margin: -4px 0 0 -8px;
+}
+
+.pr-summary-row .range-picker > .pill {
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.pr-summary-row .range-picker > .pill > .icon:first-child {
+  display: none;
+}
+
+.pr-summary-row .range-picker > .pill:hover {
+  background: light-dark(#818b9826, #656c7633);
+}
+
+/* GitHub shows the branch summary from 1012 px. */
+.pr-branches {
+  display: none;
+  align-items: center;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+@media (width >= 1012px) {
+  .pr-branches {
+    display: flex;
+  }
+}
+
+.pr-branches-divider {
+  flex: none;
+  height: 16px;
+  margin: 0 4px;
+  border-left: 1px solid var(--pierre-border);
+}
+
+.pr-branches-text {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 0 8px 0 10px;
+  color: var(--pierre-muted);
+  white-space: nowrap;
+}
+
+.pr-actor {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.pr-actor:hover {
+  color: var(--pierre-accent);
+  text-decoration: underline;
+}
+
+/* Primer BranchName. */
+.branch-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: light-dark(#ddf4ff, rgba(56, 139, 253, 0.1));
+  color: var(--pierre-accent);
+  font-family: var(--pierre-mono);
+  text-decoration: none;
+}
+
+.branch-name:hover {
+  text-decoration: underline;
+}
+
+/* Primer's invisible icon button (28 px, muted icon). */
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--pierre-muted);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background: light-dark(#818b9826, #656c7633);
+}
+
+/* GitHub's divider between the viewed counter and Submit review. */
+.toolbar-divider {
+  flex: none;
+  height: 28px;
+  margin: 0 4px;
+  border-left: 1px solid var(--pierre-border);
 }
 
 /* Primer small buttons: 28 px, 12px/500. */
@@ -133,12 +289,19 @@ button {
   border: 1px solid var(--pierre-border);
   border-radius: 6px;
   padding: 0 8px;
-  background: var(--pierre-bg-subtle);
+  background: light-dark(#f6f8fa, #212830);
+  box-shadow: 0 1px 0 light-dark(rgba(31, 35, 40, 0.04), transparent);
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
   line-height: 18px;
   white-space: nowrap;
+}
+
+/* Primer's trailing action (the menu chevron) sits 4 px from the button's edge. */
+.pill:has(> .icon:last-child:not(:first-child)),
+.btn-primary:has(> .icon:last-child) {
+  padding-right: 4px;
 }
 
 .pill .icon,
@@ -181,9 +344,12 @@ button {
   cursor: pointer;
 }
 
-.tree-toggle[aria-expanded='true'],
 .tree-toggle:hover {
   background: light-dark(#818b9826, #656c7633);
+}
+
+.tree-toggle[aria-expanded='true'] {
+  background: light-dark(#818b9826, #656c7640);
 }
 
 .seg {
@@ -214,6 +380,13 @@ button {
   font-weight: 500;
 }
 
+/* GitHub drops the word below 1012 px. */
+@media (width < 1012px) {
+  .viewed-word {
+    display: none;
+  }
+}
+
 .viewed-ring-track {
   stroke: var(--pierre-border);
 }
@@ -230,9 +403,12 @@ button {
   height: 28px;
   background: var(--pierre-primary-bg);
   color: #fff;
-  border: 1px solid rgba(31, 35, 40, 0.15);
+  border: 1px solid light-dark(rgba(31, 35, 40, 0.15), rgba(255, 255, 255, 0.15));
   border-radius: 6px;
-  padding: 0 12px;
+  padding: 0 8px;
+  box-shadow:
+    0 1px 1px light-dark(rgba(31, 35, 40, 0.04), rgba(1, 4, 9, 0.6)),
+    0 1px 2px light-dark(rgba(31, 35, 40, 0.03), rgba(1, 4, 9, 0.6));
   font-weight: 500;
   font-size: 12px;
   line-height: 18px;
@@ -248,6 +424,18 @@ button {
 /* Popovers */
 .popover {
   position: relative;
+}
+
+/* GitHub's diff view settings button: a 28 px gear at the toolbar's end, its menu opening leftwards. */
+.display-menu > .pill {
+  justify-content: center;
+  width: 28px;
+  padding: 0;
+}
+
+.display-menu > .popover-panel {
+  left: auto;
+  right: 0;
 }
 
 /* GitHub's ActionMenu overlay: 14 px text, 12 px radius, overlay background, 32 px rows. */

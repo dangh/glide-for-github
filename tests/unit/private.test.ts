@@ -42,6 +42,8 @@ describe('fetchPrData', () => {
     expect(pr.author).toBe('dangh');
     expect(pr.title).toBe('review-me: sandbox fixture PR');
     expect(pr.state).toBe('open');
+    expect(pr.mergedBy).toBeUndefined();
+    expect(pr.branches).toEqual({ base: 'main', head: { owner: 'dangh', repo: 'pierre-sandbox', branch: 'review-me' }, commits: 4 });
     expect(pr.baseOid).toBe(route.comparison.fullDiff.baseOid);
     expect(pr.headOid).toBe(route.comparison.fullDiff.headOid);
     expect(pr.headOid).toBe(fixture('meta.json').headOid);
@@ -61,6 +63,22 @@ describe('fetchPrData', () => {
     const routeReads = threads.calls.filter((c) => String(c.args[0]).endsWith('/changes'));
     expect(routeReads.length).toBeGreaterThan(0);
     for (const c of routeReads) expect(c.args[2]).toEqual({ dataRouter: true });
+  });
+
+  it("reads GitHub's draft and merged states, who merged, and a fork's head; a route without branch names has no branches", async () => {
+    const withPr = (patch: Record<string, unknown>) =>
+      fakeRpc((path) => {
+        if (path !== `${base}/changes`) return undefined;
+        const data = structuredClone(fixture('route.json'));
+        Object.assign(data.payload.pullRequestsChangesRoute.pullRequest, patch);
+        return { data, link: null };
+      });
+    const draft = await fetchPrData(withPr({ state: 'DRAFT', headRepositoryOwnerLogin: 'fork', headRepositoryName: 'sandbox-fork' }), ref);
+    expect(draft.state).toBe('draft');
+    expect(draft.branches?.head).toEqual({ owner: 'fork', repo: 'sandbox-fork', branch: 'review-me' });
+    const merged = await fetchPrData(withPr({ state: 'MERGED', mergedBy: 'octocat' }), ref);
+    expect(merged).toMatchObject({ state: 'merged', mergedBy: 'octocat' });
+    expect((await fetchPrData(withPr({ headBranch: null }), ref)).branches).toBeUndefined();
   });
 
   it('builds file summaries in GitHub order with statuses, counts and digests', async () => {

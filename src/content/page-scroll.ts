@@ -53,11 +53,28 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
   /** GitHub's elements restyled here (hidden footer, `merged` header; the root) and their inline style to restore. */
   const restyled = new Map<HTMLElement, string | null>();
 
+  /**
+   * `merged`: the iframe reaches past GitHub's page gutters to the viewport's edges, so its toolbar spans the viewport
+   * once stuck, like GitHub's; the viewer keeps the gutters around its content.
+   */
+  let bleed = '';
+
   const layoutSizes = () => {
     const sizes = stickySizes(stickTop, extent);
     wrapper.style.cssText = `position:relative;width:100%;flex:1 1 auto;min-width:0;height:${sizes.wrapper};`;
-    iframe.style.cssText = `display:block;width:100%;border:0;position:sticky;top:${stickTop}px;height:${sizes.iframe};`;
+    iframe.style.cssText = `display:block;width:100%;border:0;position:sticky;top:${stickTop}px;height:${sizes.iframe};${bleed}`;
   };
+
+  const fitBleed = () => {
+    const { left, right } = wrapper.getBoundingClientRect();
+    const next = `margin-left:${-left}px;width:calc(100% + ${left + doc.documentElement.clientWidth - right}px);`;
+    if (next === bleed) return;
+    bleed = next;
+    layoutSizes();
+  };
+  /** The wrapper's width changes with the gutters (and when it enters the page). */
+  const bleeds = layout === 'merged' ? new win.ResizeObserver(fitBleed) : null;
+  bleeds?.observe(wrapper);
 
   const sendScroll = () => {
     if (!port) return;
@@ -161,6 +178,7 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
     },
     refresh: remeasure,
     dispose() {
+      bleeds?.disconnect();
       win.removeEventListener('scroll', onScroll);
       win.removeEventListener('resize', onResize);
       win.cancelAnimationFrame(resizeFrame);

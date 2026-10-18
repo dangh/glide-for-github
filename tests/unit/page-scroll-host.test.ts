@@ -14,7 +14,24 @@ const ref: PrRef = { owner: 'dangh', repo: 'pierre-sandbox', number: 1, page: 'c
 const EXT = 'chrome-extension://abcdefghijklmnop/';
 const STICKY_STYLE = 'position: sticky; display: none';
 
-const rect = (top: number, height: number) => ({ top, height, bottom: top + height, left: 0, right: 0, width: 0, x: 0, y: top, toJSON() {} }) as DOMRect;
+const rect = (top: number, height: number, left = 0, right = 0) =>
+  ({ top, height, bottom: top + height, left, right, width: right - left, x: left, y: top, toJSON() {} }) as DOMRect;
+
+/** jsdom has no ResizeObserver: `resizeAll()` plays the browser reporting every observed element. */
+const observers = new Set<() => void>();
+const resizeAll = () => observers.forEach((fire) => fire());
+class FakeResizeObserver {
+  #fire: () => void;
+  constructor(callback: () => void) {
+    this.#fire = () => callback();
+  }
+  observe() {
+    observers.add(this.#fire);
+  }
+  disconnect() {
+    observers.delete(this.#fire);
+  }
+}
 
 /** Adds GitHub's sticky PR header (hidden until the title scrolls away; 60 px when shown) to the layout header. */
 function addStickyHeader(): HTMLElement {
@@ -28,6 +45,8 @@ function addStickyHeader(): HTMLElement {
 
 let original: string;
 let wrapperTop = 261;
+/** The wrapper's left and right edges in the viewport, and the viewport's width without its scrollbar. */
+let wrapperX = { left: 0, right: 0, viewport: 0 };
 
 beforeEach(() => {
   setExtensionUrlResolver((path) => EXT + path);
@@ -35,13 +54,18 @@ beforeEach(() => {
   document.body.innerHTML = readFileSync(resolve(__dirname, '../fixtures/dom/pr-tabs-new.html'), 'utf8');
   original = document.body.innerHTML;
   wrapperTop = 261;
+  wrapperX = { left: 0, right: 0, viewport: 0 };
+  vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+  vi.spyOn(document.documentElement, 'clientWidth', 'get').mockImplementation(() => wrapperX.viewport);
   vi.spyOn(HTMLDivElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLDivElement) {
-    return this.hasAttribute('data-glide-scroll') ? rect(wrapperTop, 0) : rect(0, 0);
+    return this.hasAttribute('data-glide-scroll') ? rect(wrapperTop, 0, wrapperX.left, wrapperX.right) : rect(0, 0);
   });
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  observers.clear();
   document.body.innerHTML = '';
   document.documentElement.removeAttribute('style');
 });
@@ -253,6 +277,34 @@ describe('merged layout', () => {
 
     host.unmount();
     expect(again.getAttribute('style')).toBe(STICKY_STYLE);
+  });
+
+  it("spans the viewport past GitHub's page gutters, refitted as they change, keeping its sticky sizing", () => {
+    addStickyHeader();
+    const host = mountViewer(document, ref, 'merged');
+    wrapperX = { left: 32, right: 1553, viewport: 1585 };
+    resizeAll();
+    expect(host.iframe.style.marginLeft).toBe('-32px');
+    expect(host.iframe.style.width).toBe('calc(100% + 64px)');
+    expect(host.iframe.style.top).toBe('0px');
+    expect(host.iframe.style.height).toBe('calc(100vh - 0px)');
+
+    wrapperX = { left: 24, right: 961, viewport: 985 };
+    resizeAll();
+    expect(host.iframe.style.marginLeft).toBe('-24px');
+    expect(host.iframe.style.width).toBe('calc(100% + 48px)');
+    host.unmount();
+    expect(observers.size).toBe(0);
+  });
+
+  it('page layout keeps the iframe inside the gutters', () => {
+    addStickyHeader();
+    const host = mountViewer(document, ref, 'page');
+    wrapperX = { left: 32, right: 1553, viewport: 1585 };
+    resizeAll();
+    expect(host.iframe.style.marginLeft).toBe('');
+    expect(host.iframe.style.width).toBe('100%');
+    host.unmount();
   });
 
   it('without a header to hide it falls back to the page layout (nothing hidden)', () => {

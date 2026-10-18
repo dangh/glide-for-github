@@ -1,9 +1,12 @@
 /**
- * Toolbar: commit range, Split/Unified, Wrap, Hide whitespace, Display menu, viewed counter, Review button; with the
- * merged bar (page-scrolling experiment), the PR's state, title and number while GitHub's own title is scrolled away.
+ * Toolbar, laid out like GitHub's Files changed toolbar: file tree button, commit range, then viewed counter, Submit
+ * review and the Display (settings) button. Outside the merged bar, Split/Unified, Wrap and Hide whitespace sit after
+ * the commit range. With the merged bar (page-scrolling experiment) the toolbar has no such toggles (they are in the
+ * Display menu, as on GitHub), and while GitHub's title is scrolled away it shows GitHub's sticky PR header instead of
+ * the commit range: state label, then title and number above the commit range and branch summary.
  * Each control subscribes to its own slice, so diff loading never re-renders the toolbar.
  */
-import { memo } from 'react';
+import { memo, useEffect, useState, type ReactNode } from 'react';
 import { resolveDiffChoice } from '../../shared/github-defaults';
 import type { PrState } from '../github/private';
 import { usePageScroll } from '../pageScroll';
@@ -11,32 +14,120 @@ import { useSettings } from '../state/settings';
 import { usePr } from '../state/store';
 import { CommitRangePicker } from './CommitRangePicker';
 import { DisplayMenu } from './DisplayMenu';
-import { ProgressRing, SidebarCollapseIcon, SidebarExpandIcon } from './icons';
+import {
+  CheckIcon,
+  CopyIcon,
+  GitMergeIcon,
+  GitPullRequestClosedIcon,
+  GitPullRequestDraftIcon,
+  GitPullRequestIcon,
+  ProgressRing,
+  SidebarCollapseIcon,
+  SidebarExpandIcon,
+} from './icons';
 import { ReviewMenu } from './ReviewMenu';
 
-const STATE_LABELS: Record<PrState, string> = { open: 'Open', closed: 'Closed', merged: 'Merged' };
+/** GitHub's state labels (verified on react/react PRs in each state, 2026-10-19). */
+const STATE_LABELS: Record<PrState, { text: string; icon: ReactNode }> = {
+  open: { text: 'Open', icon: <GitPullRequestIcon /> },
+  draft: { text: 'Draft', icon: <GitPullRequestDraftIcon /> },
+  closed: { text: 'Closed', icon: <GitPullRequestClosedIcon /> },
+  merged: { text: 'Merged', icon: <GitMergeIcon /> },
+};
 
-/** A PR title with its `code spans` (the only markup GitHub renders in titles); unbalanced backticks stay text. */
-function titleParts(title: string) {
-  const parts = title.split('`');
-  if (parts.length % 2 === 0) return title;
-  return parts.map((part, i) => (i % 2 === 1 ? <code key={i}>{part}</code> : part));
+const COPIED_MS = 2000;
+
+const github = (path: string) => `https://github.com/${path.split('/').map(encodeURIComponent).join('/')}`;
+
+function BranchName({ owner, repo, branch, label }: { owner: string; repo: string; branch: string; label: string }) {
+  return (
+    <a className="branch-name" href={github(`${owner}/${repo}/tree/${branch}`)} target="_top" title={`${owner}/${repo}:${branch}`}>
+      {label}
+    </a>
+  );
 }
 
-/** GitHub's sticky PR header, folded into the toolbar like on GitHub's Files changed page. */
-const PrTitle = memo(function PrTitle() {
-  const show = usePageScroll((s) => s.layout === 'merged' && s.stuck);
+function CopyBranch({ branch }: { branch: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), COPIED_MS);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  const label = copied ? 'Copied!' : 'Copy head branch name to clipboard';
+  return (
+    <button
+      type="button"
+      className="icon-button"
+      aria-label={label}
+      title={label}
+      onClick={() => void navigator.clipboard?.writeText(branch).then(() => setCopied(true), () => undefined)}
+    >
+      {copied ? <CheckIcon /> : <CopyIcon />}
+    </button>
+  );
+}
+
+/** "<who> merged|wants to merge <n> commits into <base> from <head>"; forks name each branch's owner, like GitHub. */
+const BranchSummary = memo(function BranchSummary() {
+  const pr = usePr((s) => s.pr);
+  if (!pr?.branches) return null;
+  const { ref, branches } = pr;
+  const { head } = branches;
+  const merged = pr.state === 'merged';
+  const actor = merged ? pr.mergedBy : pr.author;
+  const fork = head.owner !== ref.owner || head.repo !== ref.repo;
+  const commits = `${branches.commits} ${branches.commits === 1 ? 'commit' : 'commits'}`;
+  return (
+    <span className="pr-branches" data-testid="pr-branches">
+      <span className="pr-branches-divider" />
+      <span className="pr-branches-text">
+        {actor && (
+          <a className="pr-actor" href={github(actor)} target="_top">
+            {actor}
+          </a>
+        )}
+        <span>
+          {merged ? 'merged' : 'wants to merge'} {commits} into
+        </span>
+        <BranchName owner={ref.owner} repo={ref.repo} branch={branches.base} label={fork ? `${ref.owner}:${branches.base}` : branches.base} />
+        <span>from</span>
+        <BranchName owner={head.owner} repo={head.repo} branch={head.branch} label={fork ? `${head.owner}:${head.branch}` : head.branch} />
+        <CopyBranch branch={head.branch} />
+      </span>
+    </span>
+  );
+});
+
+/**
+ * GitHub's sticky PR header, folded into the toolbar like on GitHub's Files changed page. The title is plain text,
+ * backticks included, as GitHub's sticky title shows it.
+ */
+const PrHeader = memo(function PrHeader() {
   const title = usePr((s) => s.pr?.title);
   const number = usePr((s) => s.pr?.ref.number);
   const state = usePr((s) => s.pr?.state);
-  if (!show || !title) return null;
+  if (!title) return <CommitRangePicker />;
   return (
-    <span className="pr-title" data-testid="pr-title">
-      {state && <span className={`pr-state pr-state-${state}`}>{STATE_LABELS[state]}</span>}
-      <span className="pr-title-text" title={title}>
-        {titleParts(title)}
+    <span className="pr-header" data-testid="pr-title">
+      {state && (
+        <span className={`pr-state pr-state-${state}`}>
+          {STATE_LABELS[state].icon}
+          {STATE_LABELS[state].text}
+        </span>
+      )}
+      <span className="pr-summary">
+        <span className="pr-title-row">
+          <span className="pr-title-text" title={title}>
+            {title}
+          </span>
+          <span className="pr-number">#{number}</span>
+        </span>
+        <span className="pr-summary-row">
+          <CommitRangePicker />
+          <BranchSummary />
+        </span>
       </span>
-      <span className="pr-number">#{number}</span>
     </span>
   );
 });
@@ -108,25 +199,32 @@ const ViewedCounter = memo(function ViewedCounter() {
     <span className="viewed-counter" data-testid="viewed-counter">
       <ProgressRing done={total > 0 ? viewed / total : 0} />
       <span>
-        <span className="viewed-count">{viewed}</span> / <span className="viewed-count">{total}</span> viewed
+        <span className="viewed-count">{viewed}</span> / <span className="viewed-count">{total}</span>
+        <span className="viewed-word"> viewed</span>
       </span>
     </span>
   );
 });
 
 export const Toolbar = memo(function Toolbar() {
+  const merged = usePageScroll((s) => s.layout === 'merged');
+  const stuck = usePageScroll((s) => s.stuck) && merged;
   return (
-    <div className="pierre-toolbar" role="toolbar">
+    <div className="pierre-toolbar" role="toolbar" data-stuck={stuck || undefined}>
       <TreeToggle />
-      <PrTitle />
-      <CommitRangePicker />
-      <DiffStyleToggle />
-      <WrapToggle />
-      <WhitespaceToggle />
-      <DisplayMenu />
+      {stuck ? <PrHeader /> : <CommitRangePicker />}
+      {!merged && (
+        <>
+          <DiffStyleToggle />
+          <WrapToggle />
+          <WhitespaceToggle />
+        </>
+      )}
       <span className="grow" />
       <ViewedCounter />
+      <span className="toolbar-divider" />
       <ReviewMenu />
+      <DisplayMenu />
     </div>
   );
 });

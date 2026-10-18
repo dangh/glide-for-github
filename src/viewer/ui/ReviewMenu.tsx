@@ -1,5 +1,5 @@
 /**
- * The toolbar's Review button and menu ("Finish your review", as on GitHub): summary (draft `review-summary`),
+ * The toolbar's Submit review button and menu ("Finish your review", as on GitHub): summary (draft `review-summary`),
  * Comment / Approve / Request changes, Submit review, and Discard pending review (with a confirm step).
  *
  * The PR author cannot approve or request changes on their own pull request: those options are disabled with
@@ -47,7 +47,7 @@ export const ReviewMenu = memo(function ReviewMenu() {
   return (
     <div className="popover review-menu" ref={root}>
       <button type="button" className="btn-primary" aria-haspopup="dialog" aria-expanded={open} data-testid="review-button" onClick={() => setOpen((o) => !o)}>
-        {pending > 0 ? `Review (${pending} pending)` : 'Review'}
+        {pending > 0 ? `Review (${pending} pending)` : 'Submit review'}
         <TriangleDownIcon />
       </button>
       {open && <ReviewPanel close={close} />}

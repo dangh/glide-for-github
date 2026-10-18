@@ -680,7 +680,7 @@ test.describe('review submission (Task 10)', () => {
         await page.keyboard.type(second);
         await c.getByRole('button', { name: 'Add review comment' }).click();
         await expect(c).toHaveCount(0);
-        await expect(reviewButton(viewer)).toHaveText('Review (2 pending) ▾');
+        await expect(reviewButton(viewer)).toHaveText('Review (2 pending)');
       });
 
       await test.step('submit as Comment: GitHub shows one review with both comments', async () => {
@@ -693,7 +693,7 @@ test.describe('review submission (Task 10)', () => {
         await panel.locator('textarea').fill(summary);
         await panel.getByRole('button', { name: 'Submit review' }).click();
         await expect(panel).toHaveCount(0);
-        await expect(reviewButton(viewer)).toHaveText('Review ▾');
+        await expect(reviewButton(viewer)).toHaveText('Submit review');
         const findReview = () => ghApi<{ id: number; body: string; state: string }[]>(`${SANDBOX_REPO}/pulls/${SANDBOX.number}/reviews`).find((r) => r.body === summary);
         await expect.poll(() => findReview()?.state, { timeout: 30_000 }).toBe('COMMENTED');
         const review = findReview()!;
@@ -709,14 +709,14 @@ test.describe('review submission (Task 10)', () => {
         await expect(c.locator('textarea')).toBeFocused();
         await page.keyboard.type(dropped);
         await c.getByRole('button', { name: 'Start a review' }).click();
-        await expect(reviewButton(viewer)).toHaveText('Review (1 pending) ▾');
+        await expect(reviewButton(viewer)).toHaveText('Review (1 pending)');
         expect((await githubPendingReview(page))?.threads).toEqual([expect.objectContaining({ bodies: [dropped] })]);
         await reviewButton(viewer).click();
         const panel = viewer.locator.locator('.review-panel');
         await panel.getByRole('button', { name: 'Discard pending review' }).click();
         await expect(panel).toContainText('1 pending comment');
         await panel.getByRole('button', { name: 'Discard review' }).click();
-        await expect(reviewButton(viewer)).toHaveText('Review ▾');
+        await expect(reviewButton(viewer)).toHaveText('Submit review');
         await expect(fileItem(viewer).locator('.thread', { hasText: dropped })).toHaveCount(0);
         expect(await githubPendingReview(page)).toBeNull();
         const all = ghApi<{ body: string }[]>(`${SANDBOX_REPO}/pulls/${SANDBOX.number}/comments`);

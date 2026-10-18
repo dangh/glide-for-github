@@ -111,20 +111,22 @@ const type = (el: HTMLTextAreaElement | HTMLInputElement, value: string) =>
     Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(el, value);
     el.dispatchEvent(new Event('input', { bubbles: true }));
   });
+const panel = () => document.querySelector<HTMLElement>('.review-panel')!;
+const reviewButton = () => document.querySelector<HTMLButtonElement>('[data-testid="review-button"]')!;
 const radio = (value: string) => document.querySelector<HTMLInputElement>(`input[type="radio"][value="${value}"]`)!;
 const gql = () => fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init.body)) as { query: string; variables: { input: Record<string, unknown> } });
 
 describe('ReviewMenu', () => {
-  it('labels the button "Review", or "Review (N pending)"', async () => {
+  it('labels the button "Submit review" like GitHub, or "Review (N pending)"', async () => {
     await render(<ReviewMenu />);
-    expect(button(/^Review/)!.textContent).toMatch(/^Review\b(?! \()/);
+    expect(reviewButton().textContent).toBe('Submit review');
     await act(async () => usePr.getState().setPendingReview({ nodeId: 'PRR_1', count: 2 }));
-    expect(button(/^Review/)!.textContent).toContain('Review (2 pending)');
+    expect(reviewButton().textContent).toContain('Review (2 pending)');
   });
 
   it('closes when focus leaves the frame for the GitHub page (window blur)', async () => {
     await render(<ReviewMenu />);
-    await click(button(/^Review/)!);
+    await click(reviewButton());
     expect(document.querySelector('.review-panel')).not.toBeNull();
     await act(async () => void window.dispatchEvent(new Event('blur')));
     expect(document.querySelector('.review-panel')).toBeNull();
@@ -132,7 +134,7 @@ describe('ReviewMenu', () => {
 
   it('the PR author cannot Approve or Request changes (GitHub\'s wording); Comment stays available', async () => {
     await render(<ReviewMenu />);
-    await click(button(/^Review/)!);
+    await click(reviewButton());
     expect(radio('COMMENT').disabled).toBe(false);
     expect(radio('COMMENT').checked).toBe(true);
     expect(radio('APPROVE').disabled).toBe(true);
@@ -150,11 +152,11 @@ describe('ReviewMenu', () => {
       return json(200, { data: { submitPullRequestReview: { pullRequestReview: { id: 'PRR_9' } } } });
     });
     await render(<ReviewMenu />);
-    await click(button(/^Review/)!);
+    await click(reviewButton());
     expect(radio('APPROVE').disabled).toBe(false);
     await click(radio('APPROVE'));
     await type(document.querySelector<HTMLTextAreaElement>('.review-menu textarea')!, 'Ship it');
-    await click(button('Submit review')!);
+    await click(button('Submit review', panel())!);
     await settle();
     await settle();
     expect(gql().at(-1)!.variables.input).toEqual({ pullRequestReviewId: 'PRR_9', event: 'APPROVE', body: 'Ship it' });
@@ -164,7 +166,7 @@ describe('ReviewMenu', () => {
 
   it('a summary typed less than a debounce ago is saved on pagehide (a real reload)', async () => {
     await render(<ReviewMenu />);
-    await click(button(/^Review/)!);
+    await click(reviewButton());
     await type(document.querySelector<HTMLTextAreaElement>('.review-menu textarea')!, 'half typed summary');
     expect(usePr.getState().drafts.has(draftKey.reviewSummary)).toBe(false); // still inside the debounce
     window.dispatchEvent(new Event('pagehide'));
@@ -173,16 +175,16 @@ describe('ReviewMenu', () => {
 
   it('Comment needs a summary or pending comments; the summary is kept as the review-summary draft', async () => {
     await render(<ReviewMenu />);
-    await click(button(/^Review/)!);
-    expect(button('Submit review')!.disabled).toBe(true);
+    await click(reviewButton());
+    expect(button('Submit review', panel())!.disabled).toBe(true);
     const ta = document.querySelector<HTMLTextAreaElement>('.review-menu textarea')!;
     await type(ta, 'Some notes');
-    expect(button('Submit review')!.disabled).toBe(false);
+    expect(button('Submit review', panel())!.disabled).toBe(false);
     await act(async () => void ta.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
     expect(usePr.getState().drafts.get(draftKey.reviewSummary)?.body).toBe('Some notes');
     // Closing and reopening keeps the text.
-    await click(button(/^Review/)!);
-    await click(button(/^Review/)!);
+    await click(reviewButton());
+    await click(reviewButton());
     expect(document.querySelector<HTMLTextAreaElement>('.review-menu textarea')!.value).toBe('Some notes');
   });
 
@@ -190,9 +192,9 @@ describe('ReviewMenu', () => {
     usePr.getState().setPendingReview({ nodeId: 'PRR_1', count: 1 });
     fetchMock.mockResolvedValue(json(200, { data: null, errors: [{ type: 'UNPROCESSABLE', message: 'Something went wrong' }] }));
     await render(<ReviewMenu />);
-    await click(button(/^Review/)!);
+    await click(reviewButton());
     await type(document.querySelector<HTMLTextAreaElement>('.review-menu textarea')!, 'Keep me');
-    await click(button('Submit review')!);
+    await click(button('Submit review', panel())!);
     await settle();
     expect(document.querySelector('.review-menu [role="alert"]')!.textContent).toContain('Something went wrong');
     expect(button('Retry')).toBeDefined();
@@ -205,11 +207,11 @@ describe('ReviewMenu', () => {
     usePr.getState().setPendingReview({ nodeId: 'PRR_1', count: 1 });
     fetchMock.mockResolvedValue(json(200, { data: null, errors: [{ type: 'UNPROCESSABLE', message: 'Something went wrong' }] }));
     await render(<ReviewMenu />);
-    await click(button(/^Review/)!);
+    await click(reviewButton());
     const ta = () => document.querySelector<HTMLTextAreaElement>('.review-menu textarea')!;
     await click(radio('APPROVE'));
     await type(ta(), 'Looks good');
-    await click(button('Submit review')!);
+    await click(button('Submit review', panel())!);
     await settle();
     expect(gql().at(-1)!.variables.input).toMatchObject({ event: 'APPROVE', body: 'Looks good' });
     expect(button('Retry')).toBeDefined();
@@ -219,7 +221,7 @@ describe('ReviewMenu', () => {
     expect(document.querySelector('.review-menu [role="alert"]')).toBeNull();
 
     // Fail again, then edit the summary: also clears the error.
-    await click(button('Submit review')!);
+    await click(button('Submit review', panel())!);
     await settle();
     expect(button('Retry')).toBeDefined();
     await type(ta(), 'Needs work');
@@ -234,10 +236,10 @@ describe('ReviewMenu', () => {
       fail ? json(200, { data: null, errors: [{ type: 'UNPROCESSABLE', message: 'Something went wrong' }] }) : json(200, { data: { submitPullRequestReview: { pullRequestReview: { id: 'PRR_1' } } } }),
     );
     await render(<ReviewMenu />);
-    await click(button(/^Review/)!);
+    await click(reviewButton());
     await click(radio('APPROVE'));
     await type(document.querySelector<HTMLTextAreaElement>('.review-menu textarea')!, 'First');
-    await click(button('Submit review')!);
+    await click(button('Submit review', panel())!);
     await settle();
     fail = false;
     // Edit without an input event (programmatic change): the error stays, so Retry is clickable.
@@ -252,7 +254,7 @@ describe('ReviewMenu', () => {
     usePr.getState().setPendingReview({ nodeId: 'PRR_1', count: 3 });
     fetchMock.mockResolvedValue(json(200, { data: { deletePullRequestReview: { pullRequestReview: { id: 'PRR_1' } } } }));
     await render(<ReviewMenu />);
-    await click(button(/^Review/)!);
+    await click(reviewButton());
     await click(button('Discard pending review')!);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain('3 pending comments');
@@ -261,7 +263,7 @@ describe('ReviewMenu', () => {
     expect(gql()[0]!.query).toContain('deletePullRequestReview');
     expect(gql()[0]!.variables.input).toEqual({ pullRequestReviewId: 'PRR_1' });
     expect(usePr.getState().pendingReview).toBeNull();
-    expect(button(/^Review/)!.textContent).not.toContain('pending');
+    expect(reviewButton().textContent).not.toContain('pending');
   });
 });
 

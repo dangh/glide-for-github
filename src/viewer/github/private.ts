@@ -35,8 +35,18 @@ export interface FileSummary {
   binary: boolean;
 }
 
-export type PrState = 'open' | 'closed' | 'merged';
-const PR_STATES: Record<string, PrState> = { OPEN: 'open', CLOSED: 'closed', MERGED: 'merged' };
+export type PrState = 'open' | 'draft' | 'closed' | 'merged';
+const PR_STATES: Record<string, PrState> = { OPEN: 'open', DRAFT: 'draft', CLOSED: 'closed', MERGED: 'merged' };
+
+/** What GitHub's Files changed toolbar says of the branches: "… <commits> commits into <base> from <head>". */
+export interface PrBranches {
+  /** `pullRequest.baseBranch`, in the PR's repository. */
+  base: string;
+  /** `headBranch` in `headRepositoryOwnerLogin/headRepositoryName` (a fork for cross-repository PRs). */
+  head: { owner: string; repo: string; branch: string };
+  /** `commitsCount`. */
+  commits: number;
+}
 
 export interface PrData {
   ref: PrRef;
@@ -53,6 +63,9 @@ export interface PrData {
   title?: string;
   /** `pullRequest.state`, when it is one GitHub's header shows. */
   state?: PrState;
+  /** `pullRequest.mergedBy` (a login), on merged PRs. */
+  mergedBy?: string;
+  branches?: PrBranches;
   baseOid: string;
   headOid: string;
   commits: CommitInfo[];
@@ -234,6 +247,12 @@ interface ChangesRoute {
     author?: { login: string } | null;
     title?: string;
     state?: string;
+    mergedBy?: string | null;
+    baseBranch?: string;
+    headBranch?: string;
+    headRepositoryOwnerLogin?: string;
+    headRepositoryName?: string;
+    commitsCount?: number;
     comparison?: { baseOid: string; headOid: string };
   };
   repository?: { id?: number };
@@ -418,6 +437,8 @@ export async function fetchHeadOid(rpc: Rpc, ref: PrRef): Promise<string> {
  * under `payload.pullRequestsChangesRoute`:
  * - `nodeId`  ← `pullRequest.globalRelayId` ("PR_…")
  * - `author`  ← `pullRequest.author.login`
+ * - `title`, `state` (OPEN/DRAFT/CLOSED/MERGED), `mergedBy` ← the same `pullRequest` fields
+ * - `branches` ← `pullRequest.baseBranch`, `headBranch`, `headRepositoryOwnerLogin`, `headRepositoryName`, `commitsCount`
  * - `baseOid` ← `comparison.fullDiff.baseOid` (fallback `pullRequest.comparison.baseOid`)
  * - `headOid` ← `comparison.fullDiff.headOid` (fallback `pullRequest.comparison.headOid`)
  * - `commits` ← `commits[]`: `oid`, `shortOid`, `message` ← `messageHeadline` (only the headline is sent)
@@ -469,6 +490,8 @@ export async function fetchPrData(rpc: Rpc, ref: PrRef, opts: { prefetched?: boo
     ...(typeof route.pullRequest.state === 'string' && Object.hasOwn(PR_STATES, route.pullRequest.state)
       ? { state: PR_STATES[route.pullRequest.state] }
       : {}),
+    ...(typeof route.pullRequest.mergedBy === 'string' ? { mergedBy: route.pullRequest.mergedBy } : {}),
+    ...branchesOf(route.pullRequest),
     baseOid: full.baseOid,
     headOid: full.headOid,
     commits: (route.commits ?? []).map((c) => ({ oid: c.oid, shortOid: c.shortOid, message: c.messageHeadline })),
@@ -480,6 +503,13 @@ export async function fetchPrData(rpc: Rpc, ref: PrRef, opts: { prefetched?: boo
     },
     threadMarkers: markersOf(route),
   };
+}
+
+function branchesOf(pr: ChangesRoute['pullRequest']): { branches?: PrBranches } {
+  const { baseBranch, headBranch, headRepositoryOwnerLogin: owner, headRepositoryName: repo, commitsCount } = pr;
+  if (typeof baseBranch !== 'string' || typeof headBranch !== 'string' || typeof commitsCount !== 'number') return {};
+  if (typeof owner !== 'string' || typeof repo !== 'string') return {};
+  return { branches: { base: baseBranch, head: { owner, repo, branch: headBranch }, commits: commitsCount } };
 }
 
 function markersOf(route: ChangesRoute): ThreadMarkers {

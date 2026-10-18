@@ -265,6 +265,30 @@ test("merged bar: GitHub's sticky header is hidden, Glide's toolbar shows the ti
   const viewer = await openPierre(page, REACT);
   const githubTitle = await page.locator('header [data-component="PageHeader"] [data-component="TitleArea"]').first().innerText();
   expect((await positions(page, viewer)).title).toBeNull(); // GitHub's own title is on screen
+  // Like GitHub's Files changed toolbar: the diff toggles live in the Display menu, the gear ends the bar.
+  await expect(viewer.locator.getByRole('button', { name: 'Split', exact: true })).toHaveCount(0);
+  await expect(viewer.locator.getByRole('button', { name: 'Hide whitespace', exact: true })).toHaveCount(0);
+  await expect(viewer.locator.locator('.pierre-toolbar > :last-child [data-testid="display-menu"]')).toHaveCount(1);
+  await expect(viewer.locator.getByTestId('review-button')).toHaveText('Submit review');
+  const edges = () =>
+    Promise.all([
+      page.evaluate(() => {
+        const wrapper = document.querySelector('[data-glide-scroll]')!.getBoundingClientRect();
+        const iframe = document.querySelector('iframe[data-pierre-viewer]')!.getBoundingClientRect();
+        return { gutter: wrapper.left, iframeLeft: iframe.left, iframeWidth: iframe.width, viewport: document.documentElement.clientWidth };
+      }),
+      viewer.frame().evaluate(() => {
+        const box = (sel: string) => document.querySelector(sel)!.getBoundingClientRect();
+        return { toolbar: { left: box('.pierre-toolbar').left, width: box('.pierre-toolbar').width }, bodyLeft: box('.pierre-body').left, treeToggleLeft: box('[data-testid="tree-toggle"]').left };
+      }),
+    ]).then(([outer, inner]) => ({ ...outer, ...inner }));
+  // The iframe spans the viewport; before it sticks the bar and the diffs keep GitHub's page gutters.
+  const atTop = await edges();
+  expect(atTop.gutter).toBeGreaterThan(0);
+  expect(atTop.iframeLeft).toBe(0);
+  expect(atTop.iframeWidth).toBe(atTop.viewport);
+  expect(atTop.toolbar.left).toBe(atTop.gutter);
+  expect(atTop.bodyLeft).toBe(atTop.gutter);
 
   await wheel(page, 200, 12);
   const down = await positions(page, viewer);
@@ -273,8 +297,19 @@ test("merged bar: GitHub's sticky header is hidden, Glide's toolbar shows the ti
   expect(down.iframeTop).toBe(0);
   expect(down.title).toContain('#37778');
   expect(down.title).toContain('Merged');
+  // GitHub's sticky title is plain text: the backticks GitHub's page title renders as code stay.
   const titleText = await viewer.locator.locator('.pr-title-text').innerText();
-  expect(githubTitle.replace(/\s+/g, ' ')).toContain(titleText.replace(/\s+/g, ' '));
+  expect(titleText).toBe(await viewer.frame().evaluate(() => window.__pierre!.store.getState().pr!.title));
+  expect(titleText).toContain('`');
+  expect(githubTitle.replace(/\s+/g, ' ')).toContain(titleText.replaceAll('`', '').replace(/\s+/g, ' '));
+  await expect(viewer.locator.locator('.pr-state-merged svg')).toHaveCount(1);
+  await expect(viewer.locator.locator('.pr-summary-row [data-testid="range-picker"]')).toHaveText('All commits');
+  await expect(viewer.locator.getByTestId('pr-branches')).toContainText(/merged 4 commits into\s*main\s*from\s*sebbie\/foundation/);
+  // Stuck, the bar spans the viewport like GitHub's, its controls and the diffs still inside the gutters.
+  const stuck = await edges();
+  expect(stuck.toolbar).toEqual({ left: 0, width: stuck.viewport });
+  expect(stuck.treeToggleLeft).toBe(stuck.gutter);
+  expect(stuck.bodyLeft).toBe(stuck.gutter);
   await page.screenshot({ path: `${SHOTS}/merged-stuck.png` });
 
   // Leaving Glide (back to Conversation) shows GitHub's header again.
