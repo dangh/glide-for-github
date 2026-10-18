@@ -226,6 +226,19 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
       host.unmount();
     });
 
+    it('sends no breakpoints once GitHub dropped the iframe, before the lifecycle unmounts the viewer', () => {
+      let width = 1280;
+      vi.spyOn(window, 'innerWidth', 'get').mockImplementation(() => width);
+      const host = mountViewer(document, ref);
+      const framePost = vi.spyOn(host.iframe.contentWindow!, 'postMessage').mockImplementation(() => {});
+      host.iframe.dispatchEvent(new Event('load'));
+      host.iframe.remove();
+      width = 767;
+      window.dispatchEvent(new Event('resize'));
+      expect(posted(framePost, 'pierre:viewport')).toHaveLength(1);
+      host.unmount();
+    });
+
     it('sizes the viewer to end at the bottom of the viewport, from its own top', () => {
       const rect = vi.spyOn(HTMLIFrameElement.prototype, 'getBoundingClientRect');
       rect.mockReturnValue({ top: 261.4, left: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 261.4, toJSON() {} } as DOMRect);

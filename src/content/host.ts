@@ -150,7 +150,8 @@ export function mountViewer(doc: Document, ref: PrRef, layout: ScrollLayout = 'f
   fitHeight();
   const onResize = () => {
     fitHeight();
-    if (loaded && reachedBreakpoints(win.innerWidth).join() !== reported) sendViewport();
+    // GitHub can drop the iframe in a re-render before the lifecycle unmounts this viewer: nothing to tell then.
+    if (loaded && iframe.isConnected && reachedBreakpoints(win.innerWidth).join() !== reported) sendViewport();
   };
   win.addEventListener('resize', onResize);
   sendToBridge();
