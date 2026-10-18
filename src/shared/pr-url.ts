@@ -63,6 +63,37 @@ export function isGlideActive(url: string): boolean {
   }
 }
 
+/** Marks a link to GitHub's Files changed page that the user chose over Glide, so Glide does not replace it. */
+const KEEP_GITHUB = { name: 'glide', value: 'off' };
+
+/**
+ * GitHub's own Files changed page for a PR, at one file's diff when its path digest is known. Never replaced by Glide:
+ * a spot in the diff never is, and the page itself carries the flag.
+ */
+export function filesChangedUrl(ref: Pick<PrRef, 'owner' | 'repo' | 'number'>, digest?: string): string {
+  const page = `https://github.com/${ref.owner}/${ref.repo}/pull/${ref.number}/changes`;
+  return digest ? `${page}#diff-${digest}` : `${page}?${KEEP_GITHUB.name}=${KEEP_GITHUB.value}`;
+}
+
+/** GitHub's Files changed page is what the URL shows: a files page without Glide open over it. */
+export function showsGithubFiles(url: string): boolean {
+  const page = parsePrUrl(url)?.page;
+  return (page === 'changes' || page === 'files') && !isGlideActive(url);
+}
+
+/**
+ * With "Replace Files changed with Glide" on, the URL to show instead of `url`: the same page with Glide open, for
+ * the whole PR's Files changed page. Null for every other URL, including a commit range or a spot in the diff (a
+ * hash), which only GitHub's page can show, and links made with `filesChangedUrl`.
+ */
+export function filesRedirect(url: string): string | null {
+  if (!showsGithubFiles(url)) return null;
+  const u = new URL(url);
+  const wholePr = u.pathname.replace(/\/+$/, '').split('/').length === 6; // '', owner, repo, 'pull', n, page
+  if (!wholePr || u.hash !== '' || u.searchParams.get(KEEP_GITHUB.name) === KEEP_GITHUB.value) return null;
+  return `${u.origin}${u.pathname}${u.search}${GLIDE_HASH}`;
+}
+
 /** Base PR URL on the Conversation page, the lightest page to load, with the Glide hash. */
 export function glideUrl(ref: PrRef): string {
   return `https://github.com/${ref.owner}/${ref.repo}/pull/${ref.number}${GLIDE_HASH}`;

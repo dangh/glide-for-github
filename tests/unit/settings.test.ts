@@ -24,6 +24,7 @@ import {
   type SettingsStorage,
 } from '../../src/shared/settings';
 import { DIFF_CSS, GITHUB_CHANGE_CSS, GITHUB_HUNK_CSS, GITHUB_TREE_CSS, GITHUB_TREE_ICONS, hunkSeparatorHeight } from '../../src/shared/github-defaults';
+import { githubSettingsOf } from '../../src/shared/github-settings';
 import { HIDE_GIT_STATUS_CSS } from '../../src/shared/github-tree-icons';
 
 type Changes = Record<string, { newValue?: unknown; oldValue?: unknown }>;
@@ -115,6 +116,7 @@ describe('DEFAULT_SETTINGS', () => {
       layout: { treePosition: 'left' },
       review: { hideWhitespace: false },
       experiments: { pageScroll: false, mergedBar: false },
+      github: { replaceFilesTab: false },
     } satisfies DisplaySettings);
   });
 
@@ -215,6 +217,25 @@ describe('experiments', () => {
   });
 });
 
+describe('github', () => {
+  it('replaces Files changed only when stored as true, read the same by the content script', async () => {
+    for (const stored of [undefined, { github: { replaceFilesTab: 'yes' } }, { github: { replaceFilesTab: 1, extra: true } }]) {
+      fake.data[SETTINGS_STORAGE_KEY] = stored;
+      expect((await loadSettings()).github).toEqual({ replaceFilesTab: false });
+      expect(githubSettingsOf(stored)).toEqual({ replaceFilesTab: false });
+    }
+    const on = { github: { replaceFilesTab: true } };
+    fake.data[SETTINGS_STORAGE_KEY] = on;
+    expect((await loadSettings()).github).toEqual({ replaceFilesTab: true });
+    expect(githubSettingsOf(on)).toEqual({ replaceFilesTab: true });
+  });
+
+  it('saves as a sparse override', async () => {
+    await saveSettings({ github: { replaceFilesTab: true } });
+    expect(fake.data[SETTINGS_STORAGE_KEY]).toEqual({ github: { replaceFilesTab: true } });
+  });
+});
+
 describe('loadSettings', () => {
   it('returns the defaults, as a fresh copy, when nothing is stored', async () => {
     const s = await loadSettings();
@@ -242,7 +263,7 @@ describe('loadSettings', () => {
       review: { hideWhitespace: true, other: 1 },
     };
     const s = await loadSettings();
-    expect(Object.keys(s).sort()).toEqual(['diff', 'experiments', 'fonts', 'layout', 'review', 'tree']);
+    expect(Object.keys(s).sort()).toEqual(['diff', 'experiments', 'fonts', 'github', 'layout', 'review', 'tree']);
     expect(Object.keys(s.diff).sort()).toEqual(Object.keys(DEFAULT_SETTINGS.diff).sort());
     expect(Object.keys(s.tree).sort()).toEqual(Object.keys(DEFAULT_SETTINGS.tree).sort());
     expect(Object.keys(s.review)).toEqual(['hideWhitespace']);

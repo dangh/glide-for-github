@@ -29,6 +29,8 @@ review features: comments, suggestions, resolving threads, viewed files and revi
   "Default (GitHub)", which looks like GitHub's own Files changed page (unified, GitHub's colors, fonts and file boxes,
   slim expandable "N unmodified lines" rows instead of `@@` headers, file status icons but no status letters in the tree); Pierre's other styles are one choice away. Changes apply to open pull
   requests without a reload.
+- Replace Files changed with Glide, off by default, on the options page: GitHub's Files changed tab is hidden, Glide
+  takes its place, and links to that page open Glide; the Display menu still links to GitHub's page.
 - Experimental, off by default, on the options page only: scroll the diffs with GitHub's page (its header scrolls
   away and the footer is reachable), and fold GitHub's sticky pull request header into Glide's toolbar.
 

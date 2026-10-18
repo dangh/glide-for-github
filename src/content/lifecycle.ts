@@ -1,7 +1,8 @@
-import { isGlideActive, parsePrUrl, prKey } from '../shared/pr-url';
+import { filesRedirect, isGlideActive, parsePrUrl, prKey, showsGithubFiles } from '../shared/pr-url';
 import { findContentAnchor, mountViewer, type ViewerHost } from './host';
 import { FRAME_LAYOUT, type LayoutSource } from './layout-source';
-import { injectTab, removeTab, setTabActive } from './tab';
+import { fixedSetting, type SettingSource } from './setting-source';
+import { hideFilesTab, injectTab, removeTab, setTabActive } from './tab';
 
 const DEBOUNCE_MS = 50;
 
@@ -15,7 +16,12 @@ export interface Lifecycle {
 
 type NavigationTarget = { addEventListener(type: string, listener: () => void): void; removeEventListener(type: string, listener: () => void): void };
 
-export function createLifecycle(win: Window & typeof globalThis = window, layouts: LayoutSource = FRAME_LAYOUT): Lifecycle {
+/** `replaceFilesTab` is the "Replace Files changed with Glide" setting (`github.replaceFilesTab`). */
+export function createLifecycle(
+  win: Window & typeof globalThis = window,
+  layouts: LayoutSource = FRAME_LAYOUT,
+  replaceFilesTab: SettingSource<boolean> = fixedSetting(false),
+): Lifecycle {
   const doc = win.document;
   let mounted: { key: string; host: ViewerHost } | null = null;
   let observer: MutationObserver | null = null;
@@ -28,7 +34,7 @@ export function createLifecycle(win: Window & typeof globalThis = window, layout
   }
 
   function sync(): void {
-    const href = win.location.href;
+    let href = win.location.href;
     const ref = parsePrUrl(href);
     if (!ref) {
       unmountViewer();
@@ -36,11 +42,21 @@ export function createLifecycle(win: Window & typeof globalThis = window, layout
       return;
     }
 
+    const replace = replaceFilesTab.get() === true;
+    const glide = replace ? filesRedirect(href) : null;
+    if (glide) {
+      // Replace, not push: Back then skips GitHub's Files changed page instead of landing on it again.
+      win.history.replaceState(win.history.state, '', glide);
+      href = glide;
+    }
+
     const key = prKey(ref);
     if (mounted && mounted.key !== key) unmountViewer();
 
     // The strip may not be rendered yet (or is mid re-render); the observer will call us again.
     const tab = injectTab(doc, ref);
+    // On GitHub's own Files changed page (a range, a spot in the diff, or chosen from Glide) its tab stays.
+    hideFilesTab(doc, replace && !!tab && !showsGithubFiles(href));
 
     if (!isGlideActive(href)) {
       unmountViewer();
@@ -65,6 +81,13 @@ export function createLifecycle(win: Window & typeof globalThis = window, layout
     event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
   const pierreTabOf = (target: EventTarget | null) =>
     target instanceof win.Element ? target.closest<HTMLAnchorElement>('a[data-pierre-tab]') : null;
+  /** A link to GitHub's Files changed page that opens Glide instead, while it replaces that page. */
+  const replacedFilesLinkOf = (target: EventTarget | null) => {
+    if (replaceFilesTab.get() !== true || !(target instanceof win.Element)) return null;
+    const link = target.closest<HTMLAnchorElement>('a[href]');
+    if (!link || (link.target !== '' && link.target !== '_self') || link.hasAttribute('download')) return null;
+    return filesRedirect(link.href) ? link : null;
+  };
   /** The tab is for the PR on screen (a tab of another PR is left to the browser). */
   const samePr = (tab: HTMLAnchorElement) => {
     const here = parsePrUrl(win.location.href);
@@ -111,11 +134,11 @@ export function createLifecycle(win: Window & typeof globalThis = window, layout
     }, 0);
   }
 
-  /** Clicking Glide on any page of the same PR stays on that page and only adds `#glide`. */
+  /** Clicking Glide (or a link to Files changed it replaces) on any page of the same PR stays there and adds `#glide`. */
   function onClick(event: MouseEvent): void {
     if (event.defaultPrevented || !plainPress(event)) return;
-    const tab = pierreTabOf(event.target);
-    if (!tab || !samePr(tab)) return; // different PR: let the browser navigate
+    const tab = pierreTabOf(event.target) ?? replacedFilesLinkOf(event.target);
+    if (!tab || !samePr(tab)) return; // different PR: let the browser navigate (sync opens Glide when it lands)
     if (release) release.handled = true;
     event.preventDefault();
     event.stopPropagation(); // keep GitHub's router and Turbo out of it
@@ -145,6 +168,7 @@ export function createLifecycle(win: Window & typeof globalThis = window, layout
     observer.observe(doc.documentElement, { childList: true, subtree: true });
     // A changed experiment remounts an open viewer in its new layout.
     cleanups.push(layouts.subscribe(sync));
+    cleanups.push(replaceFilesTab.subscribe(sync));
 
     sync();
   }

@@ -13,3 +13,8 @@ iframe[data-pierre-viewer] {
 a[data-pierre-tab] {
   cursor: pointer;
 }
+
+/* "Replace Files changed with Glide": the Glide tab, right after it, takes its place. */
+[data-pierre-hidden] {
+  display: none !important;
+}

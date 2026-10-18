@@ -108,13 +108,26 @@ export function injectTab(doc: Document, ref: PrRef): HTMLAnchorElement | null {
   return tab;
 }
 
-/** Removes the Glide tab (restoring GitHub's selected styling first). */
+/** Marks "Files changed" while Glide takes its place; content.css hides it. */
+const HIDDEN_ATTR = 'data-pierre-hidden';
+
+/**
+ * Hides "Files changed", leaving the Glide tab right after it in its place, or shows it again exactly as it was.
+ * Hidden, it stays in the DOM, so the Glide tab still copies its count. Idempotent.
+ */
+export function hideFilesTab(doc: Document, hidden: boolean): void {
+  if (hidden) findFilesTab(doc)?.setAttribute(HIDDEN_ATTR, '');
+  else doc.querySelectorAll(`[${HIDDEN_ATTR}]`).forEach((a) => a.removeAttribute(HIDDEN_ATTR));
+}
+
+/** Removes the Glide tab (restoring GitHub's selected styling and Files changed first). */
 export function removeTab(doc: Document): void {
   const tab = doc.querySelector('a[data-pierre-tab]');
-  // This runs on every DOM change of every non-PR GitHub page: with no Glide tab (and no tab it left unselected)
-  // there is nothing to undo, so do not scan the page's links.
-  if (!tab && !doc.querySelector('[data-pierre-class]')) return;
+  // This runs on every DOM change of every non-PR GitHub page: with no Glide tab (and no tab it left unselected or
+  // hidden) there is nothing to undo, so do not scan the page's links.
+  if (!tab && !doc.querySelector(`[data-pierre-class], [${HIDDEN_ATTR}]`)) return;
   setTabActive(doc, false);
+  hideFilesTab(doc, false);
   doc.querySelectorAll('a[data-pierre-tab]').forEach((t) => t.remove());
 }
 

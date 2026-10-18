@@ -70,6 +70,7 @@
  *   layout.treePosition       'left' | 'right', default 'left'
  *   experiments.pageScroll    boolean, false: GitHub's page scrolls the diffs (src/shared/page-scroll.ts), not the viewer
  *   experiments.mergedBar     boolean, false: GitHub's sticky PR header folds into Glide's toolbar (only with pageScroll)
+ *   github.replaceFilesTab    boolean, false: GitHub's Files changed tab is hidden and its page opens Glide instead
  *
  * EXCLUDED, with reasons:
  *   preferredHighlighter        not a user option: toDiffOptions always sets 'shiki-js' (global no-WASM constraint)
@@ -104,8 +105,9 @@ import type {
 import { DIFF_CSS, GITHUB_CHANGE_CSS, GITHUB_HUNK_CSS, GITHUB_TREE, GITHUB_TREE_ROW_HEIGHT, resolveDiff } from './github-defaults';
 import { GITHUB_TREE_CSS, GITHUB_TREE_ICONS, HIDE_GIT_STATUS_CSS } from './github-tree-icons';
 import { SETTINGS_STORAGE_KEY, type ExperimentSettings } from './experiments';
+import type { GithubSettings } from './github-settings';
 
-export { SETTINGS_STORAGE_KEY, type ExperimentSettings };
+export { SETTINGS_STORAGE_KEY, type ExperimentSettings, type GithubSettings };
 
 // ---------------------------------------------------------------------------------------------------------
 // Types
@@ -190,10 +192,11 @@ export interface DisplaySettings {
   layout: LayoutSettings;
   review: ReviewSettings;
   experiments: ExperimentSettings;
+  github: GithubSettings;
 }
 
 /** The sections of `DisplaySettings`, in storage order. */
-export const SETTINGS_SECTIONS = ['diff', 'tree', 'fonts', 'layout', 'review', 'experiments'] as const;
+export const SETTINGS_SECTIONS = ['diff', 'tree', 'fonts', 'layout', 'review', 'experiments', 'github'] as const;
 
 export type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] };
 
@@ -348,6 +351,7 @@ export const DEFAULT_SETTINGS: DisplaySettings = deepFreeze({
   layout: { treePosition: 'left' },
   review: { hideWhitespace: false },
   experiments: { pageScroll: false, mergedBar: false },
+  github: { replaceFilesTab: false },
 });
 
 // ---------------------------------------------------------------------------------------------------------
@@ -426,6 +430,8 @@ const REVIEW_SCHEMA: Schema<ReviewSettings> = { hideWhitespace: isBool };
 
 const EXPERIMENTS_SCHEMA: Schema<ExperimentSettings> = { pageScroll: isBool, mergedBar: isBool };
 
+const GITHUB_SCHEMA: Schema<GithubSettings> = { replaceFilesTab: isBool };
+
 const SCHEMAS = {
   diff: DIFF_SCHEMA,
   tree: TREE_SCHEMA,
@@ -433,6 +439,7 @@ const SCHEMAS = {
   layout: LAYOUT_SCHEMA,
   review: REVIEW_SCHEMA,
   experiments: EXPERIMENTS_SCHEMA,
+  github: GITHUB_SCHEMA,
 } as const;
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -480,6 +487,7 @@ function resolve(raw: unknown): DisplaySettings {
     layout: { ...DEFAULT_SETTINGS.layout, ...o.layout },
     review: { ...DEFAULT_SETTINGS.review, ...o.review },
     experiments: { ...DEFAULT_SETTINGS.experiments, ...o.experiments },
+    github: { ...DEFAULT_SETTINGS.github, ...o.github },
   };
 }
 

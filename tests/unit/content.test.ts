@@ -3,10 +3,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { injectTab, removeTab, setTabActive } from '../../src/content/tab';
+import { hideFilesTab, injectTab, removeTab, setTabActive } from '../../src/content/tab';
 import { mountViewer, setExtensionUrlResolver } from '../../src/content/host';
 import { createLifecycle } from '../../src/content/lifecycle';
-import { glideUrl, type PrRef } from '../../src/shared/pr-url';
+import { fixedSetting } from '../../src/content/setting-source';
+import { filesChangedUrl, glideUrl, type PrRef } from '../../src/shared/pr-url';
 
 const ref: PrRef = { owner: 'dangh', repo: 'pierre-sandbox', number: 1, page: 'changes' };
 const EXT = 'chrome-extension://abcdefghijklmnop/';
@@ -459,6 +460,183 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
       life.stop();
       expect(ev.defaultPrevented).toBe(false);
       expect(viewers()).toHaveLength(0);
+    });
+  });
+
+  describe('Replace Files changed with Glide', () => {
+    const files = () => document.querySelector<HTMLAnchorElement>(filesTab)!;
+    const isHidden = (a: Element) => a.hasAttribute('data-pierre-hidden');
+    /** The tab strip as the user sees it: every tab but a hidden one. */
+    const visibleTabs = () => [...document.querySelectorAll('nav a')].filter((a) => !isHidden(a));
+    const conversation = '/dangh/pierre-sandbox/pull/1';
+    const click = (a: Element, init: MouseEventInit = {}) => {
+      const ev = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, ...init });
+      a.dispatchEvent(ev);
+      return ev;
+    };
+    const link = (href: string, attrs: Record<string, string> = {}) => {
+      const a = document.createElement('a');
+      a.setAttribute('href', href);
+      for (const [k, v] of Object.entries(attrs)) a.setAttribute(k, v);
+      a.textContent = 'link';
+      document.body.append(a);
+      return a;
+    };
+
+    describe('hideFilesTab', () => {
+      it('hides Files changed and leaves Glide in its place, with its count', () => {
+        const before = [...document.querySelectorAll('nav a')].indexOf(files());
+        const tab = injectTab(document, ref)!;
+        hideFilesTab(document, true);
+        expect(isHidden(files())).toBe(true);
+        expect(files().nextElementSibling).toBe(tab);
+        expect(visibleTabs().indexOf(tab)).toBe(before);
+        const count = files().querySelector('[data-component="CounterLabel"], .Counter')!.textContent;
+        expect(tab.querySelector('[data-pierre-counter]')!.textContent).toBe(count);
+      });
+
+      it('keeps the count following the hidden tab', () => {
+        const tab = injectTab(document, ref)!;
+        hideFilesTab(document, true);
+        files().querySelector('[data-component="CounterLabel"], .Counter')!.textContent = '42';
+        injectTab(document, ref);
+        expect(tab.querySelector('[data-pierre-counter]')!.textContent).toBe('42');
+      });
+
+      it('restores Files changed byte-identically, and is idempotent both ways', () => {
+        const filesHtml = files().outerHTML;
+        injectTab(document, ref);
+        hideFilesTab(document, true);
+        hideFilesTab(document, true);
+        hideFilesTab(document, false);
+        hideFilesTab(document, false);
+        expect(files().outerHTML).toBe(filesHtml);
+        expect(bodyWithoutPierre()).toBe(original);
+      });
+
+      it('removeTab restores it too', () => {
+        injectTab(document, ref);
+        hideFilesTab(document, true);
+        removeTab(document);
+        expect(document.body.innerHTML).toBe(original);
+      });
+    });
+
+    describe('lifecycle', () => {
+      it('opens Glide in place of a directly loaded Files changed page, without a history entry', () => {
+        const length = window.history.length;
+        createLifecycle(window, undefined, fixedSetting(true)).sync();
+        expect(window.location.pathname).toBe('/dangh/pierre-sandbox/pull/1/changes');
+        expect(window.location.hash).toBe('#glide');
+        expect(window.history.length).toBe(length);
+        expect(viewers()).toHaveLength(1);
+        expect(isHidden(files())).toBe(true);
+        expect(pierreTabs()[0]!.getAttribute('aria-current')).toBe('page');
+      });
+
+      it('hides Files changed on the other PR pages and puts Glide in its place', () => {
+        go(conversation);
+        createLifecycle(window, undefined, fixedSetting(true)).sync();
+        expect(isHidden(files())).toBe(true);
+        expect(files().nextElementSibling).toBe(pierreTabs()[0]);
+        expect(viewers()).toHaveLength(0);
+        expect(window.location.hash).toBe('');
+      });
+
+      it('a click on a link to this PR\'s Files changed opens Glide on the current page instead', () => {
+        go(conversation);
+        const life = createLifecycle(window, undefined, fixedSetting(true));
+        life.start();
+        for (const href of [`${conversation}/files`, `${conversation}/changes`, `https://github.com${conversation}/changes`]) {
+          go(conversation);
+          life.sync();
+          const ev = click(link(href));
+          expect(ev.defaultPrevented).toBe(true);
+          expect(window.location.pathname).toBe(conversation);
+          expect(window.location.hash).toBe('#glide');
+          expect(viewers()).toHaveLength(1);
+        }
+        life.stop();
+      });
+
+      it("leaves links Glide does not replace to the browser: another PR, a range, a spot in the diff, a new tab, GitHub's page", () => {
+        go(conversation);
+        const life = createLifecycle(window, undefined, fixedSetting(true));
+        life.start();
+        const links = [
+          link('/dangh/pierre-sandbox/pull/2/changes'),
+          link(`${conversation}/files/abc..def`),
+          link(`${conversation}/changes#diff-abc`),
+          link(`${conversation}/changes`, { target: '_blank' }),
+          link(filesChangedUrl(ref)),
+        ];
+        const prevented = links.map((a) => click(a).defaultPrevented);
+        prevented.push(click(link(`${conversation}/changes`), { metaKey: true }).defaultPrevented);
+        life.stop();
+        expect(prevented).toEqual([false, false, false, false, false, false]);
+        expect(viewers()).toHaveLength(0);
+      });
+
+      it("keeps GitHub's page (and its tab) when chosen from Glide", () => {
+        go(new URL(filesChangedUrl(ref)).pathname + '?glide=off');
+        createLifecycle(window, undefined, fixedSetting(true)).sync();
+        expect(window.location.hash).toBe('');
+        expect(viewers()).toHaveLength(0);
+        expect(isHidden(files())).toBe(false);
+        expect(bodyWithoutPierre()).toBe(original);
+      });
+
+      it('does nothing until the setting is read, then follows it live; off restores the strip exactly', () => {
+        go(conversation);
+        let value: boolean | undefined;
+        const listeners = new Set<() => void>();
+        const source = { get: () => value, subscribe: (fn: () => void) => (listeners.add(fn), () => void listeners.delete(fn)) };
+        const set = (v: boolean) => {
+          value = v;
+          listeners.forEach((fn) => fn());
+        };
+        const life = createLifecycle(window, undefined, source);
+        life.start();
+        expect(isHidden(files())).toBe(false);
+        set(true);
+        expect(isHidden(files())).toBe(true);
+        set(false);
+        expect(bodyWithoutPierre()).toBe(original);
+        expect(click(link(`${conversation}/changes`)).defaultPrevented).toBe(false);
+
+        go('/dangh/pierre-sandbox/pull/1/changes');
+        life.sync();
+        expect(viewers()).toHaveLength(0);
+        set(true);
+        expect(window.location.hash).toBe('#glide');
+        expect(viewers()).toHaveLength(1);
+        life.stop();
+      });
+
+      it('idempotent across GitHub re-rendering the strip', () => {
+        go(conversation);
+        const life = createLifecycle(window, undefined, fixedSetting(true));
+        life.sync();
+        const nav = document.querySelector('nav')!;
+        const fresh = nav.cloneNode(true) as HTMLElement;
+        fresh.querySelectorAll('[data-pierre-tab]').forEach((e) => e.remove());
+        fresh.querySelectorAll('[data-pierre-hidden]').forEach((e) => e.removeAttribute('data-pierre-hidden'));
+        nav.replaceWith(fresh);
+        life.sync();
+        life.sync();
+        expect(pierreTabs()).toHaveLength(1);
+        expect(isHidden(files())).toBe(true);
+        expect(files().nextElementSibling).toBe(pierreTabs()[0]);
+      });
+
+      it('leaving the PR restores everything', () => {
+        go(conversation);
+        const life = createLifecycle(window, undefined, fixedSetting(true));
+        life.sync();
+        go('/dangh/pierre-sandbox/issues/1');
+        life.sync();
+        expect(document.body.innerHTML).toBe(original);
+      });
     });
   });
 });

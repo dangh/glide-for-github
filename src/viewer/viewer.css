@@ -313,6 +313,13 @@ button {
   padding: 0;
 }
 
+.display-menu-footer {
+  margin: 6px 6px 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--pierre-border);
+  font-size: 12px;
+}
+
 .field {
   display: flex;
   justify-content: space-between;

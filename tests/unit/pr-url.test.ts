@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { glideUrl, isGlideActive, parsePrUrl, prKey } from '../../src/shared/pr-url';
+import { filesChangedUrl, filesRedirect, glideUrl, isGlideActive, parsePrUrl, prKey, showsGithubFiles } from '../../src/shared/pr-url';
 
 describe('parsePrUrl', () => {
   it('maps the base PR URL to the conversation page', () => {
@@ -102,5 +102,61 @@ describe('glideUrl', () => {
 describe('prKey', () => {
   it('formats owner/repo#number', () => {
     expect(prKey({ owner: 'o', repo: 'r', number: 12, page: 'changes' })).toBe('o/r#12');
+  });
+});
+
+describe('filesChangedUrl', () => {
+  const r = { owner: 'o', repo: 'r', number: 7 };
+  it("links to GitHub's Files changed, marked to stay on GitHub, or one file in it", () => {
+    expect(filesChangedUrl(r)).toBe('https://github.com/o/r/pull/7/changes?glide=off');
+    expect(filesChangedUrl(r, 'abc123')).toBe('https://github.com/o/r/pull/7/changes#diff-abc123');
+  });
+  it('is never replaced by Glide', () => {
+    expect(filesRedirect(filesChangedUrl(r))).toBeNull();
+    expect(filesRedirect(filesChangedUrl(r, 'abc123'))).toBeNull();
+  });
+});
+
+describe('showsGithubFiles', () => {
+  it("is true on GitHub's files pages without Glide open over them", () => {
+    expect(showsGithubFiles('https://github.com/o/r/pull/7/changes')).toBe(true);
+    expect(showsGithubFiles('https://github.com/o/r/pull/7/files')).toBe(true);
+    expect(showsGithubFiles('https://github.com/o/r/pull/7/files/abc..def')).toBe(true);
+    expect(showsGithubFiles('https://github.com/o/r/pull/7/changes#diff-abc')).toBe(true);
+    expect(showsGithubFiles('https://github.com/o/r/pull/7/changes?glide=off')).toBe(true);
+  });
+  it('is false with Glide open and on the other PR pages', () => {
+    expect(showsGithubFiles('https://github.com/o/r/pull/7/changes#glide')).toBe(false);
+    expect(showsGithubFiles('https://github.com/o/r/pull/7')).toBe(false);
+    expect(showsGithubFiles('https://github.com/o/r/pull/7/commits')).toBe(false);
+    expect(showsGithubFiles('https://github.com/o/r/issues/7')).toBe(false);
+  });
+});
+
+describe('filesRedirect', () => {
+  it("opens Glide on the whole PR's Files changed page, staying on the page", () => {
+    expect(filesRedirect('https://github.com/o/r/pull/7/changes')).toBe('https://github.com/o/r/pull/7/changes#glide');
+    expect(filesRedirect('https://github.com/o/r/pull/7/files')).toBe('https://github.com/o/r/pull/7/files#glide');
+    expect(filesRedirect('https://github.com/o/r/pull/7/files/')).toBe('https://github.com/o/r/pull/7/files/#glide');
+    expect(filesRedirect('https://github.com/o/r/pull/7/changes?w=1')).toBe('https://github.com/o/r/pull/7/changes?w=1#glide');
+  });
+  it('is idempotent: the page with Glide open stays', () => {
+    expect(filesRedirect(filesRedirect('https://github.com/o/r/pull/7/changes')!)).toBeNull();
+    expect(filesRedirect('https://github.com/o/r/pull/7/changes#pierre')).toBeNull();
+  });
+  it("leaves what only GitHub's page shows: a commit range, a spot in the diff, an explicit choice", () => {
+    expect(filesRedirect('https://github.com/o/r/pull/7/files/abc..def')).toBeNull();
+    expect(filesRedirect('https://github.com/o/r/pull/7/changes/abc')).toBeNull();
+    expect(filesRedirect('https://github.com/o/r/pull/7/changes#diff-abc')).toBeNull();
+    expect(filesRedirect('https://github.com/o/r/pull/7/files#r123')).toBeNull();
+    expect(filesRedirect('https://github.com/o/r/pull/7/changes?glide=off')).toBeNull();
+  });
+  it('leaves every other page', () => {
+    expect(filesRedirect('https://github.com/o/r/pull/7')).toBeNull();
+    expect(filesRedirect('https://github.com/o/r/pull/7/commits')).toBeNull();
+    expect(filesRedirect('https://github.com/o/r/pull/7/checks')).toBeNull();
+    expect(filesRedirect('https://github.com/o/r/compare/main...x')).toBeNull();
+    expect(filesRedirect('https://gist.github.com/o/r/pull/7/changes')).toBeNull();
+    expect(filesRedirect('not a url')).toBeNull();
   });
 });

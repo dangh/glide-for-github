@@ -4,7 +4,6 @@ import type { GitStatusEntry } from '@pierre/trees';
 import type { CodeViewReactOptions } from '@pierre/diffs/react';
 import { filePaddingBottom, hunkSeparatorHeight, resolveDiffChoice } from '../../shared/github-defaults';
 import { DEFAULT_SETTINGS, toDiffOptions, treeNeedsGitStatus, type DiffSettings, type TreeSettings } from '../../shared/settings';
-import type { PrRef } from '../../shared/pr-url';
 import type { FileSummary } from '../github/private';
 import type { AnnotationMeta } from './items';
 import { effectiveThemeType } from './settings';
@@ -91,12 +90,6 @@ export function createDiffOptionsBuilder() {
     last = { diff, colorMode, ...(loadDiffFiles ? { loadDiffFiles } : {}), ...(interactions ? { interactions } : {}), lineHeight, options };
     return options;
   };
-}
-
-/** GitHub's Files changed page for a PR, at one file's diff when its path digest is known. */
-export function filesChangedUrl(ref: Pick<PrRef, 'owner' | 'repo' | 'number'>, digest?: string): string {
-  const base = `https://github.com/${ref.owner}/${ref.repo}/pull/${ref.number}/changes`;
-  return digest ? `${base}#diff-${digest}` : base;
 }
 
 /**

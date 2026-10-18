@@ -6,6 +6,7 @@ import { initSettings, useSettings } from '../viewer/state/settings';
 import { DisplaySettingsForm } from '../viewer/ui/DisplaySettingsForm';
 import { DisplayStyle } from '../viewer/ui/DisplayStyle';
 import { ExperimentSettingsForm } from './ExperimentSettings';
+import { GithubSettingsForm } from './GithubSettings';
 import { SampleDiff } from './SampleDiff';
 import { TokenSettings } from './TokenSettings';
 
@@ -40,6 +41,11 @@ export function OptionsPage() {
             </div>
           </div>
         )}
+      </section>
+      <section className="options-section" aria-labelledby="github-heading">
+        <h2 id="github-heading">GitHub</h2>
+        <p className="muted">Changes apply at once, also in pull requests that are already open.</p>
+        {loaded && <GithubSettingsForm github={settings.github} update={update} />}
       </section>
       <section className="options-section" aria-labelledby="experiments-heading">
         <h2 id="experiments-heading">Experimental</h2>

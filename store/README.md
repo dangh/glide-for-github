@@ -45,6 +45,7 @@ Review GitHub pull requests with fast diffs and a file tree, next to Files chang
 > - Viewed checkboxes stay in sync with GitHub, both ways.
 > - Commit range picker and hide whitespace.
 > - Display options (layout, themes, line wrapping, tree density and more) in the viewer and on the options page.
+> - Optionally, Glide replaces GitHub's Files changed tab and opens wherever that page would.
 >
 > Reading a pull request needs no setup. To post comments, replies, reviews or reactions, Glide asks for a GitHub
 > token (fine-grained or classic), which stays on your device and is only ever sent to api.github.com.

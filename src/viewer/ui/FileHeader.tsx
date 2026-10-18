@@ -7,6 +7,7 @@
  */
 import { memo, useCallback } from 'react';
 import { CHEVRON_DOWN, CHEVRON_RIGHT } from '../../shared/github-tree-icons';
+import { filesChangedUrl } from '../../shared/pr-url';
 import { isNoTokenError } from '../auth/requireToken';
 import type { FileSummary } from '../github/private';
 import { fileTarget } from '../state/compose';
@@ -14,7 +15,7 @@ import { errorMessage, setFileViewed } from '../state/review';
 import { session } from '../state/session';
 import { commentCount, isCollapsed, threadsByPath, usePr, type FileLoadState } from '../state/store';
 import { useSettings } from '../state/settings';
-import { filesChangedUrl, headerHeight } from '../state/view';
+import { headerHeight } from '../state/view';
 import { openComposerAt } from './Composer';
 
 /** Octicon comment-16 path. */
