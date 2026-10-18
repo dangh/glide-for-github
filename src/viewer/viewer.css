@@ -405,6 +405,15 @@ html[data-scroll-layout] .pierre-diffs {
   scrollbar-width: none;
 }
 
+/* No list scrollbar to keep the file boxes off: the side facing the page edge lines up with the toolbar. */
+html[data-scroll-layout] .pierre-body[data-tree-position='left'] .pierre-diffs {
+  padding-right: 0;
+}
+
+html[data-scroll-layout] .pierre-body[data-tree-position='right'] .pierre-diffs {
+  padding-left: 0;
+}
+
 .pierre-loading {
   padding: 24px;
   color: var(--pierre-muted);
