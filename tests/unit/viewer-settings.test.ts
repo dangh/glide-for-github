@@ -79,13 +79,20 @@ describe('viewer settings identity', () => {
     const diff = DEFAULT_SETTINGS.diff;
     const base = build(diff, undefined);
     expect(base.itemMetrics).toBe(ITEM_METRICS);
-    expect(ITEM_METRICS).toMatchObject({ lineHeight: 20, diffHeaderHeight: 40 });
+    expect(ITEM_METRICS).toMatchObject({ lineHeight: 20, diffHeaderHeight: 42, hunkSeparatorHeight: 24 });
     const big = build(diff, undefined, undefined, undefined, 40);
     expect(big).not.toBe(base);
-    expect(big.itemMetrics).toMatchObject({ lineHeight: 40, diffHeaderHeight: 40 });
+    expect(big.itemMetrics).toMatchObject({ lineHeight: 40, diffHeaderHeight: 42 });
     expect(build(diff, undefined, undefined, undefined, 40)).toBe(big);
     expect(itemMetricsFor(40)).toBe(big.itemMetrics);
     expect(itemMetricsFor(20)).toBe(ITEM_METRICS);
+  });
+
+  it("reserves each header style's height and GitHub's 24 px separator rows only for hunkSeparators 'default'", () => {
+    const build = createDiffOptionsBuilder();
+    const pierre = build({ ...DEFAULT_SETTINGS.diff, fileHeaderStyle: 'pierre', hunkSeparators: 'line-info-basic' }, undefined).itemMetrics;
+    expect(pierre).toMatchObject({ diffHeaderHeight: 40 });
+    expect(pierre).not.toHaveProperty('hunkSeparatorHeight');
   });
 
   it('estimates no space under wrapped files and Pierre\'s 8 px scrollbar strip under scrolling ones', () => {

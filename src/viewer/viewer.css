@@ -366,14 +366,53 @@ button {
   z-index: 6;
 }
 
+/*
+ * GitHub's .diff-file-header (measured on /changes): 42 px (headerHeight), 8 px inside the 1 px border, the path
+ * 4 px after the chevron in 12px/18px regular mono, +/- counts in 12px/600 UI font at the right with the actions,
+ * 28 px Viewed and comment buttons with 16 px icons.
+ */
 [data-file-header='github'] .fh {
-  padding: 0 8px;
+  padding: 0 9px;
   border-radius: 6px 6px 0 0;
 }
 
 /* GitHub's file header shows no status letter. */
 [data-file-header='github'] .fh-badge {
   display: none;
+}
+
+[data-file-header='github'] .fh-path {
+  font-weight: 400;
+  line-height: 18px;
+  margin-left: -4px;
+}
+
+[data-file-header='github'] .fh-counts {
+  order: 1;
+  gap: 4px;
+  font: 600 12px/18px var(--pierre-font);
+}
+
+[data-file-header='github'] .fh-comments,
+[data-file-header='github'] .fh-icon-button,
+[data-file-header='github'] .fh-viewed {
+  order: 2;
+}
+
+[data-file-header='github'] .fh .icon {
+  width: 16px;
+  height: 16px;
+}
+
+[data-file-header='github'] .fh-icon-button,
+[data-file-header='github'] .fh-viewed {
+  height: 28px;
+  padding: 0 8px;
+  font-weight: 500;
+}
+
+[data-file-header='github'] .fh-viewed {
+  background: var(--pierre-bg-subtle);
 }
 
 /* File header (slotted into each Pierre item) */

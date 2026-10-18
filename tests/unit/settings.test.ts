@@ -19,10 +19,12 @@ import {
   setSettingsStorage,
   toDiffOptions,
   toTreeOptions,
+  treeNeedsGitStatus,
   type DisplaySettings,
   type SettingsStorage,
 } from '../../src/shared/settings';
-import { DIFF_CSS, GITHUB_CHANGE_CSS, GITHUB_TREE_CSS, GITHUB_TREE_ICONS } from '../../src/shared/github-defaults';
+import { DIFF_CSS, GITHUB_CHANGE_CSS, GITHUB_HUNK_CSS, GITHUB_TREE_CSS, GITHUB_TREE_ICONS, hunkSeparatorHeight } from '../../src/shared/github-defaults';
+import { HIDE_GIT_STATUS_CSS } from '../../src/shared/github-tree-icons';
 
 type Changes = Record<string, { newValue?: unknown; oldValue?: unknown }>;
 type ChangeListener = (changes: Changes, areaName: string) => void;
@@ -676,11 +678,23 @@ describe('toDiffOptions', () => {
 
   it("GitHub change colors ('default') add the CSS that makes Pierre use them unmixed and seamless; every look aligns line numbers", () => {
     const github = toDiffOptions(DEFAULT_SETTINGS) as Record<string, unknown>;
-    expect(github.unsafeCSS).toBe(`${DIFF_CSS}\n${GITHUB_CHANGE_CSS}`);
+    expect(github.unsafeCSS).toBe(`${DIFF_CSS}\n${GITHUB_CHANGE_CSS}\n${GITHUB_HUNK_CSS}`);
     expect(GITHUB_CHANGE_CSS).toMatch(/--mix-light:\s*0%/);
     expect(GITHUB_CHANGE_CSS).toMatch(/--diffs-gap-style:\s*none/);
-    const theme = toDiffOptions({ ...DEFAULT_SETTINGS, diff: { ...DEFAULT_SETTINGS.diff, changeColors: 'theme' } }) as Record<string, unknown>;
+    const theme = toDiffOptions({ ...DEFAULT_SETTINGS, diff: { ...DEFAULT_SETTINGS.diff, changeColors: 'theme', hunkSeparators: 'line-info-basic' } }) as Record<
+      string,
+      unknown
+    >;
     expect(theme.unsafeCSS).toBe(DIFF_CSS);
+  });
+
+  it("GitHub hunk separators ('default') get GitHub's 24 px blue expander rows; an explicit 'line-info-basic' keeps Pierre's", () => {
+    expect(GITHUB_HUNK_CSS).toMatch(/\[data-separator='line-info-basic'\][^}]*height:\s*24px/);
+    expect(hunkSeparatorHeight('default')).toBe(24);
+    expect(hunkSeparatorHeight('line-info-basic')).toBeUndefined();
+    const explicit = toDiffOptions({ ...DEFAULT_SETTINGS, diff: { ...DEFAULT_SETTINGS.diff, hunkSeparators: 'line-info-basic' } });
+    expect(explicit.hunkSeparators).toBe('line-info-basic');
+    expect(explicit.unsafeCSS).not.toContain(GITHUB_HUNK_CSS);
   });
 
   it('does not set options the viewer owns', () => {
@@ -692,20 +706,36 @@ describe('toDiffOptions', () => {
 });
 
 describe('toTreeOptions', () => {
-  it("resolves the defaults to GitHub's tree: open folders, plain octicons, filter text kept, no git status", () => {
+  it("resolves the defaults to GitHub's tree: open folders, 32 px rows, octicons, filter text kept, no status letters", () => {
     const o = toTreeOptions(DEFAULT_SETTINGS);
     expect(o).toEqual({
       flattenEmptyDirectories: true,
       initialExpansion: 'open',
       fileTreeSearchMode: 'hide-non-matches',
       density: 'default',
+      itemHeight: 32,
       icons: GITHUB_TREE_ICONS,
       stickyFolders: false,
       search: true,
       searchBlurBehavior: 'retain',
-      unsafeCSS: GITHUB_TREE_CSS,
+      unsafeCSS: `${GITHUB_TREE_CSS}${HIDE_GIT_STATUS_CSS}`,
     });
     expect(o).not.toHaveProperty('gitStatus');
+    // GitHub's icons pick each file's glyph by its status, so the tree gets the status, but shows no letters.
+    expect(treeNeedsGitStatus(DEFAULT_SETTINGS.tree)).toBe(true);
+    expect(HIDE_GIT_STATUS_CSS).toMatch(/\[data-item-section="git"\][^}]*display:\s*none/);
+  });
+
+  it('shows the status letters with GitHub icons when showGitStatus is on, and needs no status for other icons', () => {
+    const letters = { ...DEFAULT_SETTINGS.tree, showGitStatus: true };
+    expect(toTreeOptions({ ...DEFAULT_SETTINGS, tree: letters }).unsafeCSS).toBe(GITHUB_TREE_CSS);
+    expect(treeNeedsGitStatus({ icons: 'complete', showGitStatus: false })).toBe(false);
+    expect(treeNeedsGitStatus({ icons: 'complete', showGitStatus: true })).toBe(true);
+  });
+
+  it("gives only the density 'default' GitHub's 32 px rows; the other densities keep Pierre's heights", () => {
+    expect(toTreeOptions({ ...DEFAULT_SETTINGS, tree: { ...DEFAULT_SETTINGS.tree, density: 'relaxed' } })).not.toHaveProperty('itemHeight');
+    expect(toTreeOptions({ ...DEFAULT_SETTINGS, tree: { ...DEFAULT_SETTINGS.tree, density: 1.5 } })).not.toHaveProperty('itemHeight');
   });
 
   it('maps explicit tree settings onto @pierre/trees options', () => {

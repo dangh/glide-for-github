@@ -10,19 +10,20 @@
  *                                                                             (classic `.blob-code-inner { white-space: pre-wrap }`)
  * diff.lineDiffType          'default'    'word'                              GitHub highlights changed words
  * diff.diffIndicators        'default'    'classic'                           +/- signs in the line gutter
- * diff.hunkSeparators        'default'    'line-info-basic'                   user's choice: a slim "N unmodified lines" row
+ * diff.hunkSeparators        'default'    'line-info-basic' + GITHUB_HUNK_CSS user's choice: a slim "N unmodified lines" row
  *                                                                             with expand buttons and no "@@ -a,b +c,d @@"
- *                                                                             text, flush with the code (no gap), like
- *                                                                             GitHub's expander rows. (Pierre's createSeparator
- *                                                                             renders hunk specs only for 'metadata';
- *                                                                             'simple' has no expand buttons.)
+ *                                                                             text, flush with the code (no gap), styled like
+ *                                                                             GitHub's 24 px blue expander rows. (Pierre's
+ *                                                                             createSeparator renders hunk specs only for
+ *                                                                             'metadata'; 'simple' has no expand buttons.)
  * diff.themeLight/Dark       'default'    'github-light-default' /            GitHub's Primer syntax colors (Shiki's
  *                                         'github-dark-default'               bundled GitHub themes)
  * diff.themeType             'default'    'system' (follows GitHub's mode)    GitHub's default theme setting syncs with the OS
  * diff.lineHoverHighlight    'default'    'disabled'                          GitHub draws no row hover highlight
- * diff.changeColors          'default'    GitHub's diffBlob colors            see GITHUB_COLORS ('theme' = Pierre's)
- * diff.fileHeaderStyle       'default'    GitHub's file box (viewer.css)      gray bar, mono path, +/- counts, Viewed
- *                                                                             right-aligned, 1px border, 6px radius
+ * diff.changeColors          'default'    GitHub's diffBlob colors            see GITHUB_COLORS ('theme' = Pierre's), line
+ *                                                                             numbers included
+ * diff.fileHeaderStyle       'default'    GitHub's file box (viewer.css)      42 px gray bar, mono path, +/- counts and
+ *                                                                             Viewed right-aligned, 1px border, 6px radius
  * diff.disableBackground     false        colored change lines                GitHub colors added/removed lines
  * diff.disableLineNumbers    false        line numbers shown                  GitHub shows both line numbers
  * diff.expandUnchanged       false        unchanged lines collapsed           GitHub collapses unchanged context
@@ -35,8 +36,9 @@
  * tree.initialExpansion      'default'    'open'                              GitHub's file tree starts expanded
  * tree.fileTreeSearchMode    'default'    'hide-non-matches'                  GitHub's filter lists only matching files
  * tree.searchBlurBehavior    'default'    'retain'                            GitHub keeps the filter text
- * tree.density               'default'    Pierre's 'default' (30 px rows)     closest to GitHub's ~32 px tree rows
- * tree.icons                 'default'    octicon file / folder icons         ./github-tree-icons.ts
+ * tree.density               'default'    Pierre's 'default', 32 px rows      GitHub's tree rows are 32 px
+ * tree.icons                 'default'    GitHub's tree look                  ./github-tree-icons.ts: octicon folders and
+ *                                                                             status file icons, palette, spacing, filter
  * tree.coloredIcons          true         (only affects Pierre's icon sets)
  * tree.flattenEmptyDirectories true       single-child folders compacted      GitHub compacts folder chains
  * tree.stickyFolders         false                                            GitHub's tree has no sticky folders
@@ -74,6 +76,9 @@ export const GITHUB_TREE = Object.freeze({
   searchBlurBehavior: 'retain',
 } as const) satisfies Partial<TreeSettings>;
 
+/** GitHub's tree row height (`.PRIVATE_TreeView-item-container`, 32.19 px measured): @pierre/trees `itemHeight` for density 'default'. */
+export const GITHUB_TREE_ROW_HEIGHT = 32;
+
 type GithubDiffKey = keyof typeof GITHUB_DIFF;
 export type ResolvedDiffSettings = Resolved<DiffSettings>;
 
@@ -108,6 +113,9 @@ export const GITHUB_COLORS = Object.freeze({
   deletionLine: { light: '#ffebe9', dark: '#f851491a' },
   deletionWord: { light: '#ffcecb', dark: '#f8514966' },
   deletionNum: { light: '#ffcecb', dark: '#f851494d' },
+  /** Line number text: fgColor-muted on context rows, fgColor-default on changed rows (measured on /changes). */
+  numberText: { light: '#59636e', dark: '#9198a1' },
+  changedNumberText: { light: '#1f2328', dark: '#f0f6fc' },
 });
 
 /** Pierre's override variables, each fed one GitHub color as a `light-dark()` pair. */
@@ -118,6 +126,9 @@ const COLOR_VARS: Record<string, keyof typeof GITHUB_COLORS> = {
   '--diffs-bg-deletion-override': 'deletionLine',
   '--diffs-bg-deletion-emphasis-override': 'deletionWord',
   '--diffs-bg-deletion-number-override': 'deletionNum',
+  '--diffs-fg-number-override': 'numberText',
+  '--diffs-fg-number-addition-override': 'changedNumberText',
+  '--diffs-fg-number-deletion-override': 'changedNumberText',
 };
 
 /**
@@ -140,6 +151,20 @@ export const DIFF_CSS = `[data-diff] { --diffs-min-number-column-width: 4ch; }
 
 /** CodeView `itemMetrics.paddingBottom` (its height estimate for the space under a file) matching DIFF_CSS. */
 export const filePaddingBottom = (overflow: 'wrap' | 'scroll'): number => (overflow === 'wrap' ? 0 : 8);
+
+/**
+ * Diff `unsafeCSS` for `diff.hunkSeparators` 'default': GitHub's expander rows (`.diff-hunk-cell`, 24 px, Primer
+ * bgColor-accent-muted #ddf4ff / #388bfd1a; its expand button #b6e3ff / #0c2d6b, measured on /changes), flush with
+ * the code. The label is transparent over its row, so the translucent dark color is not painted twice. Must match
+ * `hunkSeparatorHeight`.
+ */
+export const GITHUB_HUNK_CSS = `[data-diff] { --diffs-bg-separator: light-dark(#ddf4ff, #388bfd1a); }
+[data-separator='line-info-basic'] { height: 24px; }
+[data-expand-button] { background-color: light-dark(#b6e3ff, #0c2d6b); border-right: 0; }
+[data-separator-content] { background-color: transparent; }`;
+
+/** CodeView `itemMetrics.hunkSeparatorHeight` (its estimate per separator row) matching GITHUB_HUNK_CSS; Pierre's 32 px otherwise. */
+export const hunkSeparatorHeight = (choice: DiffSettings['hunkSeparators']): number | undefined => (choice === DEFAULT ? 24 : undefined);
 
 /** GitHub's Primer font stacks and sizes. */
 export const GITHUB_FONTS = Object.freeze({

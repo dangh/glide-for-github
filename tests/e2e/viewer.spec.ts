@@ -59,11 +59,11 @@ async function expander(viewer: Viewer, path: string) {
   };
 }
 
-/** The tree's git status lane: number of rows that have one, and the letters shown. */
+/** The tree's visible git status lane: number of rows that show one, and the letters shown. */
 const gitLane = (viewer: Viewer) =>
   viewer.frame().evaluate(() => {
     const root = document.querySelector('file-tree-container')?.shadowRoot;
-    const lanes = [...(root?.querySelectorAll('[data-item-section="git"]') ?? [])];
+    const lanes = [...(root?.querySelectorAll<HTMLElement>('[data-item-section="git"]') ?? [])].filter((l) => getComputedStyle(l).display !== 'none');
     return { rows: lanes.length, letters: lanes.map((l) => l.textContent?.trim() ?? '').filter((t) => /^[AMDR]$/.test(t)) };
   });
 
@@ -197,7 +197,7 @@ test.describe('sandbox PR', () => {
     await resetSettings(again);
   });
 
-  test("default look is GitHub's: expandable rows without @@, no A/M/D letters, GitHub colors, fonts and file boxes", async ({ page }) => {
+  test("default look is GitHub's: expandable rows without @@, status icons but no A/M/D letters, GitHub colors, fonts and file boxes", async ({ page }) => {
     const viewer = await openPierre(page, SANDBOX, 'hash');
     await resetSettings(viewer);
     await viewer.allFetched();
@@ -250,20 +250,33 @@ test.describe('sandbox PR', () => {
         codeSize: added ? getComputedStyle(added).fontSize : null,
         uiFont: getComputedStyle(document.querySelector('.pierre-toolbar')!).fontFamily,
         fileIcons: [...tree.querySelectorAll('[data-item-type="file"] use')].map((u) => u.getAttribute('href')).slice(0, 3),
+        // GitHub's status icons: file-added in fgColor-success, file-diff in fgColor-muted.
+        statusIcons: Object.fromEntries(
+          [...tree.querySelectorAll<HTMLElement>('[data-item-git-status]')].map((r) => [
+            r.dataset.itemGitStatus,
+            rgba(getComputedStyle(r.querySelector('[data-item-section="icon"]')!).color),
+          ]),
+        ),
+        statusColors: { added: [rgba('#1a7f37'), rgba('#3fb950')], modified: [rgba('#59636e'), rgba('#9198a1')] },
         badge: getComputedStyle(document.querySelector('.fh-badge')!).display,
         header: document.documentElement.dataset.fileHeader,
       };
     });
+    const close = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]!) <= 2);
     expect(look.added).not.toBeNull();
     expect(look.codeFont).toContain('ui-monospace');
     expect(look.codeSize).toBe('12px');
     expect(look.uiFont).toContain('-apple-system');
     expect(look.fileIcons.length).toBeGreaterThan(0);
     for (const href of look.fileIcons) expect(href).toBe('#glide-octicon-file');
+    for (const status of ['added', 'modified'] as const) {
+      const color = look.statusIcons[status];
+      expect(color, status).toBeDefined();
+      expect(look.statusColors[status].some((e) => close(color!, e)), `${status}: ${color}`).toBe(true);
+    }
     expect(look.badge).toBe('none');
     expect(look.header).toBe('github');
     // The line background is GitHub's color (light or dark, whichever scheme applies), not a mix into the background.
-    const close = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]!) <= 2);
     expect(look.expected.some((e) => close(look.added!, e)), `${look.added} vs ${JSON.stringify(look.expected)}`).toBe(true);
     await resetSettings(viewer);
   });

@@ -2,8 +2,8 @@
  * Per-file header inside the CodeView (custom header slot). Subscribes to its own file's state, so a
  * change to one file re-renders one header; the CodeView item only changes for diff/collapse/annotations.
  *
- * Layout must stay one row of exactly `HEADER_HEIGHT` px: CodeView reserves `itemMetrics.diffHeaderHeight`
- * for it and does not measure headers.
+ * Layout must stay one row of exactly `headerHeight(diff.fileHeaderStyle)` px: CodeView reserves
+ * `itemMetrics.diffHeaderHeight` for it and does not measure headers.
  */
 import { memo, useCallback } from 'react';
 import { CHEVRON_DOWN, CHEVRON_RIGHT } from '../../shared/github-tree-icons';
@@ -13,11 +13,9 @@ import { fileTarget } from '../state/compose';
 import { errorMessage, setFileViewed } from '../state/review';
 import { session } from '../state/session';
 import { commentCount, isCollapsed, threadsByPath, usePr, type FileLoadState } from '../state/store';
-import { filesChangedUrl, HEADER_HEIGHT } from '../state/view';
+import { useSettings } from '../state/settings';
+import { filesChangedUrl, headerHeight } from '../state/view';
 import { openComposerAt } from './Composer';
-
-export { HEADER_HEIGHT };
-
 
 /** Octicon comment-16 path. */
 export function CommentIcon() {
@@ -101,6 +99,7 @@ export const FileHeader = memo(function FileHeader({ path }: { path: string }) {
   const viewed = usePr((s) => s.viewed.has(path));
   const collapsed = usePr((s) => isCollapsed(s, path));
   const comments = usePr((s) => commentCount(threadsByPath(s.threads).get(path)));
+  const height = useSettings((s) => headerHeight(s.settings.diff.fileHeaderStyle));
 
   const toggleCollapsed = useCallback(() => {
     const s = usePr.getState();
@@ -126,7 +125,7 @@ export const FileHeader = memo(function FileHeader({ path }: { path: string }) {
   const copyPath = () => void navigator.clipboard?.writeText(path).catch(() => undefined);
 
   return (
-    <div className="fh" data-path={path} data-viewed={viewed || undefined} style={{ height: HEADER_HEIGHT }}>
+    <div className="fh" data-path={path} data-viewed={viewed || undefined} style={{ height }}>
       <button
         className="fh-chevron"
         aria-label={collapsed ? 'Expand file' : 'Collapse file'}

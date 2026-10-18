@@ -14,7 +14,7 @@ import { rangeOids } from '../state/range';
 import { session } from '../state/session';
 import { useSettings } from '../state/settings';
 import { usePr } from '../state/store';
-import { createDiffOptionsBuilder, createSettle, HEADER_HEIGHT, visibleFiles, type DiffViewOptions } from '../state/view';
+import { createDiffOptionsBuilder, createSettle, headerHeight, visibleFiles, type DiffViewOptions } from '../state/view';
 import { Composer, openComposerAt } from './Composer';
 import { FileHeader } from './FileHeader';
 import { Thread } from './Thread';
@@ -46,7 +46,7 @@ function createFileLoader(rpc: Rpc, pr: PrData) {
 function viewportFiles(handle: Handle): { ids: string[]; current?: string } {
   const instance = handle.getInstance();
   if (!instance) return { ids: [] };
-  return visibleFiles(usePr.getState().order, (id) => instance.getTopForItem(id), instance.getScrollTop(), instance.getHeight(), HEADER_HEIGHT);
+  return visibleFiles(usePr.getState().order, (id) => instance.getTopForItem(id), instance.getScrollTop(), instance.getHeight(), headerHeight(useSettings.getState().settings.diff.fileHeaderStyle));
 }
 
 /** CodeView callbacks get the item context last; the item id is the file path. */

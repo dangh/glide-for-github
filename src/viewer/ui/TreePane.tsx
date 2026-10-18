@@ -93,7 +93,7 @@ export const TreePane = memo(function TreePane() {
   const pr = usePr((s) => s.pr);
   const settings = useSettings((s) => s.settings.tree);
   const themeType = useSettings((s) => effectiveThemeType(s.settings.diff.themeType, s.colorMode));
-  const gitStatus = useMemo(() => gitStatusEntries(pr?.files ?? [], settings.showGitStatus), [pr, settings.showGitStatus]);
+  const gitStatus = useMemo(() => gitStatusEntries(pr?.files ?? [], settings), [pr, settings]);
   const key = useMemo(() => JSON.stringify(settings), [settings]);
   const colorScheme = themeType === 'system' ? 'light dark' : themeType;
 

@@ -2,37 +2,49 @@
 import type { FileDiffContentsLoader } from '@pierre/diffs';
 import type { GitStatusEntry } from '@pierre/trees';
 import type { CodeViewReactOptions } from '@pierre/diffs/react';
-import { filePaddingBottom, resolveDiffChoice } from '../../shared/github-defaults';
-import { DEFAULT_SETTINGS, toDiffOptions, type DiffSettings } from '../../shared/settings';
+import { filePaddingBottom, hunkSeparatorHeight, resolveDiffChoice } from '../../shared/github-defaults';
+import { DEFAULT_SETTINGS, toDiffOptions, treeNeedsGitStatus, type DiffSettings, type TreeSettings } from '../../shared/settings';
 import type { PrRef } from '../../shared/pr-url';
 import type { FileSummary } from '../github/private';
 import type { AnnotationMeta } from './items';
 import { effectiveThemeType } from './settings';
 import { commentCount, threadsByPath, type PrState } from './store';
 
-/** Height of the per-file header row; CodeView reserves exactly this (`itemMetrics.diffHeaderHeight`). */
-export const HEADER_HEIGHT = 40;
+/**
+ * Per-file header row height by `diff.fileHeaderStyle`: FileHeader renders exactly this and CodeView reserves it
+ * (`itemMetrics.diffHeaderHeight`). GitHub's `.diff-file-header` is 42 px.
+ */
+const HEADER_HEIGHTS = Object.freeze({ default: 42, pierre: 40 });
+export const headerHeight = (style: DiffSettings['fileHeaderStyle']): number => HEADER_HEIGHTS[style];
 
 /** Pierre's default code row height (`--diffs-line-height`), GitHub's 20 px at the default 12 px font. */
 export const DEFAULT_LINE_HEIGHT = 20;
 
-type Overflow = 'wrap' | 'scroll';
-const metricsByKey = new Map<string, Readonly<{ diffHeaderHeight: number; lineHeight: number; paddingBottom: number }>>();
+type MetricsChoices = Pick<DiffSettings, 'overflow' | 'hunkSeparators' | 'fileHeaderStyle'>;
+type ItemMetrics = Readonly<{ diffHeaderHeight: number; lineHeight: number; paddingBottom: number; hunkSeparatorHeight?: number }>;
+const metricsByKey = new Map<string, ItemMetrics>();
 
 /**
- * CodeView `itemMetrics` for a code row height and overflow. CodeView estimates rows it does not measure (overflow
- * 'scroll' without annotations) at `lineHeight`, so it must match `--diffs-line-height` (github-defaults.ts
- * toStyleVars), and the space under each file at `paddingBottom`, which DIFF_CSS sets per overflow.
- * One frozen object per pair, so CodeView's option comparison sees no change while they stay.
+ * CodeView `itemMetrics` for a code row height and the diff options that size rows CodeView estimates without
+ * measuring: rows at `lineHeight` (must match `--diffs-line-height`, github-defaults.ts toStyleVars), the space under
+ * each file at `paddingBottom` (DIFF_CSS, per overflow), separator rows at `hunkSeparatorHeight` (GITHUB_HUNK_CSS) and
+ * the header at `headerHeight`. One frozen object per combination, so CodeView's option comparison sees no change
+ * while they stay.
  */
-export function itemMetricsFor(lineHeight: number, overflow: Overflow = 'wrap') {
-  const key = `${lineHeight}:${overflow}`;
+export function itemMetricsFor(lineHeight: number, diff: MetricsChoices = DEFAULT_SETTINGS.diff): ItemMetrics {
+  const overflow = resolveDiffChoice('overflow', diff.overflow);
+  const hunk = hunkSeparatorHeight(diff.hunkSeparators);
+  const header = headerHeight(diff.fileHeaderStyle);
+  const key = `${lineHeight}:${overflow}:${hunk}:${header}`;
   let m = metricsByKey.get(key);
-  if (!m) metricsByKey.set(key, (m = Object.freeze({ diffHeaderHeight: HEADER_HEIGHT, lineHeight, paddingBottom: filePaddingBottom(overflow) })));
+  if (!m) {
+    m = Object.freeze({ diffHeaderHeight: header, lineHeight, paddingBottom: filePaddingBottom(overflow), ...(hunk ? { hunkSeparatorHeight: hunk } : {}) });
+    metricsByKey.set(key, m);
+  }
   return m;
 }
 
-/** Metrics at the default code font size. */
+/** Metrics at the default code font size and diff settings. */
 export const ITEM_METRICS = itemMetricsFor(DEFAULT_LINE_HEIGHT);
 
 export type DiffViewOptions = CodeViewReactOptions<AnnotationMeta, undefined>;
@@ -72,7 +84,7 @@ export function createDiffOptionsBuilder() {
     const options: DiffViewOptions = {
       ...toDiffOptions<AnnotationMeta>({ ...DEFAULT_SETTINGS, diff }),
       themeType: effectiveThemeType(diff.themeType, colorMode),
-      itemMetrics: itemMetricsFor(lineHeight, resolveDiffChoice('overflow', diff.overflow)),
+      itemMetrics: itemMetricsFor(lineHeight, diff),
       ...(loadDiffFiles ? { loadDiffFiles } : {}),
       ...interactions,
     };
@@ -119,11 +131,11 @@ export function visibleFiles(
 }
 
 /**
- * The tree's `gitStatus` (A/M/D letters, colored names and folder roll-ups), or undefined when the
- * `tree.showGitStatus` option is off, so @pierre/trees draws no status at all.
+ * The tree's `gitStatus`: for its A/M/D letters, colored names and folder roll-ups (`tree.showGitStatus`) and for
+ * GitHub's status file icons (`tree.icons` 'default'); undefined when neither is on, so @pierre/trees draws no status.
  */
-export function gitStatusEntries(files: readonly FileSummary[], show: boolean): GitStatusEntry[] | undefined {
-  return show ? files.map((f) => ({ path: f.path, status: f.status })) : undefined;
+export function gitStatusEntries(files: readonly FileSummary[], tree: Pick<TreeSettings, 'icons' | 'showGitStatus'>): GitStatusEntry[] | undefined {
+  return treeNeedsGitStatus(tree) ? files.map((f) => ({ path: f.path, status: f.status })) : undefined;
 }
 
 export type Decoration = { text: string; title?: string; parts?: { text: string; color?: string }[] } | null;

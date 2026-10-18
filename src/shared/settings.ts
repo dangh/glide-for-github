@@ -83,8 +83,8 @@
  *                               interaction wiring owned by the viewer (or inert without token callbacks)
  *   lineAnnotations, items, createEditor, edit, onItemEdit*   data / editing mode / merge-conflict UI
  *   every callback and render hook (render*, on*, getEditStateKey, ...)
- *   trees: sort (only 'default' or a comparator function, which cannot be persisted), itemHeight (density already
- *     drives row height), overscan / initialVisibleRowCount (virtualization perf), searchFakeFocus (demo/test aid),
+ *   trees: sort (only 'default' or a comparator function, which cannot be persisted), itemHeight (follows density;
+ *     'default' gets GitHub's 32 px), overscan / initialVisibleRowCount (virtualization perf), searchFakeFocus (demo/test aid),
  *     dragAndDrop / renaming (editing), composition / renderRowDecoration (render hooks), gitStatus / paths /
  *     preparedInput / initialExpandedPaths / initialSelectedPaths / initialSearchQuery / id (data, set by the viewer),
  *     icons object form beyond {set, colored} (custom sprite sheets and remaps)
@@ -99,8 +99,8 @@ import type {
   FileTreeSearchBlurBehavior,
   FileTreeSearchMode,
 } from '@pierre/trees';
-import { DIFF_CSS, GITHUB_CHANGE_CSS, GITHUB_TREE, resolveDiff } from './github-defaults';
-import { GITHUB_TREE_CSS, GITHUB_TREE_ICONS } from './github-tree-icons';
+import { DIFF_CSS, GITHUB_CHANGE_CSS, GITHUB_HUNK_CSS, GITHUB_TREE, GITHUB_TREE_ROW_HEIGHT, resolveDiff } from './github-defaults';
+import { GITHUB_TREE_CSS, GITHUB_TREE_ICONS, HIDE_GIT_STATUS_CSS } from './github-tree-icons';
 
 // ---------------------------------------------------------------------------------------------------------
 // Types
@@ -148,7 +148,7 @@ export interface TreeSettings {
   flattenEmptyDirectories: boolean;
   initialExpansion: OrDefault<FileTreeInitialExpansion>;
   fileTreeSearchMode: OrDefault<FileTreeSearchMode>;
-  /** Pierre's own density keyword 'default' is also the GitHub-closest one, so 'default' needs no resolution. */
+  /** Pierre's own density keyword 'default' doubles as ours: Pierre's 'default' spacing with GitHub's 32 px rows. */
   density: FileTreeDensity;
   icons: OrDefault<FileTreeBuiltInIconSet>;
   coloredIcons: boolean;
@@ -618,12 +618,17 @@ export function onSettingsChange(cb: (settings: DisplaySettings) => void): () =>
  * `preferredHighlighter` is fixed to 'shiki-js' (global constraint: no WASM) and is deliberately not a setting.
  * Viewer-owned options (lineAnnotations, enableGutterUtility, enableLineSelection, collapsed, callbacks) are not
  * set here; spread this and add them. `unsafeCSS` is a fixed string (never user text): aligned line numbers and no
- * padding under the last line, plus, with GitHub's change colors, Pierre using the colors as they are.
+ * padding under the last line, plus, with GitHub's change colors, Pierre using the colors as they are, and with
+ * GitHub's hunk separators, GitHub's 24 px blue expander rows (CodeView's `itemMetrics.hunkSeparatorHeight` must
+ * match: `hunkSeparatorHeight` in ./github-defaults.ts).
  */
 export function toDiffOptions<LAnnotation = undefined, Caret = undefined>(
   s: DisplaySettings,
 ): CodeViewReactOptions<LAnnotation, Caret> {
   const d = resolveDiff(s.diff);
+  const css = [DIFF_CSS];
+  if (s.diff.changeColors === DEFAULT_CHOICE) css.push(GITHUB_CHANGE_CSS);
+  if (s.diff.hunkSeparators === DEFAULT_CHOICE) css.push(GITHUB_HUNK_CSS);
   return {
     theme: { light: d.themeLight, dark: d.themeDark },
     themeType: d.themeType,
@@ -645,7 +650,7 @@ export function toDiffOptions<LAnnotation = undefined, Caret = undefined>(
     maxLineDiffLength: d.maxLineDiffLength,
     layout: { gap: d.layoutGap, paddingTop: d.layoutPaddingTop, paddingBottom: d.layoutPaddingBottom },
     preferredHighlighter: 'shiki-js',
-    unsafeCSS: s.diff.changeColors === DEFAULT_CHOICE ? `${DIFF_CSS}\n${GITHUB_CHANGE_CSS}` : DIFF_CSS,
+    unsafeCSS: css.join('\n'),
   };
 }
 
@@ -655,6 +660,7 @@ export type TreeDisplayOptions = Pick<
   | 'initialExpansion'
   | 'fileTreeSearchMode'
   | 'density'
+  | 'itemHeight'
   | 'icons'
   | 'stickyFolders'
   | 'search'
@@ -663,8 +669,15 @@ export type TreeDisplayOptions = Pick<
 >;
 
 /**
+ * Whether the tree gets `gitStatus`: for its A/M/D letters (`tree.showGitStatus`), or for GitHub's icons, which pick
+ * each file's glyph by its status (./github-tree-icons.ts).
+ */
+export const treeNeedsGitStatus = (t: Pick<TreeSettings, 'icons' | 'showGitStatus'>): boolean => t.showGitStatus || t.icons === DEFAULT_CHOICE;
+
+/**
  * Display-only `@pierre/trees` options, 'default' resolved; add `paths`, `onSelectionChange` etc. at the call site,
- * and `gitStatus` only when `tree.showGitStatus` is on. `unsafeCSS` is a fixed string that goes with the GitHub icons.
+ * and `gitStatus` when `treeNeedsGitStatus`. `unsafeCSS` is a fixed string that goes with the GitHub icons (and hides
+ * the status letters they need the git status for while `tree.showGitStatus` is off).
  */
 export function toTreeOptions(s: DisplaySettings): TreeDisplayOptions {
   const t = s.tree;
@@ -674,10 +687,11 @@ export function toTreeOptions(s: DisplaySettings): TreeDisplayOptions {
     initialExpansion: t.initialExpansion === DEFAULT_CHOICE ? GITHUB_TREE.initialExpansion : t.initialExpansion,
     fileTreeSearchMode: t.fileTreeSearchMode === DEFAULT_CHOICE ? GITHUB_TREE.fileTreeSearchMode : t.fileTreeSearchMode,
     density: t.density,
+    ...(t.density === DEFAULT_CHOICE ? { itemHeight: GITHUB_TREE_ROW_HEIGHT } : {}),
     icons: github ? GITHUB_TREE_ICONS : { set: t.icons as FileTreeBuiltInIconSet, colored: t.coloredIcons },
     stickyFolders: t.stickyFolders,
     search: t.search,
     searchBlurBehavior: t.searchBlurBehavior === DEFAULT_CHOICE ? GITHUB_TREE.searchBlurBehavior : t.searchBlurBehavior,
-    ...(github ? { unsafeCSS: GITHUB_TREE_CSS } : {}),
+    ...(github ? { unsafeCSS: t.showGitStatus ? GITHUB_TREE_CSS : `${GITHUB_TREE_CSS}${HIDE_GIT_STATUS_CSS}` } : {}),
   };
 }

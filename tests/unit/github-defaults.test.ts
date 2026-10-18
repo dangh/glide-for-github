@@ -9,12 +9,14 @@ import {
   GITHUB_DIFF,
   GITHUB_FONTS,
   GITHUB_TREE,
+  GITHUB_HUNK_CSS,
   GITHUB_TREE_CSS,
   GITHUB_TREE_ICONS,
   resolveDiffChoice,
   resolveFonts,
   toStyleVars,
 } from '../../src/shared/github-defaults';
+import { HIDE_GIT_STATUS_CSS } from '../../src/shared/github-tree-icons';
 import { DEFAULT_SETTINGS, type DisplaySettings } from '../../src/shared/settings';
 import { effectiveThemeType } from '../../src/viewer/state/settings';
 
@@ -63,6 +65,8 @@ describe("the GitHub mapping of 'default'", () => {
       deletionLine: { light: '#ffebe9', dark: '#f851491a' },
       deletionWord: { light: '#ffcecb', dark: '#f8514966' },
       deletionNum: { light: '#ffcecb', dark: '#f851494d' },
+      numberText: { light: '#59636e', dark: '#9198a1' },
+      changedNumberText: { light: '#1f2328', dark: '#f0f6fc' },
     });
   });
 });
@@ -138,9 +142,13 @@ describe('toStyleVars', () => {
       '--diffs-bg-deletion-override': 'light-dark(#ffebe9, #f851491a)',
       '--diffs-bg-deletion-emphasis-override': 'light-dark(#ffcecb, #f8514966)',
       '--diffs-bg-deletion-number-override': 'light-dark(#ffcecb, #f851494d)',
+      // GitHub's line numbers: muted on context rows, default text on changed rows.
+      '--diffs-fg-number-override': 'light-dark(#59636e, #9198a1)',
+      '--diffs-fg-number-addition-override': 'light-dark(#1f2328, #f0f6fc)',
+      '--diffs-fg-number-deletion-override': 'light-dark(#1f2328, #f0f6fc)',
     });
     const theme = toStyleVars({ ...DEFAULT_SETTINGS, diff: { ...DEFAULT_SETTINGS.diff, changeColors: 'theme' } });
-    expect(Object.keys(theme).filter((k) => k.startsWith('--diffs-bg-'))).toEqual([]);
+    expect(Object.keys(theme).filter((k) => k.startsWith('--diffs-bg-') || k.startsWith('--diffs-fg-'))).toEqual([]);
   });
 
   it('returns the same object for the same inputs (applied once per settings change)', () => {
@@ -151,9 +159,19 @@ describe('toStyleVars', () => {
 describe('GitHub tree icons', () => {
   const { resolveIcon } = createFileTreeIconResolver(GITHUB_TREE_ICONS);
 
-  it('uses the plain octicon file icon for every file, whatever its type', () => {
+  it('uses the octicon file icon for every file, whatever its type', () => {
     for (const path of ['src/a.ts', 'package.json', 'README.md', 'Dockerfile', 'img.png']) {
       expect(resolveIcon('file-tree-icon-file', path).name, path).toBe('glide-octicon-file');
+    }
+  });
+
+  it("shows each file's status like GitHub: file-added green, file-diff muted, file-moved attention, file-removed red", () => {
+    const sprite = GITHUB_TREE_ICONS.spriteSheet!;
+    const colors = { added: '#1a7f37, #3fb950', modified: '#59636e, #9198a1', renamed: '#9a6700, #d29922', deleted: '#d1242f, #f85149' };
+    for (const [status, color] of Object.entries(colors)) {
+      expect(sprite, status).toContain(`--glide-file-${status}`);
+      const rule = new RegExp(`\\[data-item-git-status="${status}"\\] > \\[data-item-section="icon"\\] \\{[^}]*--glide-file-${status}: inline;[^}]*light-dark\\(${color}\\)`);
+      expect(GITHUB_TREE_CSS, status).toMatch(rule);
     }
   });
 
@@ -204,18 +222,55 @@ describe('names our fixed Pierre CSS relies on (guards drift on @pierre upgrades
   const trees = pierreDist('trees');
 
   it('the diff unsafeCSS and the style variables exist in @pierre/diffs', () => {
-    const names = [...cssNames(GITHUB_CHANGE_CSS), ...cssNames(DIFF_CSS), 'change-addition', 'change-deletion', 'data-diff-span'];
+    const names = [...cssNames(GITHUB_CHANGE_CSS), ...cssNames(DIFF_CSS), ...cssNames(GITHUB_HUNK_CSS), 'change-addition', 'change-deletion', 'data-diff-span'];
     for (const v of Object.keys(toStyleVars(DEFAULT_SETTINGS))) if (v.startsWith('--diffs-')) names.push(v);
     expect(names).toEqual(
-      expect.arrayContaining(['--mix-light', '--mix-dark', 'data-line-type', 'data-background', '--diffs-line-height', '--diffs-gap-style', '--diffs-min-number-column-width', '--diffs-scrollbar-gutter', 'data-overflow', 'data-code']),
+      expect.arrayContaining([
+        '--mix-light',
+        '--mix-dark',
+        'data-line-type',
+        'data-background',
+        '--diffs-line-height',
+        '--diffs-gap-style',
+        '--diffs-min-number-column-width',
+        '--diffs-scrollbar-gutter',
+        'data-overflow',
+        'data-code',
+        '--diffs-bg-separator',
+        'data-separator',
+        'line-info-basic',
+        'data-expand-button',
+        '--diffs-fg-number-override',
+        '--diffs-fg-number-addition-override',
+      ]),
     );
     for (const name of names) expect(diffs.includes(name), name).toBe(true);
   });
 
   it('the tree unsafeCSS, icon slots and style variables exist in @pierre/trees', () => {
-    const names = [...cssNames(GITHUB_TREE_CSS), ...Object.keys(GITHUB_TREE_ICONS.remap ?? {})];
+    const names = [...cssNames(GITHUB_TREE_CSS), ...cssNames(HIDE_GIT_STATUS_CSS), ...Object.keys(GITHUB_TREE_ICONS.remap ?? {})];
     for (const v of Object.keys(toStyleVars(DEFAULT_SETTINGS))) if (v.startsWith('--trees-')) names.push(v);
-    expect(names).toEqual(expect.arrayContaining(['data-item-section', 'data-item-type', 'data-icon-name', 'aria-expanded', 'file-tree-icon-chevron']));
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'data-item-section',
+        'data-item-type',
+        'data-icon-name',
+        'aria-expanded',
+        'file-tree-icon-chevron',
+        'data-item-git-status',
+        'renamed',
+        'spacing-item',
+        'git',
+        'data-file-tree-search-container',
+        'data-file-tree-search-input',
+        'data-file-tree-virtualized-scroll',
+        '--trees-fg-override',
+        '--trees-selected-bg-override',
+        '--trees-padding-inline-override',
+        '--trees-item-row-gap-override',
+        '--trees-indent-guide-bg',
+      ]),
+    );
     for (const name of names) expect(trees.includes(name), name).toBe(true);
   });
 });

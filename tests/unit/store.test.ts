@@ -138,10 +138,11 @@ describe('store', () => {
 });
 
 describe('view helpers', () => {
-  it('gitStatusEntries: none when the git status option is off (no letters, no folder roll-ups)', () => {
+  it("gitStatusEntries: none when neither the status letters nor GitHub's status icons need it", () => {
     const files = [file('a.ts', { status: 'added' }), file('b.ts'), file('c.ts', { status: 'deleted' })];
-    expect(gitStatusEntries(files, false)).toBeUndefined();
-    expect(gitStatusEntries(files, true)).toEqual([
+    expect(gitStatusEntries(files, { icons: 'complete', showGitStatus: false })).toBeUndefined();
+    expect(gitStatusEntries(files, { icons: 'default', showGitStatus: false })).toHaveLength(3);
+    expect(gitStatusEntries(files, { icons: 'complete', showGitStatus: true })).toEqual([
       { path: 'a.ts', status: 'added' },
       { path: 'b.ts', status: 'modified' },
       { path: 'c.ts', status: 'deleted' },
