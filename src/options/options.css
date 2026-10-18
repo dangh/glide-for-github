@@ -16,9 +16,35 @@ body {
   padding: 24px 24px 64px;
 }
 
+.options-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+/* icons/icon.svg keeps the store's 16 px padding in its 128 px canvas: show the tile only. */
+.options-icon {
+  object-view-box: inset(16px);
+  flex: none;
+}
+
 .options h1 {
   font-size: 24px;
-  margin: 0 0 16px;
+  margin: 0;
+}
+
+.options-version {
+  align-self: flex-end;
+  margin-bottom: 4px;
+  color: var(--pierre-muted);
+  font: 12px var(--pierre-mono);
+  text-decoration: none;
+}
+
+.options-version:hover {
+  color: var(--pierre-accent);
+  text-decoration: underline;
 }
 
 .options-section {

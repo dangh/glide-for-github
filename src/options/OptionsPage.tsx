@@ -1,6 +1,9 @@
 /** The extension's options page: tokens, display settings (shared with the viewer's Display menu) and a live sample. */
 import { useEffect } from 'react';
 import { BRAND } from '../shared/brand';
+
+/** The installed version, from the manifest (absent outside the extension, e.g. in unit tests). */
+const VERSION = globalThis.chrome?.runtime?.getManifest?.().version;
 import { resolveDiffChoice, resolveFonts } from '../shared/github-defaults';
 import { initSettings, useSettings } from '../viewer/state/settings';
 import { DisplaySettingsForm } from '../viewer/ui/DisplaySettingsForm';
@@ -27,7 +30,21 @@ export function OptionsPage() {
   return (
     <main className="options">
       <DisplayStyle />
-      <h1>{BRAND.name}</h1>
+      <header className="options-header">
+        <img className="options-icon" src="icons/icon.svg" width={40} height={40} alt="" />
+        <h1>{BRAND.name}</h1>
+        {VERSION && (
+          <a
+            className="options-version"
+            href={`https://github.com/dangh/glide-for-github/releases/tag/v${VERSION}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Release notes"
+          >
+            v{VERSION}
+          </a>
+        )}
+      </header>
       <TokenSettings />
       <section className="options-section" aria-labelledby="display-heading">
         <h2 id="display-heading">Display</h2>
