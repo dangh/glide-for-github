@@ -95,15 +95,21 @@ describe('wheel hand-off', () => {
   });
 
   it('hands a latched gesture to the page at the top (header comes back) and the bottom (footer comes in)', () => {
-    expect(wheelHandOff(true, -100, 0, 5000)).toBe(-100);
-    expect(wheelHandOff(true, 100, 5000, 5000)).toBe(100);
-    expect(wheelHandOff(true, -100, 300, 5000)).toBe(0);
-    expect(wheelHandOff(true, 100, 300, 5000)).toBe(0);
+    expect(wheelHandOff(true, true, -100, 0, 5000)).toBe(-100);
+    expect(wheelHandOff(true, true, 100, 5000, 5000)).toBe(100);
+    expect(wheelHandOff(true, true, -100, 300, 5000)).toBe(0);
+    expect(wheelHandOff(true, true, 100, 300, 5000)).toBe(0);
   });
 
-  it('leaves a gesture that started at the edge to the browser, which chains it to the page already', () => {
-    expect(wheelHandOff(false, -100, 0, 5000)).toBe(0);
-    expect(wheelHandOff(false, 100, 5000, 5000)).toBe(0);
+  it('hands all of a latched gesture to the page once the iframe is no longer stuck', () => {
+    expect(wheelHandOff(true, false, -100, 5000, 5000)).toBe(-100);
+    expect(wheelHandOff(true, false, 100, 0, 5000)).toBe(100);
+  });
+
+  it('leaves a gesture that started at the edge or on the page to the browser, which chains it to the page already', () => {
+    expect(wheelHandOff(false, true, -100, 0, 5000)).toBe(0);
+    expect(wheelHandOff(false, true, 100, 5000, 5000)).toBe(0);
+    expect(wheelHandOff(false, false, 100, 5000, 5000)).toBe(0);
   });
 });
 

@@ -6,11 +6,11 @@
 import { create } from 'zustand';
 import {
   listCanScroll,
+  parsePageMessage,
   parseScrollAnchor,
   ScrollRequests,
   wheelHandOff,
   wheelPixels,
-  type PageScrollMessage,
   type ScrollAnchor,
   type ScrollLayout,
   type ViewerScrollMessage,
@@ -19,10 +19,18 @@ import {
 /** The layout this viewer was mounted in, and whether the page has it stuck (the merged bar shows the title then). */
 export const usePageScroll = create<{ layout: ScrollLayout; stuck: boolean }>(() => ({ layout: 'frame', stuck: false }));
 
-/** How long after the last wheel event a gesture counts as over (Chrome latches a wheel gesture to one scroller). */
-const GESTURE_MS = 250;
+/**
+ * Chrome latches a wheel gesture to one scroller. A mouse wheel has no gesture phases, so Chrome ends the gesture
+ * 500 ms after its last event, or once the pointer is 10 px from where it began (kDefaultMouseWheelLatchingTransaction
+ * and kWheelLatchingSlopRegion in Chromium's mouse_wheel_phase_handler.h). Trackpad gestures can outlast this; the
+ * page side catches the double scroll that would cause (src/content/page-scroll.ts).
+ */
+const LATCH_MS = 500;
+const LATCH_SLOP_PX = 10;
 /** The position is saved for a reload once scrolling pauses this long. */
 const SAVE_MS = 300;
+/** How long a scroll the user asked for may take to start (Pierre scrolls on its next frame). */
+const EXPECT_MS = 500;
 
 /** The list's position in its own terms, for restoring it after a reload. */
 export interface ListAnchors {
@@ -33,14 +41,11 @@ export interface ListAnchors {
 export interface PageScrollView {
   /** A fresh scroll channel from the page (each handshake brings one). */
   setPort(port: MessagePort): void;
+  /** The list is about to scroll where the user asked (a tree click): the page follows, even from its header or footer. */
+  expectListScroll(): void;
   /** The CodeView root (null when it unmounts); the first one restores the position saved before a reload. */
   attach(root: HTMLElement | null, anchors: ListAnchors | null): void;
 }
-
-const isPageMessage = (v: unknown): v is PageScrollMessage => {
-  const m = v as Partial<PageScrollMessage> | null;
-  return typeof m === 'object' && m !== null && m.type === 'scroll' && typeof m.top === 'number' && typeof m.stuck === 'boolean' && typeof m.ack === 'number';
-};
 
 export function createPageScrollView(win: Window, layout: Exclude<ScrollLayout, 'frame'>, storageKey: string): PageScrollView {
   usePageScroll.setState({ layout });
@@ -51,9 +56,14 @@ export function createPageScrollView(win: Window, layout: Exclude<ScrollLayout, 
   let restored = false;
   let stuck = false;
   let lastApplied = 0;
+  /** The newest viewer request the page had applied in its last position. */
+  let lastAck = 0;
   let lastExtent = -1;
-  /** The wheel gesture in progress, and whether the browser latched it to the list. */
-  let gesture: { latched: boolean; timer: ReturnType<typeof setTimeout> } | null = null;
+  /** A list scroll the user asked for is on its way (see `expectListScroll`). */
+  let expected = false;
+  let expectTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The wheel gesture in progress: where it began, and whether the browser latched it to the list. */
+  let gesture: { latched: boolean; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null = null;
 
   const post = (msg: ViewerScrollMessage) => port?.postMessage(msg);
   const extentOf = (el: HTMLElement) => Math.max(0, el.scrollHeight - el.clientHeight);
@@ -94,32 +104,52 @@ export function createPageScrollView(win: Window, layout: Exclude<ScrollLayout, 
     saveTimer = setTimeout(save, SAVE_MS);
     const top = root.scrollTop;
     if (Math.abs(top - lastApplied) < 1) return;
+    // With GitHub's header or footer on screen the list only moves where the user asked: Pierre keeping its view in
+    // place as files above load must not pull the page back to the list.
+    if (!stuck && !expected && requests.current(lastAck)) {
+      root.scrollTop = lastApplied;
+      return;
+    }
+    expected = false;
     lastApplied = top;
     // The page must know the new range before it is asked to scroll into it.
     sendExtent();
     post({ type: 'scrollTo', top, seq: requests.request() });
   };
 
+  const endGesture = () => {
+    gesture = null;
+    applyOverflow();
+  };
+
   const onWheel = (e: WheelEvent) => {
-    if (!root || (!gesture && !stuck)) return; // not latched to the list: the page scrolls by itself
+    if (!root) return;
     const dy = wheelPixels(e.deltaY, e.deltaMode, root.clientHeight);
     const extent = extentOf(root);
-    if (gesture) clearTimeout(gesture.timer);
-    const latched = gesture ? gesture.latched : listCanScroll(dy, root.scrollTop, extent);
-    const timer = setTimeout(() => {
-      gesture = null;
-      applyOverflow();
-    }, GESTURE_MS);
-    gesture = { latched, timer };
-    const handOff = wheelHandOff(latched, dy, root.scrollTop, extent);
+    if (gesture) {
+      clearTimeout(gesture.timer);
+      if (Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y) >= LATCH_SLOP_PX) gesture = null;
+    }
+    // Latched once, when the gesture begins: to the list only if it could scroll then.
+    gesture = gesture
+      ? { ...gesture, timer: setTimeout(endGesture, LATCH_MS) }
+      : {
+          latched: stuck && root.style.overflowY === 'auto' && listCanScroll(dy, root.scrollTop, extent),
+          x: e.clientX,
+          y: e.clientY,
+          timer: setTimeout(endGesture, LATCH_MS),
+        };
+    const handOff = wheelHandOff(gesture.latched, stuck, dy, root.scrollTop, extent);
     if (handOff !== 0) post({ type: 'scrollBy', dy: handOff });
   };
 
   const onPageMessage = (event: MessageEvent) => {
-    const msg: unknown = event.data;
-    if (!isPageMessage(msg)) return;
+    const msg = parsePageMessage(event.data);
+    if (!msg) return;
+    lastAck = msg.ack;
     // The list moved by itself (Pierre keeping the view in place as files above load) and its scroll event is still
-    // to come: that position wins, so ask the page for it now, which also makes this message stale.
+    // to come: that position wins while the iframe is stuck, so ask the page for it now (which makes this message
+    // stale); otherwise the list goes back to the page's position.
     if (root && Math.abs(root.scrollTop - lastApplied) >= 1) onRootScroll();
     if (!requests.current(msg.ack)) return;
     if (msg.stuck !== stuck) {
@@ -136,6 +166,13 @@ export function createPageScrollView(win: Window, layout: Exclude<ScrollLayout, 
     if (saveTimer !== undefined) save();
   });
 
+  const expectListScroll = () => {
+    expected = true;
+    clearTimeout(expectTimer);
+    // Cleared by the scroll itself; this only drops an expectation whose scroll never came (already there).
+    expectTimer = setTimeout(() => (expected = false), EXPECT_MS);
+  };
+
   const restore = () => {
     if (restored || !anchors) return;
     restored = true;
@@ -145,10 +182,13 @@ export function createPageScrollView(win: Window, layout: Exclude<ScrollLayout, 
     } catch {
       return;
     }
-    if (saved) anchors.scrollToAnchor(saved);
+    if (!saved) return;
+    expectListScroll();
+    anchors.scrollToAnchor(saved);
   };
 
   return {
+    expectListScroll,
     setPort(next) {
       if (port) {
         port.onmessage = null;
@@ -156,6 +196,7 @@ export function createPageScrollView(win: Window, layout: Exclude<ScrollLayout, 
       }
       port = next;
       requests.reset();
+      lastAck = 0;
       lastExtent = -1;
       port.onmessage = onPageMessage;
       sendExtent();

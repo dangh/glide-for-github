@@ -180,6 +180,7 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
           lastCurrent.current = path;
           quietUntil.current = performance.now() + SCROLL_QUIET_MS;
           treeSync.cancel();
+          session.pageScroll?.expectListScroll();
           handle.scrollTo({ type: 'item', id: path, align: 'start' });
         }
       : undefined;

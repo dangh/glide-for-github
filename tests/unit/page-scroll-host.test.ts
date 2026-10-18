@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountViewer, setExtensionUrlResolver } from '../../src/content/host';
+import { createPageScroll } from '../../src/content/page-scroll';
 import { createLifecycle } from '../../src/content/lifecycle';
 import type { LayoutSource } from '../../src/content/layout-source';
 import type { PageScrollMessage, ScrollLayout } from '../../src/shared/page-scroll';
@@ -123,16 +124,36 @@ describe('page layout', () => {
     host.unmount();
   });
 
-  it('ignores malformed messages on the scroll channel', async () => {
+  it('ignores malformed messages on the scroll channel: no resize, no scroll, no ack', async () => {
     const host = mountViewer(document, ref, 'page');
     const wrapper = host.iframe.parentElement!;
-    const { port } = connectViewer(host.iframe);
+    const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
+    const { port, received } = connectViewer(host.iframe);
+    await settle();
     const height = wrapper.style.height;
-    for (const bad of [null, 'x', { type: 'extent', extent: -1 }, { type: 'extent', extent: 'big' }, { type: 'scrollTo', top: 1 }, { type: 'other' }]) {
+    const before = received.length;
+    for (const bad of [
+      null,
+      'x',
+      { type: 'other' },
+      { type: 'extent', extent: -1 },
+      { type: 'extent', extent: 'big' },
+      { type: 'extent', extent: Infinity },
+      { type: 'extent', extent: NaN },
+      { type: 'scrollTo', top: 1 },
+      { type: 'scrollTo', top: NaN, seq: 1 },
+      { type: 'scrollTo', top: 1, seq: Infinity },
+      { type: 'scrollBy', dy: Infinity },
+      { type: 'scrollBy', dy: -Infinity },
+      { type: 'scrollBy', dy: NaN },
+      { type: 'scrollBy' },
+    ]) {
       port.postMessage(bad);
     }
     await settle();
     expect(wrapper.style.height).toBe(height);
+    expect(scrollBy).not.toHaveBeenCalled();
+    expect(received.length).toBe(before);
     host.unmount();
   });
 
@@ -208,5 +229,101 @@ describe('lifecycle with a layout source', () => {
     expect(document.querySelector('[data-glide-scroll]')).toBeNull();
     expect(second.getAttribute('src')).not.toContain('scroll=');
     life.stop();
+  });
+});
+
+describe('page scroll channel', () => {
+  function create() {
+    const anchor = document.createElement('div');
+    document.body.append(anchor);
+    const iframe = document.createElement('iframe');
+    const scroll = createPageScroll(document, anchor, iframe, 'page');
+    document.body.append(scroll.wrapper);
+    return scroll;
+  }
+  function channel(scroll: ReturnType<typeof create>) {
+    const c = new MessageChannel();
+    const received: PageScrollMessage[] = [];
+    c.port1.onmessage = (e) => received.push(e.data as PageScrollMessage);
+    scroll.connect(c.port2);
+    return { port: c.port1, received };
+  }
+  let scrollY = 0;
+  let now = 1000;
+  beforeEach(() => {
+    scrollY = 0;
+    now = 1000;
+    Object.defineProperty(window, 'scrollY', { configurable: true, get: () => scrollY });
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+  });
+  /** GitHub's page moving: `wrapperTop` follows `scrollY`. */
+  const moveTo = (y: number) => {
+    wrapperTop -= y - scrollY;
+    scrollY = y;
+  };
+
+  it('a new channel replaces the old one: the old port is closed and acks start over', async () => {
+    const scroll = create();
+    const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(((o: ScrollToOptions) => moveTo(scrollY + (o.top ?? 0))) as typeof window.scrollBy);
+    const a = channel(scroll);
+    a.port.postMessage({ type: 'extent', extent: 5000 });
+    a.port.postMessage({ type: 'scrollTo', top: 300, seq: 7 });
+    await settle();
+    expect(a.received.at(-1)).toMatchObject({ ack: 7 });
+
+    const b = channel(scroll);
+    await settle();
+    expect(b.received).toEqual([{ type: 'scroll', top: 300, stuck: true, ack: 0 }]);
+    scrollBy.mockClear();
+    a.port.postMessage({ type: 'scrollBy', dy: 100 });
+    await settle();
+    expect(scrollBy).not.toHaveBeenCalled();
+    scroll.dispose();
+  });
+
+  it('after dispose nothing is posted and the channel is closed', async () => {
+    const scroll = create();
+    const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
+    const { port, received } = channel(scroll);
+    await settle();
+    const before = received.length;
+    scroll.dispose();
+    wrapperTop = -500;
+    window.dispatchEvent(new Event('scroll'));
+    window.dispatchEvent(new Event('resize'));
+    port.postMessage({ type: 'scrollBy', dy: 100 });
+    await settle();
+    expect(received.length).toBe(before);
+    expect(scrollBy).not.toHaveBeenCalled();
+  });
+
+  it("drops a wheel hand-off while GitHub's page is scrolling by itself, not after its own scrolls", async () => {
+    const scroll = create();
+    const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(((o: ScrollToOptions) => moveTo(scrollY + (o.top ?? 0))) as typeof window.scrollBy);
+    const { port } = channel(scroll);
+    port.postMessage({ type: 'extent', extent: 5000 });
+
+    // A scroll the viewer asked for is the page's own.
+    port.postMessage({ type: 'scrollTo', top: 300, seq: 1 });
+    await settle();
+    window.dispatchEvent(new Event('scroll'));
+    port.postMessage({ type: 'scrollBy', dy: 100 });
+    await settle();
+    expect(scrollBy).toHaveBeenLastCalledWith({ top: 100, behavior: 'instant' });
+
+    // The page scrolled itself (Chrome latched the gesture to it): the hand-off would scroll it twice.
+    scrollBy.mockClear();
+    moveTo(scrollY + 120);
+    window.dispatchEvent(new Event('scroll'));
+    now += 50;
+    port.postMessage({ type: 'scrollBy', dy: 100 });
+    await settle();
+    expect(scrollBy).not.toHaveBeenCalled();
+
+    now += 200;
+    port.postMessage({ type: 'scrollBy', dy: 100 });
+    await settle();
+    expect(scrollBy).toHaveBeenCalledOnce();
+    scroll.dispose();
   });
 });

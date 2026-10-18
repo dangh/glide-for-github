@@ -85,11 +85,35 @@ export function listCanScroll(dy: number, scrollTop: number, extent: number): bo
 
 /**
  * The part of a wheel step to hand to the page. Only a gesture the browser latched to the list (it could still
- * scroll when the gesture began) needs this: the browser chains a gesture that starts at the list's edge to the page
- * by itself, and handing that one over too would scroll the page twice.
+ * scroll when the gesture began) needs this, wherever the list should not move: at its top or bottom, or while the
+ * iframe is not stuck. The browser chains any other gesture to the page by itself, and handing that one over too
+ * would scroll the page twice.
  */
-export function wheelHandOff(latchedToList: boolean, dy: number, scrollTop: number, extent: number): number {
-  return latchedToList && !listCanScroll(dy, scrollTop, extent) ? dy : 0;
+export function wheelHandOff(latchedToList: boolean, stuck: boolean, dy: number, scrollTop: number, extent: number): number {
+  return latchedToList && (!stuck || !listCanScroll(dy, scrollTop, extent)) ? dy : 0;
+}
+
+const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
+/**
+ * The messages are parsed on both ends: the viewer's end of the channel arrives in a `pierre:port` message, which
+ * GitHub's own scripts could also post to the iframe.
+ */
+export function parsePageMessage(data: unknown): PageScrollMessage | null {
+  if (typeof data !== 'object' || data === null) return null;
+  const m = data as Record<string, unknown>;
+  return m.type === 'scroll' && isFiniteNumber(m.top) && m.top >= 0 && typeof m.stuck === 'boolean' && isFiniteNumber(m.ack)
+    ? { type: 'scroll', top: m.top, stuck: m.stuck, ack: m.ack }
+    : null;
+}
+
+export function parseViewerMessage(data: unknown): ViewerScrollMessage | null {
+  if (typeof data !== 'object' || data === null) return null;
+  const m = data as Record<string, unknown>;
+  if (m.type === 'extent' && isFiniteNumber(m.extent) && m.extent >= 0) return { type: 'extent', extent: m.extent };
+  if (m.type === 'scrollTo' && isFiniteNumber(m.top) && isFiniteNumber(m.seq)) return { type: 'scrollTo', top: m.top, seq: m.seq };
+  if (m.type === 'scrollBy' && isFiniteNumber(m.dy)) return { type: 'scrollBy', dy: m.dy };
+  return null;
 }
 
 /**

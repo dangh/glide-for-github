@@ -5,10 +5,10 @@
 import {
   listScroll,
   pageScrollDelta,
+  parseViewerMessage,
   stickySizes,
   type PageScrollMessage,
   type ScrollLayout,
-  type ViewerScrollMessage,
 } from '../shared/page-scroll';
 import { findStickyHeader, stickyHeaderHeight, topBarBottom } from './github-header';
 
@@ -23,17 +23,8 @@ export interface PageScroll {
   dispose(): void;
 }
 
-const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-
-/** A message from the viewer, or null for anything that is not one. */
-function parseViewerMessage(data: unknown): ViewerScrollMessage | null {
-  if (typeof data !== 'object' || data === null) return null;
-  const m = data as Record<string, unknown>;
-  if (m.type === 'extent' && isNumber(m.extent) && m.extent >= 0) return { type: 'extent', extent: m.extent };
-  if (m.type === 'scrollTo' && isNumber(m.top) && isNumber(m.seq)) return { type: 'scrollTo', top: m.top, seq: m.seq };
-  if (m.type === 'scrollBy' && isNumber(m.dy)) return { type: 'scrollBy', dy: m.dy };
-  return null;
-}
+/** A wheel hand-off is dropped while the page has scrolled by itself this recently. */
+const OWN_SCROLL_MS = 200;
 
 export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTMLIFrameElement, layout: Exclude<ScrollLayout, 'frame'>): PageScroll {
   const win = doc.defaultView!;
@@ -46,6 +37,9 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
   let stickTop = 0;
   let lastAck = 0;
   let lastPosted = '';
+  /** `scrollY` after the page's last scroll, and when it last moved other than at the viewer's request. */
+  let lastY = win.scrollY;
+  let movedByItselfAt = -Infinity;
   /** GitHub's header and its height when shown, measured once per element and window size. */
   let measured: { header: HTMLElement; height: number } | null = null;
   /** Headers hidden in `merged`, with their inline style to restore. */
@@ -100,6 +94,12 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
     remeasure();
   };
 
+  const onScroll = () => {
+    if (Math.abs(win.scrollY - lastY) >= 1) movedByItselfAt = performance.now();
+    lastY = win.scrollY;
+    sendScroll();
+  };
+
   const onMessage = (event: MessageEvent) => {
     const msg = parseViewerMessage(event.data);
     if (!msg) return;
@@ -111,8 +111,13 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
       lastAck = msg.seq;
       const dy = pageScrollDelta(wrapper.getBoundingClientRect().top, stickTop, msg.top);
       if (Math.abs(dy) >= 1) win.scrollBy({ top: dy, behavior: 'instant' });
+      lastY = win.scrollY;
     } else {
+      // Chrome latched this wheel gesture to the page after all (a trackpad gesture can outlast the viewer's guess at
+      // its end): the page is scrolling itself, and taking the hand-off too would scroll it twice.
+      if (performance.now() - movedByItselfAt < OWN_SCROLL_MS) return;
       win.scrollBy({ top: msg.dy, behavior: 'instant' });
+      lastY = win.scrollY;
       return; // the scroll event reports it
     }
     // Also when the page could not move (already there, or at its end): the viewer waits for this ack.
@@ -121,7 +126,7 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
 
   stickTop = measureStickTop();
   layoutSizes();
-  win.addEventListener('scroll', sendScroll, { passive: true });
+  win.addEventListener('scroll', onScroll, { passive: true });
   win.addEventListener('resize', onResize, { passive: true });
 
   return {
@@ -139,7 +144,7 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
     },
     refresh: remeasure,
     dispose() {
-      win.removeEventListener('scroll', sendScroll);
+      win.removeEventListener('scroll', onScroll);
       win.removeEventListener('resize', onResize);
       if (port) {
         port.onmessage = null;

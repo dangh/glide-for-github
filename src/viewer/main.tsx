@@ -4,7 +4,7 @@ import { parseScrollLayout, restoreKey } from '../shared/page-scroll';
 import { prKey } from '../shared/pr-url';
 import { App } from './App';
 import { createConnection, parsePrParam, watchPort } from './connection';
-import { createPageScrollView } from './pageScroll';
+import { createPageScrollView, type PageScrollView } from './pageScroll';
 import { initBatchPersistence } from './state/batch';
 import { initDraftPersistence } from './state/drafts';
 import { startFreshness } from './state/freshness';
@@ -27,11 +27,13 @@ if (!prRef) {
   root.render(<div className="fatal">{BRAND.short}: missing pull request.</div>);
 } else {
   const layout = parseScrollLayout(location.search);
+  let pageScroll: PageScrollView | undefined;
   if (layout !== 'frame') {
     document.documentElement.dataset.scrollLayout = layout;
-    session.pageScroll = createPageScrollView(window, layout, restoreKey(prKey(prRef)));
+    pageScroll = session.pageScroll = createPageScrollView(window, layout, restoreKey(prKey(prRef)));
   }
-  const connection = createConnection(window, { onScrollPort: (port) => session.pageScroll?.setPort(port) });
+  // Without page scrolling, a scroll port is closed unused (src/viewer/connection.ts).
+  const connection = createConnection(window, pageScroll ? { onScrollPort: (port) => pageScroll.setPort(port) } : {});
   session.rpc = connection.rpc;
   initSettings();
   initBatchPersistence();
