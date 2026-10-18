@@ -86,12 +86,12 @@ outside the approved use cases, no use unrelated to the single purpose, no use f
 
 ## First submission checklist
 
-The first upload is manual (the store API can only update an item that exists). Version 0.1.0 is not submitted yet.
+The first upload is manual (the store API can only update an item that exists). Version 0.2.0 is the first one submitted.
 
-1. Push the `v0.1.0` tag. CI builds, creates the GitHub release with `glide-for-github.zip`, and skips the store
+1. Push the `v0.2.0` tag. CI builds, creates the GitHub release with `glide-for-github.zip`, and skips the store
    upload (no secrets yet; the job says so in a notice).
 2. [Developer dashboard](https://chrome.google.com/webstore/devconsole) > **Add new item** > upload
-   `glide-for-github.zip` from the v0.1.0 GitHub release.
+   `glide-for-github.zip` from the v0.2.0 GitHub release.
 3. **Store listing** tab: fill name, summary, description, category and language from the Listing section above; upload
    the icon, the four screenshots and the small and marquee tiles from the Assets table.
 4. **Privacy** tab: single purpose, the three permission justifications, remote code "No", data usage, and the privacy
