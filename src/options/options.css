@@ -188,3 +188,90 @@ body {
   display: block;
   color: var(--pierre-muted);
 }
+
+/* File groups (FileGroupSettings.tsx) */
+.file-groups-settings {
+  max-width: 720px;
+}
+
+.group-default {
+  margin-top: 12px;
+}
+
+.group-heading {
+  font-size: 14px;
+  margin: 20px 0 0;
+}
+
+.group-list {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.group-card {
+  padding: 12px;
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+}
+
+.group-card-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.group-label {
+  flex: 1;
+  font: inherit;
+  font-weight: 600;
+  padding: 3px 8px;
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+  background: var(--pierre-bg);
+  color: inherit;
+}
+
+.group-patterns {
+  display: block;
+  width: 100%;
+  height: 120px;
+  padding: 6px 8px;
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+  background: var(--pierre-bg);
+  color: inherit;
+  font: 12px/1.5 var(--pierre-mono);
+  resize: vertical;
+}
+
+.group-error {
+  color: var(--pierre-danger);
+}
+
+.group-probe {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.group-probe .field input[type='text'] {
+  width: 360px;
+}
+
+.group-card .btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.group-import summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.group-import .group-patterns {
+  margin-bottom: 8px;
+}

@@ -9,6 +9,7 @@ import { initSettings, useSettings } from '../viewer/state/settings';
 import { DisplaySettingsForm } from '../viewer/ui/DisplaySettingsForm';
 import { DisplayStyle } from '../viewer/ui/DisplayStyle';
 import { ExperimentSettingsForm } from './ExperimentSettings';
+import { FileGroupSettingsForm } from './FileGroupSettings';
 import { GithubSettingsForm } from './GithubSettings';
 import { SampleDiff } from './SampleDiff';
 import { TokenSettings } from './TokenSettings';
@@ -65,6 +66,17 @@ export function OptionsPage() {
         <h2 id="github-heading">GitHub</h2>
         <p className="muted">Changes apply at once, also in pull requests that are already open.</p>
         {loaded && <GithubSettingsForm github={settings.github} update={update} />}
+      </section>
+      <section className="options-section" aria-labelledby="file-groups-heading">
+        <h2 id="file-groups-heading">File groups</h2>
+        <p className="muted">
+          Changes apply at once, also in pull requests that are already open. The groups come from{' '}
+          <a href="https://github.com/dangh/sift-for-github" target="_blank" rel="noopener noreferrer">
+            Sift for GitHub
+          </a>
+          .
+        </p>
+        {loaded && <FileGroupSettingsForm settings={settings.fileGroups} update={update} />}
       </section>
       <section className="options-section" aria-labelledby="experiments-heading">
         <h2 id="experiments-heading">Experimental</h2>
