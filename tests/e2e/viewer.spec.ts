@@ -358,8 +358,25 @@ test.describe('sandbox PR', () => {
         firstBoxX: document.querySelector('diffs-container')!.getBoundingClientRect().x,
         toolbarX: document.querySelector('.pierre-toolbar')!.getBoundingClientRect().x,
       }));
+    /** Where the button sits in the toolbar, and whether its icon is mirrored. */
+    const side = () =>
+      viewer.frame().evaluate(() => {
+        const button = document.querySelector('[data-testid="tree-toggle"]')!;
+        const toolbar = document.querySelector('.pierre-toolbar')!;
+        const b = button.getBoundingClientRect();
+        const t = toolbar.getBoundingClientRect();
+        return {
+          first: toolbar.firstElementChild === button,
+          last: toolbar.lastElementChild === button,
+          atLeft: Math.abs(b.left - t.left) <= 1,
+          atRight: Math.abs(b.right - t.right) <= 1,
+          icon: getComputedStyle(button.querySelector('svg')!).transform,
+        };
+      });
     await expect(toggle()).toHaveAttribute('aria-label', 'Collapse file tree');
     expect((await layout()).treeShown).toBe(true);
+    // GitHub's place and orientation with the tree on the left.
+    expect(await side()).toEqual({ first: true, last: false, atLeft: true, atRight: false, icon: 'none' });
 
     await toggle().click();
     await expect(toggle()).toHaveAttribute('aria-label', 'Expand file tree');
@@ -374,7 +391,18 @@ test.describe('sandbox PR', () => {
 
     await toggle().click();
     await expect.poll(async () => (await layout()).treeShown).toBe(true);
+
+    // With the tree on the right, the button ends the toolbar and its icon points that way.
+    await viewer.locator.getByTestId('display-menu').click();
+    await viewer.locator.locator('label.field', { hasText: 'Tree position' }).locator('select').selectOption('right');
+    await page.keyboard.press('Escape');
+    await expect.poll(side).toEqual({ first: false, last: true, atLeft: false, atRight: true, icon: 'matrix(-1, 0, 0, 1, 0, 0)' });
+    await toggle().click();
+    await expect.poll(async () => (await layout()).treeShown).toBe(false);
+    await toggle().click();
+    await expect.poll(async () => (await layout()).treeShown).toBe(true);
     await resetSettings(viewer);
+    await expect.poll(async () => (await side()).first).toBe(true);
   });
 
   test('clicking the GitHub page around the viewer closes the Display menu', async ({ page }) => {

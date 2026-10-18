@@ -348,6 +348,10 @@ html[data-scroll-layout='merged'] .pierre-app {
   background: light-dark(#818b9826, #656c7633);
 }
 
+.tree-toggle[data-side='right'] .icon {
+  transform: scaleX(-1);
+}
+
 .tree-toggle[aria-expanded='true'] {
   background: light-dark(#818b9826, #656c7640);
 }

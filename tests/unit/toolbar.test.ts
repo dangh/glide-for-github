@@ -149,6 +149,24 @@ describe('Toolbar', () => {
     await unmount();
   });
 
+  it("puts the file tree button on the tree's side, its icon mirrored on the right", async () => {
+    vi.stubGlobal('chrome', { storage: { sync: { get: async () => ({}), set: async () => undefined } } });
+    usePr.getState().setPr(pr);
+    const { toolbar, unmount } = await render();
+    const toggle = () => toolbar.querySelector<HTMLElement>('[data-testid="tree-toggle"]')!;
+    expect(toolbar.firstElementChild).toBe(toggle());
+    expect(toggle().dataset.side).toBe('left');
+
+    await act(async () => useSettings.getState().update({ layout: { treePosition: 'right' } }));
+    expect(controls(toolbar).slice(-3)).toEqual(['Submit review', 'Display options', 'Collapse file tree']);
+    expect(toggle().dataset.side).toBe('right');
+
+    await act(async () => useSettings.getState().update({ layout: { treePosition: 'left' } }));
+    expect(toolbar.firstElementChild).toBe(toggle());
+    await unmount();
+    vi.unstubAllGlobals();
+  });
+
   it('with the merged bar, keeps the diff toggles in the Display menu only, as GitHub does', async () => {
     usePr.getState().setPr(pr);
     usePageScroll.setState({ layout: 'merged', stuck: false });

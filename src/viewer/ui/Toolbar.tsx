@@ -1,9 +1,10 @@
 /**
  * Toolbar, laid out like GitHub's Files changed toolbar: file tree button, commit range, then viewed counter, Submit
- * review and the Display (settings) button. Outside the merged bar, Split/Unified, Wrap and Hide whitespace sit after
- * the commit range. With the merged bar (page-scrolling experiment) the toolbar has no such toggles (they are in the
- * Display menu, as on GitHub), and while GitHub's title is scrolled away it shows GitHub's sticky PR header instead of
- * the commit range: state label, then title and number above the commit range and branch summary.
+ * review and the Display (settings) button; with the tree on the right, its button ends the toolbar instead. Outside
+ * the merged bar, Split/Unified, Wrap and Hide whitespace sit after the commit range. With the merged bar
+ * (page-scrolling experiment) the toolbar has no such toggles (they are in the Display menu, as on GitHub), and while
+ * GitHub's title is scrolled away it shows GitHub's sticky PR header instead of the commit range: state label, then
+ * title and number above the commit range and branch summary.
  * Each control subscribes to its own slice, so diff loading never re-renders the toolbar.
  */
 import { memo, useEffect, useState, type ReactNode } from 'react';
@@ -132,8 +133,11 @@ const PrHeader = memo(function PrHeader() {
   );
 });
 
-/** GitHub's file tree button: hides or shows the tree pane, remembered like any display setting. */
-const TreeToggle = memo(function TreeToggle() {
+/**
+ * GitHub's file tree button: hides or shows the tree pane, remembered like any display setting. It sits on the tree's
+ * side of the toolbar, its icon mirrored for a tree on the right.
+ */
+const TreeToggle = memo(function TreeToggle({ side }: { side: 'left' | 'right' }) {
   const shown = useSettings((s) => s.settings.layout.showTree);
   const update = useSettings((s) => s.update);
   const label = shown ? 'Collapse file tree' : 'Expand file tree';
@@ -141,6 +145,7 @@ const TreeToggle = memo(function TreeToggle() {
     <button
       type="button"
       className="tree-toggle"
+      data-side={side}
       aria-label={label}
       title={label}
       aria-expanded={shown}
@@ -209,9 +214,10 @@ const ViewedCounter = memo(function ViewedCounter() {
 export const Toolbar = memo(function Toolbar() {
   const merged = usePageScroll((s) => s.layout === 'merged');
   const stuck = usePageScroll((s) => s.stuck) && merged;
+  const treeSide = useSettings((s) => s.settings.layout.treePosition);
   return (
     <div className="pierre-toolbar" role="toolbar" data-stuck={stuck || undefined}>
-      <TreeToggle />
+      {treeSide === 'left' && <TreeToggle side="left" />}
       {stuck ? <PrHeader /> : <CommitRangePicker />}
       {!merged && (
         <>
@@ -225,6 +231,7 @@ export const Toolbar = memo(function Toolbar() {
       <span className="toolbar-divider" />
       <ReviewMenu />
       <DisplayMenu />
+      {treeSide === 'right' && <TreeToggle side="right" />}
     </div>
   );
 });
