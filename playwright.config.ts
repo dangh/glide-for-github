@@ -20,6 +20,8 @@
  * viewer.spec.ts is read-only. review.spec.ts WRITES, only on the sandbox PR (tests/sandbox.json), with the token
  * saved in .e2e-profile's extension storage by `npm run e2e:token` (it skips when no token is stored); it removes
  * what it creates. Viewed-state checks rewrite GitHub's route response inside the test browser only.
+ * freshness.spec.ts also WRITES to the sandbox PR's branch (with `gh`): it pushes a probe commit to check the "PR was
+ * updated" banner, then a commit that deletes the probe again.
  */
 import { defineConfig } from '@playwright/test';
 
