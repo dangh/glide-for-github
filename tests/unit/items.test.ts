@@ -97,4 +97,28 @@ describe('CodeView items', () => {
     expect(sync.sync(store.getState(), sink)).toEqual(['a.ts']);
     expect(updates[0]!.annotations).toBe(current);
   });
+
+  it('a file group mounts a subset: hidden files stay current without reaching the CodeView, and come back current', () => {
+    const store = createPrStore();
+    store.getState().setPr(pr([file('a.ts'), file('b.ts'), file('c.ts')]));
+    const sync = new ItemSync();
+    expect(sync.seed(store.getState(), ['b.ts']).map((i) => i.id)).toEqual(['b.ts']);
+    const updates: PierreItem[] = [];
+    const sink = { updateItem: (item: PierreItem) => (updates.push(item), true) };
+
+    store.getState().setViewedLocal('a.ts', true);
+    store.getState().setViewedLocal('b.ts', true);
+    expect(sync.sync(store.getState(), sink)).toEqual(['b.ts']);
+    expect(updates.map((i) => i.id)).toEqual(['b.ts']);
+
+    const all = sync.mount(store.getState().order);
+    expect(all.map((i) => [i.id, i.collapsed, i.version])).toEqual([
+      ['a.ts', true, 2],
+      ['b.ts', true, 2],
+      ['c.ts', false, 1],
+    ]);
+    // Unchanged items are the same objects, so the CodeView keeps their layout.
+    expect(all[1]).toBe(updates[0]);
+    expect(sync.mount(['b.ts'])[0]).toBe(all[1]);
+  });
 });

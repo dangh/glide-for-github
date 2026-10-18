@@ -77,10 +77,14 @@ export interface ItemSink {
 
 /**
  * Keeps CodeView items in step with the store: `seed` builds the initial list, `sync` pushes only the
- * items whose inputs changed (by reference) since the last call.
+ * items whose inputs changed (by reference) since the last call. Every file is tracked, but only the mounted ones
+ * (the open file group's, see `mount`) are pushed; the others keep their latest item for when they are mounted again.
  */
 export class ItemSync {
-  private last = new Map<string, { inputs: ItemInputs; version: number }>();
+  private last = new Map<string, { inputs: ItemInputs; item: PierreItem }>();
+  private mounted = new Set<string>();
+  /** The paths last passed to `mount`. */
+  mountedPaths: readonly string[] = [];
   private lastDeps: unknown[] = [];
 
   constructor(private readonly annotations: AnnotationSource = noAnnotations) {}
@@ -90,20 +94,30 @@ export class ItemSync {
     return [state.order, state.files, state.diffs, state.viewed, state.collapsed, state.threads, state.drafts];
   }
 
-  seed(state: PrState): PierreItem[] {
+  /** Items for `paths` (default: every file), which are then the mounted ones. */
+  seed(state: PrState, paths: readonly string[] = state.order): PierreItem[] {
     this.last.clear();
     this.lastDeps = this.deps(state);
-    const items: PierreItem[] = [];
     for (const path of state.order) {
       const inputs = itemInputs(state, path, this.annotations);
-      if (!inputs) continue;
-      this.last.set(path, { inputs, version: 1 });
-      items.push(buildItem(path, inputs, 1));
+      if (inputs) this.last.set(path, { inputs, item: buildItem(path, inputs, 1) });
     }
+    return this.mount(paths);
+  }
+
+  /** The current items for `paths`, which become the mounted ones (the CodeView is about to show exactly these). */
+  mount(paths: readonly string[]): PierreItem[] {
+    const items: PierreItem[] = [];
+    for (const path of paths) {
+      const entry = this.last.get(path);
+      if (entry) items.push(entry.item);
+    }
+    this.mounted = new Set(items.map((i) => i.id));
+    this.mountedPaths = paths;
     return items;
   }
 
-  /** Returns the paths that were updated. */
+  /** Returns the mounted paths that were updated. */
   sync(state: PrState, sink: ItemSink): string[] {
     const deps = this.deps(state);
     if (deps.every((d, i) => d === this.lastDeps[i])) return [];
@@ -114,9 +128,10 @@ export class ItemSync {
       if (!prev) continue;
       const inputs = itemInputs(state, path, this.annotations);
       if (!inputs || sameInputs(prev.inputs, inputs)) continue;
-      const version = prev.version + 1;
-      this.last.set(path, { inputs, version });
-      sink.updateItem(buildItem(path, inputs, version));
+      const item = buildItem(path, inputs, (prev.item.version ?? 1) + 1);
+      this.last.set(path, { inputs, item });
+      if (!this.mounted.has(path)) continue;
+      sink.updateItem(item);
       updated.push(path);
     }
     return updated;

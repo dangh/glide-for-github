@@ -1794,3 +1794,79 @@ html[data-scroll-layout] .pierre-body[data-tree-position='left'] .pierre-diffs {
   border: 1px solid var(--pierre-border);
   border-radius: 6px;
 }
+
+/*
+ * File groups (FileGroupTabs.tsx): GitHub's UnderlineNav, as on the pull request's own tabs: 14 px items with a
+ * Counter, the open one bold and underlined in GitHub's coral. Its own row under the toolbar (40 px, GitHub's is 48),
+ * so it fits beside nothing: any number of groups, every tree position and the merged bar.
+ */
+.file-groups {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: 40px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--pierre-border);
+}
+
+.file-group {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--pierre-fg);
+  font-size: 14px;
+  line-height: 30px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.file-group:hover {
+  background: light-dark(#818b9826, #656c7633);
+}
+
+.file-group:focus-visible {
+  outline: 2px solid var(--pierre-accent);
+  outline-offset: -2px;
+}
+
+.file-group[aria-selected='true'] {
+  font-weight: 600;
+}
+
+.file-group[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 -4px;
+  height: 2px;
+  border-radius: 6px;
+  background: light-dark(#fd8c73, #f78166);
+}
+
+/* Primer Counter. */
+.file-group-count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 2em;
+  background: light-dark(#818b981f, #656c7633);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  text-align: center;
+}
+
+.pierre-empty-group {
+  position: absolute;
+  inset: 32px 0 auto;
+  color: var(--pierre-muted);
+  text-align: center;
+  pointer-events: none;
+}

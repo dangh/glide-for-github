@@ -8,6 +8,7 @@ import { createConnection, parsePrParam, watchPort } from './connection';
 import { createPageScrollView, type PageScrollView } from './pageScroll';
 import { initBatchPersistence } from './state/batch';
 import { initDraftPersistence } from './state/drafts';
+import { initFileGroups, useFileGroups } from './state/fileGroups';
 import { startFreshness } from './state/freshness';
 import * as review from './state/review';
 import { session } from './state/session';
@@ -17,10 +18,10 @@ import { usePr } from './state/store';
 declare global {
   interface Window {
     /** Inspection hooks for e2e/perf tests (extension page only; never reachable from github.com). */
-    __pierre?: { store: typeof usePr; settings: typeof useSettings; session: typeof session; review: typeof review };
+    __pierre?: { store: typeof usePr; settings: typeof useSettings; session: typeof session; review: typeof review; fileGroups: typeof useFileGroups };
   }
 }
-window.__pierre = { store: usePr, settings: useSettings, session, review };
+window.__pierre = { store: usePr, settings: useSettings, session, review, fileGroups: useFileGroups };
 
 const root = createRoot(document.getElementById('root')!);
 const prRef = parsePrParam(location.search);
@@ -45,6 +46,7 @@ if (!prRef) {
   initSettings();
   initBatchPersistence();
   initDraftPersistence();
+  initFileGroups();
   startFreshness();
   // No port from the content script (extension updated, content script gone): say so instead of loading forever.
   watchPort(connection.ready, (message) => {

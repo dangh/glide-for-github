@@ -1,6 +1,7 @@
 /**
- * Every file in one virtualized Pierre CodeView (uncontrolled: items are seeded once, then updated one by
- * one with `updateItem`, see state/items.ts).
+ * The open file group's files in one virtualized Pierre CodeView (uncontrolled: items are seeded once, then updated
+ * one by one with `updateItem`, see state/items.ts). A group switch hands the CodeView the new group's items with
+ * `setItems`: items it already has keep their layout, and loaded diffs stay loaded.
  */
 import type { DiffLineAnnotation, FileDiffLoadedFiles, FileDiffMetadata, LineAnnotation, SelectedLineRange } from '@pierre/diffs';
 import { CodeView, type CodeViewHandle } from '@pierre/diffs/react';
@@ -10,6 +11,7 @@ import { fetchFullFile, type PrData, type Rpc } from '../github/private';
 import type { ListAnchors } from '../pageScroll';
 import { createAnnotationSource } from '../state/annotations';
 import { targetFromRange } from '../state/compose';
+import { currentGroup, useActiveGroup } from '../state/fileGroups';
 import { ItemSync, type AnnotationMeta, type AnnotationSource, type PierreItem } from '../state/items';
 import { rangeOids } from '../state/range';
 import { session } from '../state/session';
@@ -44,18 +46,19 @@ function createFileLoader(rpc: Rpc, pr: PrData) {
   };
 }
 
-function viewportFiles(handle: Handle): { ids: string[]; current?: string } {
+/** `paths`: the files the CodeView holds, in order. */
+function viewportFiles(handle: Handle, paths: readonly string[]): { ids: string[]; current?: string } {
   const instance = handle.getInstance();
   if (!instance) return { ids: [] };
-  return visibleFiles(usePr.getState().order, (id) => instance.getTopForItem(id), instance.getScrollTop(), instance.getHeight(), headerHeight(useSettings.getState().settings.diff.fileHeaderStyle));
+  return visibleFiles(paths, (id) => instance.getTopForItem(id), instance.getScrollTop(), instance.getHeight(), headerHeight(useSettings.getState().settings.diff.fileHeaderStyle));
 }
 
 /** The top visible file and how far the list is scrolled into it (an item `offset` of `-offset` scrolls back there). */
-function listAnchors(handle: Handle): ListAnchors {
+function listAnchors(handle: Handle, sync: ItemSync): ListAnchors {
   return {
     anchor() {
       const instance = handle.getInstance();
-      const { current } = viewportFiles(handle);
+      const { current } = viewportFiles(handle, sync.mountedPaths);
       const top = current === undefined ? undefined : instance?.getTopForItem(current);
       return instance && current !== undefined && top !== undefined ? { path: current, offset: instance.getScrollTop() - top } : null;
     },
@@ -118,7 +121,7 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
   const options = buildOptions(diffSettings, colorMode, loadDiffFiles, INTERACTIONS, lineHeight);
 
   // Seeded once per PR; later changes go through `sync` → updateItem.
-  const initialItems = useMemo<PierreItem[]>(() => (pr ? sync.seed(usePr.getState()) : []), [pr, sync]);
+  const initialItems = useMemo<PierreItem[]>(() => (pr ? sync.seed(usePr.getState(), currentGroup().shown) : []), [pr, sync]);
 
   useEffect(() => {
     if (!pr) return;
@@ -152,10 +155,10 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
       frame.current = 0;
       const handle = handleRef.current;
       if (!handle) return;
-      const { ids, current } = viewportFiles(handle);
+      const { ids, current } = viewportFiles(handle, sync.mountedPaths);
       if (ids.length > 0) {
         // The next few files below the viewport too, so scrolling down finds them loaded.
-        const order = usePr.getState().order;
+        const order = sync.mountedPaths;
         const next = order.indexOf(current!) + ids.length;
         session.viewport = [...ids, ...order.slice(next, next + PRIORITY_AHEAD)];
         session.loader?.prioritize(session.viewport);
@@ -163,8 +166,23 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
       // Every scroll frame restarts the quiet period, so the tree only updates once scrolling pauses.
       if (current && performance.now() >= quietUntil.current) treeSync.push(current);
     });
-  }, [treeSync]);
+  }, [treeSync, sync]);
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
+
+  // A group switch: the list keeps its place when the file at its top is in the new group, else starts at the top.
+  const { shown } = useActiveGroup();
+  useEffect(() => {
+    const handle = handleRef.current;
+    const instance = handle?.getInstance();
+    if (!handle || !instance || sync.mountedPaths === shown) return;
+    const anchors = listAnchors(handle, sync);
+    const anchor = anchors.anchor();
+    instance.setItems(sync.mount(shown));
+    session.pageScroll?.expectListScroll();
+    if (anchor && shown.includes(anchor.path)) anchors.scrollToAnchor(anchor);
+    else handle.scrollTo({ type: 'position', position: 0 });
+    onViewport();
+  }, [shown, sync, onViewport]);
 
   // The first viewport once items exist. (Loader restarts replay `session.viewport` themselves.)
   useEffect(() => {
@@ -184,22 +202,25 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
           handle.scrollTo({ type: 'item', id: path, align: 'start' });
         }
       : undefined;
-    session.pageScroll?.attach(handle?.getInstance()?.getContainerElement() ?? null, handle ? listAnchors(handle) : null);
-  }, [treeSync]);
+    session.pageScroll?.attach(handle?.getInstance()?.getContainerElement() ?? null, handle ? listAnchors(handle, sync) : null);
+  }, [treeSync, sync]);
 
   const renderCustomHeader = useCallback((item: PierreItem) => <FileHeader path={item.id} />, []);
 
   if (!pr) return <div className="pierre-diffs pierre-diffs-empty" />;
   return (
-    <CodeView<AnnotationMeta, undefined>
-      key={pr.headOid}
-      ref={setHandle}
-      className="pierre-diffs"
-      initialItems={initialItems}
-      options={options}
-      onScroll={onViewport}
-      renderCustomHeader={renderCustomHeader}
-      renderAnnotation={renderAnnotation}
-    />
+    <>
+      {shown.length === 0 && <div className="pierre-empty-group">No files in this group.</div>}
+      <CodeView<AnnotationMeta, undefined>
+        key={pr.headOid}
+        ref={setHandle}
+        className="pierre-diffs"
+        initialItems={initialItems}
+        options={options}
+        onScroll={onViewport}
+        renderCustomHeader={renderCustomHeader}
+        renderAnnotation={renderAnnotation}
+      />
+    </>
   );
 });

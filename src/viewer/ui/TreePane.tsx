@@ -4,11 +4,13 @@
  *
  * Tree options are construction-time in @pierre/trees, so a Display-menu change remounts the tree (cheap).
  * Decoration changes (viewed, comments, renames) re-render the mounted rows via `model.render({})`.
+ * A file group switch swaps the tree's paths in place (`resetPaths`), keeping the search and each folder's expansion.
  */
-import type { GitStatusEntry } from '@pierre/trees';
+import type { FileTreeDirectoryHandle, GitStatusEntry } from '@pierre/trees';
 import { FileTree, useFileTree } from '@pierre/trees/react';
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { DEFAULT_SETTINGS, toTreeOptions, type TreeSettings } from '../../shared/settings';
+import { useActiveGroup } from '../state/fileGroups';
 import { session } from '../state/session';
 import { effectiveThemeType, useSettings } from '../state/settings';
 import { usePr } from '../state/store';
@@ -22,7 +24,14 @@ const ancestorsOf = (path: string): string[] => {
   return out;
 };
 
-function Tree({ paths, gitStatus, settings, colorScheme }: { paths: string[]; gitStatus: GitStatusEntry[] | undefined; settings: TreeSettings; colorScheme: string }) {
+const directoryOf = (m: TreeModel, dir: string): FileTreeDirectoryHandle | undefined => {
+  const item = m.getItem(dir) ?? m.getItem(dir.slice(0, -1));
+  return item?.isDirectory() ? (item as FileTreeDirectoryHandle) : undefined;
+};
+
+const foldersOf = (paths: readonly string[]) => new Set(paths.flatMap(ancestorsOf));
+
+function Tree({ paths, gitStatus, settings, colorScheme }: { paths: readonly string[]; gitStatus: GitStatusEntry[] | undefined; settings: TreeSettings; colorScheme: string }) {
   /** True while the diff scroll position updates the selection: that selection must not scroll the diff. */
   const syncing = useRef(false);
   const modelRef = useRef<TreeModel | null>(null);
@@ -40,6 +49,33 @@ function Tree({ paths, gitStatus, settings, colorScheme }: { paths: string[]; gi
   });
   modelRef.current = model;
 
+  // A group switch: the new paths, with each folder as the user last left it in any group.
+  const shownPaths = useRef(paths);
+  const expansion = useRef(new Map<string, boolean>());
+  useEffect(() => {
+    if (shownPaths.current === paths) return;
+    for (const dir of foldersOf(shownPaths.current)) {
+      const item = directoryOf(model, dir);
+      if (item) expansion.current.set(dir, item.isExpanded());
+    }
+    shownPaths.current = paths;
+    const query = model.isSearchOpen() ? model.getSearchValue() : '';
+    model.resetPaths(paths);
+    for (const dir of foldersOf(paths)) {
+      const expanded = expansion.current.get(dir);
+      const item = expanded === undefined ? undefined : directoryOf(model, dir);
+      if (item && item.isExpanded() !== expanded) {
+        if (expanded) item.expand();
+        else item.collapse();
+      }
+    }
+    // resetPaths keeps the query but not its matches (still the old paths'); searching again finds the new ones.
+    if (query) {
+      model.setSearch('');
+      model.setSearch(query);
+    }
+  }, [model, paths]);
+
   // Diff scroll position → tree selection.
   useEffect(() => {
     session.revealInTree = (path: string) => {
@@ -51,8 +87,8 @@ function Tree({ paths, gitStatus, settings, colorScheme }: { paths: string[]; gi
       try {
         for (const p of selected) if (p !== path) m.getItem(p)?.deselect();
         for (const dir of ancestorsOf(path)) {
-          const item = m.getItem(dir) ?? m.getItem(dir.slice(0, -1));
-          if (item && 'expand' in item && !item.isExpanded()) item.expand();
+          const item = directoryOf(m, dir);
+          if (item && !item.isExpanded()) item.expand();
         }
         m.getItem(path)?.select();
         m.scrollToPath(path, { focus: false, offset: 'nearest' });
@@ -89,7 +125,7 @@ function Tree({ paths, gitStatus, settings, colorScheme }: { paths: string[]; gi
 }
 
 export const TreePane = memo(function TreePane() {
-  const order = usePr((s) => s.order);
+  const { shown } = useActiveGroup();
   const pr = usePr((s) => s.pr);
   const settings = useSettings((s) => s.settings.tree);
   const themeType = useSettings((s) => effectiveThemeType(s.settings.diff.themeType, s.colorMode));
@@ -100,7 +136,7 @@ export const TreePane = memo(function TreePane() {
   if (!pr) return <aside className="pierre-tree-pane" />;
   return (
     <aside className="pierre-tree-pane" data-testid="tree">
-      <Tree key={`${pr.headOid}:${key}`} paths={order} gitStatus={gitStatus} settings={settings} colorScheme={colorScheme} />
+      <Tree key={`${pr.headOid}:${key}`} paths={shown} gitStatus={gitStatus} settings={settings} colorScheme={colorScheme} />
     </aside>
   );
 });
