@@ -23,6 +23,10 @@ const fixtures = [
 const go = (path: string) => window.history.pushState(null, '', path);
 const pierreTabs = () => document.querySelectorAll('[data-pierre-tab]');
 const viewers = () => document.querySelectorAll('iframe[data-pierre-viewer]');
+type FramePost = [unknown, string, unknown[]];
+/** The messages posted to the viewer's window, of one type. */
+const posted = (spy: { mock: { calls: unknown[][] } }, type: string) =>
+  spy.mock.calls.filter((c) => (c[0] as { type?: string }).type === type) as unknown as FramePost[];
 
 /** Document HTML with the Pierre tab and viewer removed, to compare against the untouched fixture. */
 function bodyWithoutPierre(): string {
@@ -193,11 +197,33 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
       expect(bridgeCall[2]).toHaveLength(1);
 
       host.iframe.dispatchEvent(new Event('load'));
-      expect(framePost).toHaveBeenCalledTimes(1);
-      const [msg, origin, transfer] = framePost.mock.calls[0] as unknown as [unknown, string, unknown[]];
+      expect(posted(framePost, 'pierre:port')).toHaveLength(1);
+      const [msg, origin, transfer] = posted(framePost, 'pierre:port')[0]!;
       expect(msg).toEqual({ type: 'pierre:port', colorMode: 'dark' });
       expect(origin).toBe('chrome-extension://abcdefghijklmnop');
       expect(transfer).toHaveLength(1);
+    });
+
+    it("reports the breakpoints GitHub's viewport reaches with the handshake, then whenever they change", () => {
+      let width = 1280;
+      vi.spyOn(window, 'innerWidth', 'get').mockImplementation(() => width);
+      const host = mountViewer(document, ref);
+      const framePost = vi.spyOn(host.iframe.contentWindow!, 'postMessage').mockImplementation(() => {});
+      const reports = () => posted(framePost, 'pierre:viewport').map(([msg, origin]) => [(msg as { reached: string[] }).reached, origin]);
+      window.dispatchEvent(new Event('resize'));
+      expect(reports()).toEqual([]);
+
+      host.iframe.dispatchEvent(new Event('load'));
+      expect(reports()).toEqual([[['md', 'lg'], 'chrome-extension://abcdefghijklmnop']]);
+      width = 1100;
+      window.dispatchEvent(new Event('resize'));
+      expect(reports()).toHaveLength(1);
+      width = 1011;
+      window.dispatchEvent(new Event('resize'));
+      width = 767;
+      window.dispatchEvent(new Event('resize'));
+      expect(reports().map(([reached]) => reached)).toEqual([['md', 'lg'], ['md'], []]);
+      host.unmount();
     });
 
     it('sizes the viewer to end at the bottom of the viewport, from its own top', () => {
@@ -231,7 +257,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
         const framePost = vi.spyOn(host.iframe.contentWindow!, 'postMessage').mockImplementation(() => {});
         host.iframe.dispatchEvent(new Event('load'));
         expect(bridgeCalls()).toHaveLength(1);
-        expect(framePost).toHaveBeenCalledTimes(1);
+        expect(posted(framePost, 'pierre:port')).toHaveLength(1);
 
         deliverMessage({ type: 'pierre:bridge-ready' });
 
@@ -244,13 +270,14 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
         expect(bridgeCalls()).toHaveLength(2);
         expect(bridgeCalls()[1]![1]).toBe(window.location.origin);
         expect(bridgeCalls()[1]![2]).toHaveLength(1);
-        expect(framePost).toHaveBeenCalledTimes(2);
-        const [msg, origin, transfer] = framePost.mock.calls[1] as unknown as [unknown, string, unknown[]];
+        expect(posted(framePost, 'pierre:port')).toHaveLength(2);
+        expect(posted(framePost, 'pierre:viewport')).toHaveLength(2);
+        const [msg, origin, transfer] = posted(framePost, 'pierre:port')[1]!;
         expect(msg).toEqual({ type: 'pierre:port', colorMode: 'light' });
         expect(origin).toBe('chrome-extension://abcdefghijklmnop');
         expect(transfer).toHaveLength(1);
         // The two sides got ends of the same new channel, distinct from the first handshake's.
-        expect(transfer[0]).not.toBe((framePost.mock.calls[0] as unknown as [unknown, string, unknown[]])[2][0]);
+        expect(transfer[0]).not.toBe(posted(framePost, 'pierre:port')[0]![2][0]);
         host.unmount();
       });
 
@@ -261,7 +288,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
         expect(bridgeCalls()).toHaveLength(2);
         expect(framePost).not.toHaveBeenCalled();
         host.iframe.dispatchEvent(new Event('load'));
-        expect(framePost).toHaveBeenCalledTimes(1);
+        expect(posted(framePost, 'pierre:port')).toHaveLength(1);
         host.unmount();
       });
 

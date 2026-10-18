@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 import { BRAND } from '../shared/brand';
 import { parseScrollLayout, restoreKey } from '../shared/page-scroll';
 import { prKey } from '../shared/pr-url';
+import { reachedBreakpoints, type Breakpoint } from '../shared/viewport';
 import { App } from './App';
 import { createConnection, parsePrParam, watchPort } from './connection';
 import { createPageScrollView, type PageScrollView } from './pageScroll';
@@ -32,8 +33,14 @@ if (!prRef) {
     document.documentElement.dataset.scrollLayout = layout;
     pageScroll = session.pageScroll = createPageScrollView(window, layout, restoreKey(prKey(prRef)));
   }
+  // viewer.css follows GitHub's viewport; until the page reports it, the iframe's width is the best guess.
+  const showViewport = (reached: Breakpoint[]) => (document.documentElement.dataset.viewport = reached.join(' '));
+  showViewport(reachedBreakpoints(window.innerWidth));
   // Without page scrolling, a scroll port is closed unused (src/viewer/connection.ts).
-  const connection = createConnection(window, pageScroll ? { onScrollPort: (port) => pageScroll.setPort(port) } : {});
+  const connection = createConnection(window, {
+    onViewport: showViewport,
+    onScrollPort: pageScroll && ((port) => pageScroll.setPort(port)),
+  });
   session.rpc = connection.rpc;
   initSettings();
   initBatchPersistence();

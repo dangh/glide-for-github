@@ -74,7 +74,8 @@ afterEach(() => {
 function connectViewer(iframe: HTMLIFrameElement) {
   const framePost = vi.spyOn(iframe.contentWindow!, 'postMessage').mockImplementation(() => {});
   iframe.dispatchEvent(new Event('load'));
-  const transfer = (framePost.mock.calls.at(-1) as unknown as [unknown, string, MessagePort[]])[2];
+  const handshake = framePost.mock.calls.findLast((c) => (c[0] as { type?: string }).type === 'pierre:port');
+  const transfer = (handshake as unknown as [unknown, string, MessagePort[]])[2];
   const port = transfer[1]!;
   const received: PageScrollMessage[] = [];
   port.onmessage = (e) => received.push(e.data as PageScrollMessage);

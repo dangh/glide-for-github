@@ -6,10 +6,12 @@
  * calls wait for the first port, and a call that fails because its port was replaced (`closed`) is re-issued
  * on the new port, for reads and applySuggestions only (see `RETRY_ON_CLOSED`).
  * With page scrolling (src/shared/page-scroll.ts) the message carries a second port, the scroll channel.
+ * The page also reports which of GitHub's viewport breakpoints it reaches (src/shared/viewport.ts).
  */
 import { BRAND } from '../shared/brand';
 import { BridgeError, createRpcClient, RETRY_ON_CLOSED, type BridgeMethods, type RpcClient } from '../shared/rpc';
 import type { PrRef } from '../shared/pr-url';
+import { parseViewportMessage, type Breakpoint } from '../shared/viewport';
 import type { Rpc } from './github/private';
 
 export const GITHUB_ORIGIN = 'https://github.com';
@@ -30,6 +32,8 @@ export interface ConnectionOptions {
   createClient?: (port: MessagePort) => RpcClient<BridgeMethods>;
   /** Receives the scroll channel of each handshake that has one (page scrolling). */
   onScrollPort?: (port: MessagePort) => void;
+  /** Receives the breakpoints GitHub's viewport reaches, with every handshake and whenever they change. */
+  onViewport?: (reached: Breakpoint[]) => void;
 }
 
 export function createConnection(win: Window, options: ConnectionOptions = {}): Connection {
@@ -46,6 +50,11 @@ export function createConnection(win: Window, options: ConnectionOptions = {}): 
   const onMessage = (event: MessageEvent) => {
     if (disposed || event.origin !== GITHUB_ORIGIN) return;
     if (source !== null && event.source !== source) return;
+    const reached = parseViewportMessage(event.data);
+    if (reached) {
+      options.onViewport?.(reached);
+      return;
+    }
     const data = event.data as { type?: unknown; colorMode?: unknown } | null;
     if (!data || data.type !== 'pierre:port') return;
     const port = event.ports[0];

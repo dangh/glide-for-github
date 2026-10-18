@@ -75,22 +75,19 @@ button {
 
 /*
  * Merged bar (page-scrolling experiment): the iframe spans the viewport (src/content/page-scroll.ts), so GitHub's page
- * gutters (Primer's container: 16 px, 24 px from 768 px, 32 px from 1012 px) move inside it.
+ * gutters (Primer's container: 16 px, 24 px from 768 px, 32 px from 1012 px) move inside it. `data-viewport` lists the
+ * breakpoints GitHub's viewport reaches (src/shared/viewport.ts).
  */
 html[data-scroll-layout='merged'] {
   --gutter: 16px;
 }
 
-@media (width >= 768px) {
-  html[data-scroll-layout='merged'] {
-    --gutter: 24px;
-  }
+html[data-scroll-layout='merged'][data-viewport~='md'] {
+  --gutter: 24px;
 }
 
-@media (width >= 1012px) {
-  html[data-scroll-layout='merged'] {
-    --gutter: 32px;
-  }
+html[data-scroll-layout='merged'][data-viewport~='lg'] {
+  --gutter: 32px;
 }
 
 html[data-scroll-layout='merged'] .pierre-app {
@@ -202,10 +199,8 @@ html[data-scroll-layout='merged'] .pierre-app {
   line-height: 18px;
 }
 
-@media (width >= 1012px) {
-  .pr-branches {
-    display: flex;
-  }
+html[data-viewport~='lg'] .pr-branches {
+  display: flex;
 }
 
 .pr-branches-divider {
@@ -272,12 +267,17 @@ html[data-scroll-layout='merged'] .pierre-app {
   background: light-dark(#818b9826, #656c7633);
 }
 
-/* GitHub's divider between the viewed counter and Submit review. */
+/* GitHub's divider between the viewed counter and Submit review, from 768 px. */
 .toolbar-divider {
+  display: none;
   flex: none;
   height: 28px;
   margin: 0 4px;
   border-left: 1px solid var(--pierre-border);
+}
+
+html[data-viewport~='md'] .toolbar-divider {
+  display: block;
 }
 
 /* Primer small buttons: 28 px, 12px/500. */
@@ -385,10 +385,8 @@ html[data-scroll-layout='merged'] .pierre-app {
 }
 
 /* GitHub drops the word below 1012 px. */
-@media (width < 1012px) {
-  .viewed-word {
-    display: none;
-  }
+html:not([data-viewport~='lg']) .viewed-word {
+  display: none;
 }
 
 .viewed-ring-track {

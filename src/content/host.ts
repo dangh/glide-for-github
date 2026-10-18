@@ -1,6 +1,7 @@
 import { BRAND } from '../shared/brand';
 import { SCROLL_LAYOUT_PARAM, type ScrollLayout } from '../shared/page-scroll';
 import { prKey, type PrRef } from '../shared/pr-url';
+import { reachedBreakpoints, type ViewportMessage } from '../shared/viewport';
 import { createPageScroll } from './page-scroll';
 import { findTabNav } from './tab';
 
@@ -95,6 +96,13 @@ export function mountViewer(doc: Document, ref: PrRef, layout: ScrollLayout = 'f
   const extOrigin = originOf(resolveExtensionUrl(''));
   let channel = new MessageChannel();
   let loaded = false;
+  /** The breakpoints last reported to the viewer (src/shared/viewport.ts). */
+  let reported = '';
+  const sendViewport = () => {
+    const reached = reachedBreakpoints(win.innerWidth);
+    reported = reached.join();
+    iframe.contentWindow?.postMessage({ type: 'pierre:viewport', reached } satisfies ViewportMessage, extOrigin);
+  };
   const sendToViewer = () => {
     const ports = [channel.port1];
     if (pageScroll) {
@@ -108,6 +116,7 @@ export function mountViewer(doc: Document, ref: PrRef, layout: ScrollLayout = 'f
       extOrigin,
       ports,
     );
+    sendViewport();
   };
   const sendToBridge = () => win.postMessage({ type: 'pierre:bridge-port' }, win.location.origin, [channel.port2]);
   const onLoad = () => {
@@ -139,7 +148,11 @@ export function mountViewer(doc: Document, ref: PrRef, layout: ScrollLayout = 'f
   hideContent();
   parent.append(outer);
   fitHeight();
-  win.addEventListener('resize', fitHeight);
+  const onResize = () => {
+    fitHeight();
+    if (loaded && reachedBreakpoints(win.innerWidth).join() !== reported) sendViewport();
+  };
+  win.addEventListener('resize', onResize);
   sendToBridge();
 
   return {
@@ -159,7 +172,7 @@ export function mountViewer(doc: Document, ref: PrRef, layout: ScrollLayout = 'f
       mounted = false;
       iframe.removeEventListener('load', onLoad);
       win.removeEventListener('message', onBridgeReady);
-      win.removeEventListener('resize', fitHeight);
+      win.removeEventListener('resize', onResize);
       pageScroll?.dispose();
       outer.remove();
       for (const [el, style] of hidden) {

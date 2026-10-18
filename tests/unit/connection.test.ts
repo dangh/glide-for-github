@@ -90,6 +90,19 @@ describe('viewer connection', () => {
     expect(clients[0]!.closed).toBe(true);
   });
 
+  it("passes on the breakpoints GitHub's viewport reaches, only from github.com and the parent window", () => {
+    const w = fakeWindow();
+    const reports: string[][] = [];
+    createConnection(w.win, { onViewport: (reached) => reports.push(reached) });
+    w.post({ type: 'pierre:viewport', reached: ['md', 'lg'] });
+    w.post({ type: 'pierre:viewport', reached: ['lg', 'xl', 7] });
+    w.post({ type: 'pierre:viewport', reached: [] });
+    w.post({ type: 'pierre:viewport', reached: 'md' });
+    w.post({ type: 'pierre:viewport', reached: ['md'] }, { origin: 'https://evil.example' });
+    w.post({ type: 'pierre:viewport', reached: ['md'] }, { source: {} });
+    expect(reports).toEqual([['md', 'lg'], ['lg'], []]);
+  });
+
   it('calls wait for the first port', async () => {
     const w = fakeWindow();
     const { createClient } = fakeClients(async () => 'ok');
