@@ -13,6 +13,7 @@ import { resolveDiffChoice } from '../../shared/github-defaults';
 import type { PrState } from '../github/private';
 import { usePageScroll } from '../pageScroll';
 import { useSettings } from '../state/settings';
+import { session } from '../state/session';
 import { usePr } from '../state/store';
 import { CommitRangePicker } from './CommitRangePicker';
 import { DisplayMenu } from './DisplayMenu';
@@ -120,9 +121,18 @@ const PrHeader = memo(function PrHeader() {
       )}
       <span className="pr-summary">
         <span className="pr-title-row">
-          <span className="pr-title-text" title={title}>
+          {/* GitHub's sticky title takes the page back to the top; no href change, which would drop #glide. */}
+          <a
+            className="pr-title-text"
+            href="#top"
+            title={title}
+            onClick={(e) => {
+              e.preventDefault();
+              session.pageScroll?.scrollPageToTop();
+            }}
+          >
             {title}
-          </span>
+          </a>
           <span className="pr-number">#{number}</span>
         </span>
         <span className="pr-summary-row">

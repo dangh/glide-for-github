@@ -147,6 +147,12 @@ describe('page layout', () => {
     port.postMessage({ type: 'scrollBy', dy: 120 });
     await settle();
     expect(scrollBy).toHaveBeenLastCalledWith({ top: 120, behavior: 'instant' });
+
+    // The merged title: back to the top of GitHub's page (the scroll event then brings the list along).
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation((() => undefined) as typeof window.scrollTo);
+    port.postMessage({ type: 'scrollToTop' });
+    await settle();
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: 'instant' });
     host.unmount();
   });
 

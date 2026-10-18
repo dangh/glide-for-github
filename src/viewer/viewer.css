@@ -163,7 +163,10 @@ html[data-scroll-layout='merged'] .pierre-app {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
+  color: inherit;
+  text-decoration: none;
 }
+
 
 .pr-number {
   flex: none;

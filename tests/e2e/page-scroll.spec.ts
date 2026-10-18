@@ -413,6 +413,12 @@ test("merged bar: GitHub's sticky header is hidden, Glide's toolbar shows the ti
   expect(stuck.bodyLeft).toBe(stuck.gutter);
   await page.screenshot({ path: `${SHOTS}/merged-stuck.png` });
 
+  // Like GitHub's sticky title, clicking it goes back to the top of the page (the list with it), keeping #glide.
+  await viewer.locator.locator('.pr-title-text').click();
+  await expect.poll(async () => (await positions(page, viewer)).scrollY).toBe(0);
+  await expect.poll(async () => (await positions(page, viewer)).listTop).toBe(0);
+  expect(page.url()).toContain('#glide');
+
   // Leaving Glide (back to Conversation) shows GitHub's header again.
   await page.goBack();
   await expect(page.locator('iframe[data-pierre-viewer]')).toHaveCount(0);

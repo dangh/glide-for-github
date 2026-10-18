@@ -142,6 +142,9 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
       const dy = pageScrollDelta(wrapper.getBoundingClientRect().top, stickTop, msg.top);
       if (Math.abs(dy) >= 1) win.scrollBy({ top: dy, behavior: 'instant' });
       lastY = win.scrollY;
+    } else if (msg.type === 'scrollToTop') {
+      win.scrollTo({ top: 0, behavior: 'instant' });
+      return; // the scroll event brings the list back to its top
     } else {
       // Chrome latched this wheel gesture to the page after all (a trackpad gesture can outlast the viewer's guess at
       // its end): the page is scrolling itself, and taking the hand-off too would scroll it twice.

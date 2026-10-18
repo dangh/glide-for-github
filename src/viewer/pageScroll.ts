@@ -43,6 +43,8 @@ export interface PageScrollView {
   setPort(port: MessagePort): void;
   /** The list is about to scroll where the user asked (a tree click): the page follows, even from its header or footer. */
   expectListScroll(): void;
+  /** Back to the top of GitHub's page (the merged title, like GitHub's sticky title); the list follows. */
+  scrollPageToTop(): void;
   /** The CodeView root (null when it unmounts); the first one restores the position saved before a reload. */
   attach(root: HTMLElement | null, anchors: ListAnchors | null): void;
 }
@@ -196,6 +198,7 @@ export function createPageScrollView(win: Window, layout: Exclude<ScrollLayout, 
 
   return {
     expectListScroll,
+    scrollPageToTop: () => post({ type: 'scrollToTop' }),
     setPort(next) {
       if (port) {
         port.onmessage = null;

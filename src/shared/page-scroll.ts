@@ -49,7 +49,9 @@ export type ViewerScrollMessage =
   /** The list scrolled itself (wheel while stuck, tree click, keyboard): bring the page to the same offset. */
   | { type: 'scrollTo'; top: number; seq: number }
   /** The rest of a wheel gesture the list could not use (it reached its top or bottom). */
-  | { type: 'scrollBy'; dy: number };
+  | { type: 'scrollBy'; dy: number }
+  /** The merged title was clicked: back to the top of GitHub's page, like GitHub's own sticky title. */
+  | { type: 'scrollToTop' };
 
 /** Half a CSS pixel: sub-pixel scroll positions at the edges still count as there. */
 const EDGE = 0.5;
@@ -113,6 +115,7 @@ export function parseViewerMessage(data: unknown): ViewerScrollMessage | null {
   if (m.type === 'extent' && isFiniteNumber(m.extent) && m.extent >= 0) return { type: 'extent', extent: m.extent };
   if (m.type === 'scrollTo' && isFiniteNumber(m.top) && isFiniteNumber(m.seq)) return { type: 'scrollTo', top: m.top, seq: m.seq };
   if (m.type === 'scrollBy' && isFiniteNumber(m.dy)) return { type: 'scrollBy', dy: m.dy };
+  if (m.type === 'scrollToTop') return { type: 'scrollToTop' };
   return null;
 }
 
