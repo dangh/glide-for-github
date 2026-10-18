@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <!-- Glide: a "G" with motion streaks, like diff lines gliding past. Two flat colors (blue tile, white mark).
-       Artwork stays inside 16..112 so the 128 px store icon keeps its 16 px padding. -->
-  <rect x="16" y="16" width="96" height="96" rx="22" fill="#2f6bed"/>
-  <path d="M91 48.5A26 26 0 1 0 94 66H74" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M27 52h6M27 76h6" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+  <!-- Glide "Diff Sprint": a diff "+" over a "-" that runs into an arrow, code changes moving fast. Deep teal tile,
+       mint plus, white arrow. Artwork stays inside 16..112 so the 128 px store icon keeps its 16 px padding. -->
+  <rect x="16" y="16" width="96" height="96" rx="23" fill="#123238"/>
+  <path fill="#78F3BC" d="M62 32H74V45H96L90 57H74V70H62V57H30L36 45H62Z"/>
+  <path fill="#fff" d="M39 80H77V69L100 87L77 104V93H33Z"/>
 </svg>

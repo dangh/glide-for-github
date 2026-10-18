@@ -46,23 +46,14 @@ function createTab(doc: Document, files: HTMLAnchorElement, ref: PrRef): HTMLAnc
   icon.setAttribute('viewBox', '0 0 16 16');
   icon.setAttribute('width', '16');
   icon.setAttribute('height', '16');
-  icon.setAttribute('fill', 'none');
-  icon.setAttribute('stroke', 'currentColor');
-  icon.setAttribute('stroke-width', '1.5');
-  icon.setAttribute('stroke-linejoin', 'round');
   const iconClass = filesIcon?.getAttribute('class');
   if (iconClass) icon.setAttribute('class', iconClass.replace(/octicon-[\w-]+/, 'octicon-pierre'));
-  // The Glide mark (icons/icon-16.svg without its tile): a "G" with two motion streaks, in the tab's own color.
-  for (const d of ['M12.8 4.8A5 5 0 1 0 14 8H10.6', 'M1.6 5.4h.9M1.6 10.6h.9']) {
-    const path = doc.createElementNS(SVG_NS, 'path');
-    path.setAttribute('d', d);
-    // On the path itself: GitHub's `.octicon { fill: currentColor }` (copied class) would otherwise fill the strokes.
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', 'currentColor');
-    path.setAttribute('stroke-width', '1.5');
-    path.setAttribute('stroke-linecap', 'round');
-    icon.append(path);
-  }
+  // The Glide mark as a one-color glyph: a diff "+" over a "-" that runs into an arrow, filled in the tab's own
+  // color like GitHub's octicons.
+  const path = doc.createElementNS(SVG_NS, 'path');
+  path.setAttribute('fill', 'currentColor');
+  path.setAttribute('d', 'M7 1.5H8.5V4.5H13L12.25 6H8.5V9H7V6H2L2.75 4.5H7ZM3 11H10V8.5L14.5 11.75L10 15V12.5H2.25Z');
+  icon.append(path);
 
   tab.append(icon, BRAND.short);
   return tab;
