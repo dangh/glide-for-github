@@ -100,6 +100,76 @@ function bounceAtEnd(page: Page, s0 = 30, v0 = 2000) {
   }, [s0, v0]);
 }
 
+/**
+ * macOS Chrome also rubber-bands a scroller that is not the root (kOverscrollEffectOnNonRootScrollers, on by default):
+ * the scroller a gesture latched to, once a wheel step finds it at its top. This models it for the list as above: a
+ * wheel step up that finds the list at its top, scrollable (`overflow-y: auto`) and with `overscroll-behavior-y` other
+ * than none (which drops the overscroll, cc::InputHandler::ScrollUpdate) starts the stretch; from then on, every frame
+ * and before the viewer sees a list scroll, ReconcileStretchAndScroll scrolls the list back to its top by up to s(t).
+ * The flick in the test began mid-list, so on a trackpad Chrome latched all of it to the list.
+ */
+function bounceAtTop(viewer: Viewer, s0 = 30, v0 = 2000) {
+  return viewer.frame().evaluate(([s0, v0]) => {
+    const root = document.querySelector<HTMLElement>('.pierre-diffs')!;
+    let start: number | null = null;
+    const stretch = () => {
+      const t = (performance.now() - start!) / 1000;
+      return Math.round((s0 + 0.31 * v0 * t) * Math.exp(-12.5 * t));
+    };
+    const reconcile = () => {
+      if (start === null) return;
+      const s = stretch();
+      if (s < 1) return removeEventListener('scroll', reconcile, { capture: true });
+      if (root.scrollTop > 0) root.scrollTop -= Math.min(s, root.scrollTop);
+    };
+    const frame = () => {
+      reconcile();
+      if (start === null || stretch() >= 1) requestAnimationFrame(frame);
+    };
+    addEventListener('wheel', (e) => {
+      const style = getComputedStyle(root);
+      if (start === null && e.deltaY < 0 && root.scrollTop <= 0.5 && style.overflowY === 'auto' && style.overscrollBehaviorY !== 'none') {
+        start = performance.now();
+      }
+    }, { capture: true, passive: true });
+    addEventListener('scroll', reconcile, { capture: true });
+    requestAnimationFrame(frame);
+  }, [s0, v0]);
+}
+
+/**
+ * Every position the list and the page take while `run` scrolls (at each scroll event, before the viewer or the page
+ * reacts to it, and each frame), and how far each moved up along the way.
+ */
+async function upwardMoves(page: Page, viewer: Viewer, run: () => Promise<void>) {
+  const record = (inFrame: boolean) => {
+    const w = window as unknown as { glideTops: number[] | null };
+    const root = document.querySelector<HTMLElement>('.pierre-diffs');
+    const top = () => (inFrame ? root!.scrollTop : scrollY);
+    w.glideTops = [top()];
+    const push = () => w.glideTops?.push(top());
+    addEventListener('scroll', push, { capture: true });
+    const frame = () => {
+      if (!w.glideTops) return removeEventListener('scroll', push, { capture: true });
+      push();
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  };
+  const collect = () => {
+    const w = window as unknown as { glideTops: number[] | null };
+    const tops = w.glideTops!;
+    w.glideTops = null;
+    return tops;
+  };
+  await page.evaluate(record, false);
+  await viewer.frame().evaluate(record, true);
+  await run();
+  const [pageTops, listTops] = [await page.evaluate(collect), await viewer.frame().evaluate(collect)];
+  const ups = (tops: number[]) => tops.slice(1).map((t, i) => tops[i]! - t).filter((d) => d > 0.5);
+  return { pageDown: pageTops.at(-1)! - pageTops[0]!, page: ups(pageTops), list: ups(listTops) };
+}
+
 /** How far the list moved down, frame by frame, while `run` scrolls it up. */
 async function downwardMoves(viewer: Viewer, run: () => Promise<void>) {
   await viewer.frame().evaluate(() => {
@@ -244,6 +314,37 @@ test('page scrolling: flicking past the end and straight back up does not pull t
   });
   expect(moves.up).toBeGreaterThan(500);
   expect(moves.down).toEqual([]);
+});
+
+test('page scrolling: flicking past the top and straight back down is not pulled back up', async ({ page, extContext }) => {
+  await setExperiments(extContext, { pageScroll: true, mergedBar: false }, page);
+  const viewer = await openPierre(page, REACT);
+  await wheel(page, 200, 3);
+  const start = await positions(page, viewer);
+  expect(start.listTop).toBeGreaterThan(300);
+
+  const cdp = await page.context().newCDPSession(page);
+  // Trackpad flicks as above: up past the list's top, then straight back down while the list would still bounce.
+  // DevTools sends each wheel event as a gesture of its own (phase began, then ended), so Chrome latches each anew, as
+  // it does for a new swipe; the viewer sees one gesture, as it does on a trackpad.
+  const flick = async (sign: number, steps: number) => {
+    for (let i = 0; i < steps; i++) {
+      void cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 900, y: 650, deltaX: 0, deltaY: sign * Math.max(1, Math.round(90 * 0.92 ** i)) });
+      await page.waitForTimeout(33);
+    }
+  };
+  await bounceAtTop(viewer);
+  await flick(-1, 8);
+  const top = await positions(page, viewer);
+  expect(top.listTop).toBe(0);
+  expect(top.scrollY).toBeLessThan(start.scrollY - start.listTop);
+
+  const moves = await upwardMoves(page, viewer, async () => {
+    await flick(1, 30);
+    await page.waitForTimeout(500);
+  });
+  expect(moves.pageDown).toBeGreaterThan(500);
+  expect({ page: moves.page, list: moves.list }).toEqual({ page: [], list: [] });
 });
 
 test('page scrolling: a reload comes back to the same file', async ({ page, extContext }) => {

@@ -71,7 +71,9 @@ describe('wheel hand-off', () => {
     await flush();
     s.wheel(100);
     vi.advanceTimersByTime(50);
-    expect(s.root.style.overflowY).toBe('hidden');
+    // Stuck, the list scrolls natively; Chrome keeps this gesture on GitHub's page, so its rubber band stays on.
+    expect(s.root.style.overflowY).toBe('auto');
+    expect(s.root.style.overscrollBehaviorY).toBe('');
     s.page(EXTENT, true);
     await flush();
     expect(s.root.scrollTop).toBe(EXTENT);
@@ -81,10 +83,6 @@ describe('wheel hand-off', () => {
     s.wheel(100);
     await flush();
     expect(s.handOffs()).toEqual([]);
-
-    // Once the gesture is over the list scrolls natively.
-    vi.advanceTimersByTime(600);
-    expect(s.root.style.overflowY).toBe('auto');
   });
 
   it('a gesture latched to the list hands the rest to the page at either end', async () => {
@@ -133,22 +131,49 @@ describe('wheel hand-off', () => {
     expect(s.handOffs()).toHaveLength(1);
   });
 
-  it('switches overflow only between gestures', async () => {
+  it('the list stops scrolling natively as soon as the iframe unsticks, mid-gesture too: a flick straight back down goes to the page', async () => {
     const s = setup();
-    s.page(0, false);
+    s.page(300, true);
+    await flush();
+    s.wheel(-100);
+    s.scrollList(200);
+    s.wheel(-200);
+    s.scrollList(0);
+    s.wheel(-100);
+    await flush();
+    expect(s.handOffs()).toEqual([{ type: 'scrollBy', dy: -100 }]);
+    s.page(0, false, s.scrollTos().at(-1)!.seq); // GitHub's header is back
     await flush();
     expect(s.root.style.overflowY).toBe('hidden');
-    s.page(10, true);
-    await flush();
-    expect(s.root.style.overflowY).toBe('auto');
+
+    // The flick back down, within the same gesture as far as the viewer can tell: the page takes it.
     s.wheel(100);
-    s.page(EXTENT, false);
+    await flush();
+    expect(s.handOffs().at(-1)).toEqual({ type: 'scrollBy', dy: 100 });
+    s.page(20, true, s.scrollTos().at(-1)!.seq);
     await flush();
     expect(s.root.style.overflowY).toBe('auto');
+  });
+
+  it("a gesture latched to the list turns the list's rubber band off until it ends; one the browser chains to the page does not", async () => {
+    const s = setup();
+    s.page(1000, true);
+    await flush();
+    expect(s.root.style.overscrollBehaviorY).toBe('');
+    s.wheel(-100);
+    expect(s.root.style.overscrollBehaviorY).toBe('none');
+    s.scrollList(0);
+    s.wheel(-100);
     vi.advanceTimersByTime(499);
-    expect(s.root.style.overflowY).toBe('auto');
+    expect(s.root.style.overscrollBehaviorY).toBe('none');
     vi.advanceTimersByTime(1);
-    expect(s.root.style.overflowY).toBe('hidden');
+    expect(s.root.style.overscrollBehaviorY).toBe('');
+
+    await flush();
+    s.page(0, true, s.scrollTos().at(-1)!.seq);
+    await flush();
+    s.wheel(-100); // begins at the list's top
+    expect(s.root.style.overscrollBehaviorY).toBe('');
   });
 });
 
