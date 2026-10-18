@@ -352,8 +352,15 @@ button {
   padding-inline: 16px;
 }
 
+/*
+ * Clipped to the outline's rounded corners: a file with no body below its header (collapsed, binary, not loaded)
+ * would otherwise show the header's straight bottom border across the outline's bottom corners. `clip`, unlike
+ * `hidden`, makes no scroll container, so the sticky file header still sticks.
+ */
 [data-file-header='github'] .pierre-diffs diffs-container {
   position: relative;
+  border-radius: 6px;
+  overflow: clip;
 }
 
 [data-file-header='github'] .pierre-diffs diffs-container::after {
