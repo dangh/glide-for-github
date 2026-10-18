@@ -5,6 +5,7 @@ import { resolveDiffChoice, resolveFonts } from '../shared/github-defaults';
 import { initSettings, useSettings } from '../viewer/state/settings';
 import { DisplaySettingsForm } from '../viewer/ui/DisplaySettingsForm';
 import { DisplayStyle } from '../viewer/ui/DisplayStyle';
+import { ExperimentSettingsForm } from './ExperimentSettings';
 import { SampleDiff } from './SampleDiff';
 import { TokenSettings } from './TokenSettings';
 
@@ -39,6 +40,11 @@ export function OptionsPage() {
             </div>
           </div>
         )}
+      </section>
+      <section className="options-section" aria-labelledby="experiments-heading">
+        <h2 id="experiments-heading">Experimental</h2>
+        <p className="muted">Changes apply at once; an open Glide tab reloads its viewer to switch.</p>
+        {loaded && <ExperimentSettingsForm experiments={settings.experiments} update={update} />}
       </section>
     </main>
   );

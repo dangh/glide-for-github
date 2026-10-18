@@ -127,3 +127,33 @@ body {
     position: static;
   }
 }
+
+.experiments {
+  display: grid;
+  gap: 10px;
+  max-width: 720px;
+}
+
+.experiment {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.experiment input {
+  margin: 3px 0 0;
+}
+
+.experiment[aria-disabled] {
+  color: var(--pierre-muted);
+}
+
+.experiment-label {
+  display: block;
+  font-weight: 600;
+}
+
+.experiment-description {
+  display: block;
+  color: var(--pierre-muted);
+}

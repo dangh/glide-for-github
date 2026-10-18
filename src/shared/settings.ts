@@ -68,6 +68,8 @@
  *                             codeFontSize ('default' = 12 px, or 8-32 px). The text goes into CSS custom properties,
  *                             so it is at most 300 chars and never contains ; { } < >.
  *   layout.treePosition       'left' | 'right', default 'left'
+ *   experiments.pageScroll    boolean, false: GitHub's page scrolls the diffs (src/shared/page-scroll.ts), not the viewer
+ *   experiments.mergedBar     boolean, false: GitHub's sticky PR header folds into Glide's toolbar (only with pageScroll)
  *
  * EXCLUDED, with reasons:
  *   preferredHighlighter        not a user option: toDiffOptions always sets 'shiki-js' (global no-WASM constraint)
@@ -101,6 +103,9 @@ import type {
 } from '@pierre/trees';
 import { DIFF_CSS, GITHUB_CHANGE_CSS, GITHUB_HUNK_CSS, GITHUB_TREE, GITHUB_TREE_ROW_HEIGHT, resolveDiff } from './github-defaults';
 import { GITHUB_TREE_CSS, GITHUB_TREE_ICONS, HIDE_GIT_STATUS_CSS } from './github-tree-icons';
+import { SETTINGS_STORAGE_KEY, type ExperimentSettings } from './experiments';
+
+export { SETTINGS_STORAGE_KEY, type ExperimentSettings };
 
 // ---------------------------------------------------------------------------------------------------------
 // Types
@@ -184,10 +189,11 @@ export interface DisplaySettings {
   fonts: FontSettings;
   layout: LayoutSettings;
   review: ReviewSettings;
+  experiments: ExperimentSettings;
 }
 
 /** The sections of `DisplaySettings`, in storage order. */
-export const SETTINGS_SECTIONS = ['diff', 'tree', 'fonts', 'layout', 'review'] as const;
+export const SETTINGS_SECTIONS = ['diff', 'tree', 'fonts', 'layout', 'review', 'experiments'] as const;
 
 export type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] };
 
@@ -341,6 +347,7 @@ export const DEFAULT_SETTINGS: DisplaySettings = deepFreeze({
   fonts: { codeFontFamily: '', uiFontFamily: '', codeFontSize: 'default', codeFontFeatures: '' },
   layout: { treePosition: 'left' },
   review: { hideWhitespace: false },
+  experiments: { pageScroll: false, mergedBar: false },
 });
 
 // ---------------------------------------------------------------------------------------------------------
@@ -417,7 +424,16 @@ const LAYOUT_SCHEMA: Schema<LayoutSettings> = { treePosition: oneOf(C.layout.tre
 
 const REVIEW_SCHEMA: Schema<ReviewSettings> = { hideWhitespace: isBool };
 
-const SCHEMAS = { diff: DIFF_SCHEMA, tree: TREE_SCHEMA, fonts: FONT_SCHEMA, layout: LAYOUT_SCHEMA, review: REVIEW_SCHEMA } as const;
+const EXPERIMENTS_SCHEMA: Schema<ExperimentSettings> = { pageScroll: isBool, mergedBar: isBool };
+
+const SCHEMAS = {
+  diff: DIFF_SCHEMA,
+  tree: TREE_SCHEMA,
+  fonts: FONT_SCHEMA,
+  layout: LAYOUT_SCHEMA,
+  review: REVIEW_SCHEMA,
+  experiments: EXPERIMENTS_SCHEMA,
+} as const;
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
@@ -463,14 +479,13 @@ function resolve(raw: unknown): DisplaySettings {
     fonts: { ...DEFAULT_SETTINGS.fonts, ...o.fonts },
     layout: { ...DEFAULT_SETTINGS.layout, ...o.layout },
     review: { ...DEFAULT_SETTINGS.review, ...o.review },
+    experiments: { ...DEFAULT_SETTINGS.experiments, ...o.experiments },
   };
 }
 
 // ---------------------------------------------------------------------------------------------------------
 // Storage seam
 // ---------------------------------------------------------------------------------------------------------
-
-export const SETTINGS_STORAGE_KEY = 'pierre.settings';
 
 export interface SettingsStorageArea {
   get(key: string): Promise<Record<string, unknown>>;

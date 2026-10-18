@@ -114,6 +114,7 @@ describe('DEFAULT_SETTINGS', () => {
       fonts: { codeFontFamily: '', uiFontFamily: '', codeFontSize: 'default', codeFontFeatures: '' },
       layout: { treePosition: 'left' },
       review: { hideWhitespace: false },
+      experiments: { pageScroll: false, mergedBar: false },
     } satisfies DisplaySettings);
   });
 
@@ -195,6 +196,25 @@ describe('theme names', () => {
   });
 });
 
+describe('experiments', () => {
+  it('are off unless stored as true; anything else falls back to off', async () => {
+    fake.data[SETTINGS_STORAGE_KEY] = { experiments: { pageScroll: 'yes', mergedBar: 1, extra: true } };
+    expect((await loadSettings()).experiments).toEqual({ pageScroll: false, mergedBar: false });
+    fake.data[SETTINGS_STORAGE_KEY] = { experiments: { pageScroll: true } };
+    expect((await loadSettings()).experiments).toEqual({ pageScroll: true, mergedBar: false });
+  });
+
+  it('save as sparse overrides next to the display settings and reach followers', async () => {
+    const seen: DisplaySettings[] = [];
+    const off = onSettingsChange((s) => seen.push(s));
+    await saveSettings({ diff: { diffStyle: 'split' } });
+    await saveSettings({ experiments: { mergedBar: true, bogus: true } as never });
+    off();
+    expect(fake.data[SETTINGS_STORAGE_KEY]).toEqual({ diff: { diffStyle: 'split' }, experiments: { mergedBar: true } });
+    expect(seen.at(-1)?.experiments).toEqual({ pageScroll: false, mergedBar: true });
+  });
+});
+
 describe('loadSettings', () => {
   it('returns the defaults, as a fresh copy, when nothing is stored', async () => {
     const s = await loadSettings();
@@ -222,7 +242,7 @@ describe('loadSettings', () => {
       review: { hideWhitespace: true, other: 1 },
     };
     const s = await loadSettings();
-    expect(Object.keys(s).sort()).toEqual(['diff', 'fonts', 'layout', 'review', 'tree']);
+    expect(Object.keys(s).sort()).toEqual(['diff', 'experiments', 'fonts', 'layout', 'review', 'tree']);
     expect(Object.keys(s.diff).sort()).toEqual(Object.keys(DEFAULT_SETTINGS.diff).sort());
     expect(Object.keys(s.tree).sort()).toEqual(Object.keys(DEFAULT_SETTINGS.tree).sort());
     expect(Object.keys(s.review)).toEqual(['hideWhitespace']);
