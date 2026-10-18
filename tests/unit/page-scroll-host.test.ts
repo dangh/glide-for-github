@@ -398,12 +398,11 @@ describe('page scroll channel', () => {
     const a = channel(scroll);
     a.port.postMessage({ type: 'extent', extent: 5000 });
     a.port.postMessage({ type: 'scrollTo', top: 300, seq: 7 });
-    await settle();
-    expect(a.received.at(-1)).toMatchObject({ ack: 7 });
+    // Port messages take a task each way: wait for them rather than for a fixed time (slow CI runners).
+    await vi.waitFor(() => expect(a.received.at(-1)).toMatchObject({ ack: 7 }));
 
     const b = channel(scroll);
-    await settle();
-    expect(b.received).toEqual([{ type: 'scroll', top: 300, stuck: true, ack: 0 }]);
+    await vi.waitFor(() => expect(b.received).toEqual([{ type: 'scroll', top: 300, stuck: true, ack: 0 }]));
     scrollBy.mockClear();
     a.port.postMessage({ type: 'scrollBy', dy: 100 });
     await settle();
