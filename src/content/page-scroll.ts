@@ -1,7 +1,7 @@
 /**
  * The page's side of page scrolling (see src/shared/page-scroll.ts): the sticky iframe in its tall wrapper, GitHub's
  * sticky PR header (measured in `page`, hidden in `merged`), GitHub's footer (hidden: like GitHub's own Files changed
- * page, the page ends with the diffs), and the scroll channel to the viewer.
+ * page, the page ends with the diffs), the page's rubber band (off), and the scroll channel to the viewer.
  */
 import {
   listScroll,
@@ -20,7 +20,7 @@ export interface PageScroll {
   connect(port: MessagePort): void;
   /** After GitHub changed the page: re-finds its sticky header (re-hiding a re-rendered one in `merged`) and footer. */
   refresh(): void;
-  /** Stops listening, closes the channel and shows GitHub's header and footer again. The caller removes the wrapper. */
+  /** Stops listening, closes the channel and restores what it restyled on GitHub's page. The caller removes the wrapper. */
   dispose(): void;
 }
 
@@ -50,8 +50,8 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
    */
   let measured: { header: HTMLElement | null; width: number; height: number } | null = null;
   let resizeFrame = 0;
-  /** GitHub's elements hidden here (footer; header in `merged`), with their inline style to restore. */
-  const hidden = new Map<HTMLElement, string | null>();
+  /** GitHub's elements restyled here (hidden footer, `merged` header; the root) and their inline style to restore. */
+  const restyled = new Map<HTMLElement, string | null>();
 
   const layoutSizes = () => {
     const sizes = stickySizes(stickTop, extent);
@@ -68,12 +68,13 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
     port.postMessage({ type: 'scroll', top, stuck, ack: lastAck } satisfies PageScrollMessage);
   };
 
-  const hide = (header: HTMLElement) => {
-    if (!hidden.has(header)) hidden.set(header, header.getAttribute('style'));
-    if (header.style.getPropertyPriority('display') !== 'important' || header.style.display !== 'none') {
-      header.style.setProperty('display', 'none', 'important');
+  const restyle = (el: HTMLElement, property: string, value: string) => {
+    if (!restyled.has(el)) restyled.set(el, el.getAttribute('style'));
+    if (el.style.getPropertyPriority(property) !== 'important' || el.style.getPropertyValue(property) !== value) {
+      el.style.setProperty(property, value, 'important');
     }
   };
+  const hide = (el: HTMLElement) => restyle(el, 'display', 'none');
 
   /** Where the iframe sticks: below GitHub's header, at 0 when it is hidden, else below any bar pinned to the top. */
   const measureStickTop = (): number => {
@@ -136,6 +137,10 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
     sendScroll();
   };
 
+  // No rubber band on the page (macOS): while one animates, Chrome pulls the page back to its edge every frame
+  // (ElasticOverscrollController::ReconcileStretchAndScroll), so a list scroll the page follows meanwhile, like
+  // flicking back up right after flicking past the end, would be pulled back, and the list with it.
+  restyle(doc.documentElement, 'overscroll-behavior-y', 'none');
   stickTop = measureStickTop();
   layoutSizes();
   win.addEventListener('scroll', onScroll, { passive: true });
@@ -164,11 +169,11 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
         port.close();
         port = null;
       }
-      for (const [el, style] of hidden) {
+      for (const [el, style] of restyled) {
         if (style === null) el.removeAttribute('style');
         else el.setAttribute('style', style);
       }
-      hidden.clear();
+      restyled.clear();
     },
   };
 }
