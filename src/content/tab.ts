@@ -33,6 +33,35 @@ export function findTabNav(doc: Document): HTMLElement | null {
   return findFilesTab(doc)?.closest<HTMLElement>('nav') ?? doc.querySelector<HTMLElement>(NAV_SELECTOR);
 }
 
+/** The changed-files count in a tab: `CounterLabel` (React UI) or `.Counter` (classic). */
+const COUNTER = '[data-component="CounterLabel"], .Counter';
+/** The React UI's screen-reader copy of the count (" (20)"), right after the counter. */
+const HIDDEN_COUNT = /VisuallyHidden/;
+
+/** The count and its screen-reader copy from Files changed, as copies for the Glide tab (no ids). */
+function copyCounter(files: HTMLAnchorElement): Element[] {
+  const counter = files.querySelector(COUNTER);
+  if (!counter) return [];
+  const hidden = counter.nextElementSibling;
+  const parts = hidden && HIDDEN_COUNT.test(hidden.className) ? [counter, hidden] : [counter];
+  return parts.map((part) => {
+    const copy = part.cloneNode(true) as Element;
+    copy.removeAttribute('id');
+    copy.setAttribute('data-pierre-counter', '');
+    return copy;
+  });
+}
+
+/** Keeps the Glide tab's count equal to Files changed's (GitHub updates it, e.g. after a push). */
+function syncCounter(tab: HTMLAnchorElement, files: HTMLAnchorElement): void {
+  const ours = tab.querySelectorAll('[data-pierre-counter]');
+  const theirs = copyCounter(files);
+  if (ours.length !== theirs.length || [...ours].some((e, i) => e.textContent !== theirs[i]!.textContent)) {
+    ours.forEach((e) => e.remove());
+    tab.append(...theirs);
+  }
+}
+
 function createTab(doc: Document, files: HTMLAnchorElement, ref: PrRef): HTMLAnchorElement {
   const tab = doc.createElement('a');
   tab.className = [...files.classList].filter((c) => !SELECTED_CLASS.test(c)).join(' ');
@@ -55,7 +84,7 @@ function createTab(doc: Document, files: HTMLAnchorElement, ref: PrRef): HTMLAnc
   path.setAttribute('d', 'M7 1.5H8.5V4.5H13L12.25 6H8.5V9H7V6H2L2.75 4.5H7ZM3 11H10V8.5L14.5 11.75L10 15V12.5H2.25Z');
   icon.append(path);
 
-  tab.append(icon, BRAND.short);
+  tab.append(icon, BRAND.short, ...copyCounter(files));
   return tab;
 }
 
@@ -74,6 +103,7 @@ export function injectTab(doc: Document, ref: PrRef): HTMLAnchorElement | null {
   }
   if (!tab) tab = createTab(doc, files, ref);
   if (tab.getAttribute('href') !== glideUrl(ref)) tab.setAttribute('href', glideUrl(ref));
+  syncCounter(tab, files);
   if (files.nextElementSibling !== tab) files.after(tab);
   return tab;
 }

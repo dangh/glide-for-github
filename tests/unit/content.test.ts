@@ -52,15 +52,11 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
   });
 
   describe('injectTab', () => {
-    it('draws the Glide mark (a "G" arc with two streaks) in the tab, not the old diamond', () => {
-      const ds = [...injectTab(document, ref)!.querySelectorAll('svg path')].map((p) => p.getAttribute('d') ?? '');
-      expect(ds.some((d) => /A\d/.test(d))).toBe(true);
-      expect(ds.join(' ')).not.toContain('M8 1.5');
-      // Stroked on the paths themselves, so GitHub's octicon `fill: currentColor` cannot turn the G into a blob.
-      for (const p of injectTab(document, ref)!.querySelectorAll('svg path')) {
-        expect(p.getAttribute('fill')).toBe('none');
-        expect(p.getAttribute('stroke')).toBe('currentColor');
-      }
+    it('draws the Glide mark (a diff "+" over an arrow) as one filled path in the tab color', () => {
+      const paths = [...injectTab(document, ref)!.querySelectorAll('svg path')];
+      expect(paths).toHaveLength(1);
+      expect(paths[0]!.getAttribute('d')).toMatch(/^M7 1\.5H8\.5/);
+      expect(paths[0]!.getAttribute('fill')).toBe('currentColor');
     });
 
     it('inserts the Glide tab directly after Files changed', () => {
@@ -73,7 +69,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
       expect(tab!.hasAttribute('data-pierre-tab')).toBe(true);
     });
 
-    it('copies the tab classes but not selection, id or counters', () => {
+    it('copies the tab classes but not selection or id', () => {
       const tab = injectTab(document, ref)!;
       const files = document.querySelector(filesTab)!;
       expect(tab.id).toBe('');
@@ -81,7 +77,26 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
       expect(tab.className).not.toMatch(/selected/);
       const filesClasses = [...files.classList].filter((c) => !/^selected/.test(c));
       for (const c of filesClasses) expect(tab.classList.contains(c)).toBe(true);
-      expect(tab.querySelector('[class*="Counter"]')).toBeNull();
+    });
+
+    it("shows Files changed's file count (and its screen-reader copy), without its id", () => {
+      const tab = injectTab(document, ref)!;
+      const files = document.querySelector(filesTab)!;
+      const count = files.querySelector('[data-component="CounterLabel"], .Counter')!.textContent;
+      const counter = tab.querySelector('[data-pierre-counter]')!;
+      expect(counter.textContent).toBe(count);
+      expect(counter.id).toBe('');
+      expect(tab.textContent!.replace(/\s+/g, ' ')).toContain(`Glide${count}`);
+      if (files.querySelector('[class*="VisuallyHidden"]')) expect(tab.querySelectorAll('[data-pierre-counter]')).toHaveLength(2);
+    });
+
+    it('follows Files changed when GitHub updates its count', () => {
+      const tab = injectTab(document, ref)!;
+      const counter = document.querySelector(filesTab)!.querySelector('[data-component="CounterLabel"], .Counter')!;
+      counter.textContent = '21';
+      injectTab(document, ref);
+      expect(tab.querySelector('[data-pierre-counter]')!.textContent).toBe('21');
+      expect(tab.querySelectorAll('[data-pierre-counter]').length).toBeLessThanOrEqual(2);
     });
 
     it('is idempotent', () => {
