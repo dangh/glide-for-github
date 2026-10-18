@@ -99,7 +99,7 @@ import type {
   FileTreeSearchBlurBehavior,
   FileTreeSearchMode,
 } from '@pierre/trees';
-import { GITHUB_CHANGE_CSS, GITHUB_TREE, resolveDiff } from './github-defaults';
+import { DIFF_CSS, GITHUB_CHANGE_CSS, GITHUB_TREE, resolveDiff } from './github-defaults';
 import { GITHUB_TREE_CSS, GITHUB_TREE_ICONS } from './github-tree-icons';
 
 // ---------------------------------------------------------------------------------------------------------
@@ -617,8 +617,8 @@ export function onSettingsChange(cb: (settings: DisplaySettings) => void): () =>
  * Options for the React `CodeView`, with every 'default' resolved to GitHub's look (./github-defaults.ts).
  * `preferredHighlighter` is fixed to 'shiki-js' (global constraint: no WASM) and is deliberately not a setting.
  * Viewer-owned options (lineAnnotations, enableGutterUtility, enableLineSelection, collapsed, callbacks) are not
- * set here; spread this and add them. `unsafeCSS` is a fixed string (never user text): with GitHub's change colors
- * it makes Pierre use the colors as they are instead of mixing them into the background.
+ * set here; spread this and add them. `unsafeCSS` is a fixed string (never user text): aligned line numbers and no
+ * padding under the last line, plus, with GitHub's change colors, Pierre using the colors as they are.
  */
 export function toDiffOptions<LAnnotation = undefined, Caret = undefined>(
   s: DisplaySettings,
@@ -645,7 +645,7 @@ export function toDiffOptions<LAnnotation = undefined, Caret = undefined>(
     maxLineDiffLength: d.maxLineDiffLength,
     layout: { gap: d.layoutGap, paddingTop: d.layoutPaddingTop, paddingBottom: d.layoutPaddingBottom },
     preferredHighlighter: 'shiki-js',
-    ...(s.diff.changeColors === DEFAULT_CHOICE ? { unsafeCSS: GITHUB_CHANGE_CSS } : {}),
+    unsafeCSS: s.diff.changeColors === DEFAULT_CHOICE ? `${DIFF_CSS}\n${GITHUB_CHANGE_CSS}` : DIFF_CSS,
   };
 }
 

@@ -123,9 +123,23 @@ const COLOR_VARS: Record<string, keyof typeof GITHUB_COLORS> = {
 /**
  * Diff `unsafeCSS` for GitHub's colors. Pierre uses the line/number overrides as a mix target (88-91% background,
  * the rest override), which would turn #dafbe1 nearly white; on change rows (code and gutter) the mix is set to
- * 0% so the override is the color. Hover and selection still mix on top as usual.
+ * 0% so the override is the color. Hover and selection still mix on top as usual. GitHub's gutter also meets the
+ * code with no seam, where Pierre draws a 2 px background-colored border.
  */
-export const GITHUB_CHANGE_CSS = `[data-background] [data-line-type^='change-'] { --mix-light: 0%; --mix-dark: 0%; }`;
+export const GITHUB_CHANGE_CSS = `[data-background] [data-line-type^='change-'] { --mix-light: 0%; --mix-dark: 0%; }
+[data-diff] { --diffs-gap-style: none; }`;
+
+/**
+ * Diff `unsafeCSS` for every look. Line numbers get a 4-digit column in every file (Pierre sizes it per file, so
+ * files of different lengths would not line up). Wrapped files end on their last line like GitHub's: Pierre
+ * otherwise keeps 8 px under every file, a 6 px horizontal scrollbar strip plus padding, though a wrapped line can't
+ * scroll sideways. Scrolling files keep it (it holds their scrollbar). Must match `filePaddingBottom`.
+ */
+export const DIFF_CSS = `[data-diff] { --diffs-min-number-column-width: 4ch; }
+[data-overflow='wrap'], [data-overflow='wrap'] [data-code] { --diffs-scrollbar-gutter: 0px; padding-bottom: 0; }`;
+
+/** CodeView `itemMetrics.paddingBottom` (its height estimate for the space under a file) matching DIFF_CSS. */
+export const filePaddingBottom = (overflow: 'wrap' | 'scroll'): number => (overflow === 'wrap' ? 0 : 8);
 
 /** GitHub's Primer font stacks and sizes. */
 export const GITHUB_FONTS = Object.freeze({

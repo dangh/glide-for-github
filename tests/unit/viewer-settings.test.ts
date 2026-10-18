@@ -88,6 +88,13 @@ describe('viewer settings identity', () => {
     expect(itemMetricsFor(20)).toBe(ITEM_METRICS);
   });
 
+  it('estimates no space under wrapped files and Pierre\'s 8 px scrollbar strip under scrolling ones', () => {
+    const build = createDiffOptionsBuilder();
+    expect(build(DEFAULT_SETTINGS.diff, undefined).itemMetrics).toMatchObject({ paddingBottom: 0 });
+    expect(build({ ...DEFAULT_SETTINGS.diff, overflow: 'scroll' }, undefined).itemMetrics).toMatchObject({ paddingBottom: 8 });
+    expect(build({ ...DEFAULT_SETTINGS.diff, overflow: 'wrap' }, undefined).itemMetrics).toBe(ITEM_METRICS);
+  });
+
   it('reconcileSettings keeps section identity when values are equal', () => {
     const prev = structuredClone(DEFAULT_SETTINGS) as DisplaySettings;
     const same = structuredClone(prev);

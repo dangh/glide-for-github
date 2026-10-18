@@ -2,6 +2,7 @@
 import type { FileDiffContentsLoader } from '@pierre/diffs';
 import type { GitStatusEntry } from '@pierre/trees';
 import type { CodeViewReactOptions } from '@pierre/diffs/react';
+import { filePaddingBottom, resolveDiffChoice } from '../../shared/github-defaults';
 import { DEFAULT_SETTINGS, toDiffOptions, type DiffSettings } from '../../shared/settings';
 import type { PrRef } from '../../shared/pr-url';
 import type { FileSummary } from '../github/private';
@@ -15,16 +16,19 @@ export const HEADER_HEIGHT = 40;
 /** Pierre's default code row height (`--diffs-line-height`), GitHub's 20 px at the default 12 px font. */
 export const DEFAULT_LINE_HEIGHT = 20;
 
-const metricsByLineHeight = new Map<number, Readonly<{ diffHeaderHeight: number; lineHeight: number }>>();
+type Overflow = 'wrap' | 'scroll';
+const metricsByKey = new Map<string, Readonly<{ diffHeaderHeight: number; lineHeight: number; paddingBottom: number }>>();
 
 /**
- * CodeView `itemMetrics` for a code row height. CodeView estimates rows it does not measure (overflow 'scroll'
- * without annotations) at `lineHeight`, so it must match `--diffs-line-height` (github-defaults.ts toStyleVars).
- * One frozen object per height, so CodeView's option comparison sees no change while the height stays.
+ * CodeView `itemMetrics` for a code row height and overflow. CodeView estimates rows it does not measure (overflow
+ * 'scroll' without annotations) at `lineHeight`, so it must match `--diffs-line-height` (github-defaults.ts
+ * toStyleVars), and the space under each file at `paddingBottom`, which DIFF_CSS sets per overflow.
+ * One frozen object per pair, so CodeView's option comparison sees no change while they stay.
  */
-export function itemMetricsFor(lineHeight: number) {
-  let m = metricsByLineHeight.get(lineHeight);
-  if (!m) metricsByLineHeight.set(lineHeight, (m = Object.freeze({ diffHeaderHeight: HEADER_HEIGHT, lineHeight })));
+export function itemMetricsFor(lineHeight: number, overflow: Overflow = 'wrap') {
+  const key = `${lineHeight}:${overflow}`;
+  let m = metricsByKey.get(key);
+  if (!m) metricsByKey.set(key, (m = Object.freeze({ diffHeaderHeight: HEADER_HEIGHT, lineHeight, paddingBottom: filePaddingBottom(overflow) })));
   return m;
 }
 
@@ -68,7 +72,7 @@ export function createDiffOptionsBuilder() {
     const options: DiffViewOptions = {
       ...toDiffOptions<AnnotationMeta>({ ...DEFAULT_SETTINGS, diff }),
       themeType: effectiveThemeType(diff.themeType, colorMode),
-      itemMetrics: itemMetricsFor(lineHeight),
+      itemMetrics: itemMetricsFor(lineHeight, resolveDiffChoice('overflow', diff.overflow)),
       ...(loadDiffFiles ? { loadDiffFiles } : {}),
       ...interactions,
     };

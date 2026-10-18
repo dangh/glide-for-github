@@ -347,12 +347,22 @@ button {
 }
 
 .fh-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
+  border-radius: 6px;
   background: none;
   cursor: pointer;
-  width: 22px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   color: var(--pierre-muted);
+  flex: none;
+}
+
+.fh-chevron:hover {
+  background: light-dark(#818b981f, #656c7633);
 }
 
 .fh-badge {

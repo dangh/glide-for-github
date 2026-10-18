@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  DIFF_CSS,
   GITHUB_CHANGE_CSS,
   GITHUB_COLORS,
   GITHUB_DIFF,
@@ -156,10 +157,10 @@ describe('GitHub tree icons', () => {
     }
   });
 
-  it("draws folders like GitHub: chevron + octicon folder in one 32x16 icon (open: chevron-down + open folder)", () => {
-    expect(resolveIcon('file-tree-icon-chevron')).toMatchObject({ name: 'glide-octicon-folder', width: 32, height: 16, viewBox: '0 0 32 16' });
-    // Both rows get a 32 px icon cell; file icons sit right-aligned, under their sibling folders' icons.
-    expect(GITHUB_TREE_CSS).toMatch(/\[data-item-section="icon"\][^}]*width:\s*32px/);
+  it("draws folders like GitHub: chevron + gap + octicon folder in one 40x16 icon (open: chevron-down + open folder)", () => {
+    expect(resolveIcon('file-tree-icon-chevron')).toMatchObject({ name: 'glide-octicon-folder', width: 40, height: 16, viewBox: '0 0 40 16' });
+    // Both rows get a 40 px icon cell; file icons sit right-aligned, under their sibling folders' icons.
+    expect(GITHUB_TREE_CSS).toMatch(/\[data-item-section="icon"\][^}]*width:\s*40px/);
     const sprite = GITHUB_TREE_ICONS.spriteSheet!;
     expect(sprite).toContain('id="glide-octicon-file"');
     expect(sprite).toContain('id="glide-octicon-folder"');
@@ -203,9 +204,11 @@ describe('names our fixed Pierre CSS relies on (guards drift on @pierre upgrades
   const trees = pierreDist('trees');
 
   it('the diff unsafeCSS and the style variables exist in @pierre/diffs', () => {
-    const names = [...cssNames(GITHUB_CHANGE_CSS), 'change-addition', 'change-deletion', 'data-diff-span'];
+    const names = [...cssNames(GITHUB_CHANGE_CSS), ...cssNames(DIFF_CSS), 'change-addition', 'change-deletion', 'data-diff-span'];
     for (const v of Object.keys(toStyleVars(DEFAULT_SETTINGS))) if (v.startsWith('--diffs-')) names.push(v);
-    expect(names).toEqual(expect.arrayContaining(['--mix-light', '--mix-dark', 'data-line-type', 'data-background', '--diffs-line-height']));
+    expect(names).toEqual(
+      expect.arrayContaining(['--mix-light', '--mix-dark', 'data-line-type', 'data-background', '--diffs-line-height', '--diffs-gap-style', '--diffs-min-number-column-width', '--diffs-scrollbar-gutter', 'data-overflow', 'data-code']),
+    );
     for (const name of names) expect(diffs.includes(name), name).toBe(true);
   });
 

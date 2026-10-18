@@ -22,7 +22,7 @@ import {
   type DisplaySettings,
   type SettingsStorage,
 } from '../../src/shared/settings';
-import { GITHUB_CHANGE_CSS, GITHUB_TREE_CSS, GITHUB_TREE_ICONS } from '../../src/shared/github-defaults';
+import { DIFF_CSS, GITHUB_CHANGE_CSS, GITHUB_TREE_CSS, GITHUB_TREE_ICONS } from '../../src/shared/github-defaults';
 
 type Changes = Record<string, { newValue?: unknown; oldValue?: unknown }>;
 type ChangeListener = (changes: Changes, areaName: string) => void;
@@ -644,6 +644,7 @@ describe('toDiffOptions', () => {
       maxLineDiffLength: 2000,
       layout: { gap: 12, paddingTop: 4, paddingBottom: 20 },
       preferredHighlighter: 'shiki-js',
+      unsafeCSS: DIFF_CSS,
     });
     expect(toDiffOptions(s)).not.toHaveProperty('stickyHeader');
   });
@@ -673,12 +674,13 @@ describe('toDiffOptions', () => {
     expect(o.diffStyle).toBe('split');
   });
 
-  it("GitHub change colors ('default') come with the CSS that makes Pierre use them unmixed; 'theme' has none", () => {
+  it("GitHub change colors ('default') add the CSS that makes Pierre use them unmixed and seamless; every look aligns line numbers", () => {
     const github = toDiffOptions(DEFAULT_SETTINGS) as Record<string, unknown>;
-    expect(github.unsafeCSS).toBe(GITHUB_CHANGE_CSS);
+    expect(github.unsafeCSS).toBe(`${DIFF_CSS}\n${GITHUB_CHANGE_CSS}`);
     expect(GITHUB_CHANGE_CSS).toMatch(/--mix-light:\s*0%/);
+    expect(GITHUB_CHANGE_CSS).toMatch(/--diffs-gap-style:\s*none/);
     const theme = toDiffOptions({ ...DEFAULT_SETTINGS, diff: { ...DEFAULT_SETTINGS.diff, changeColors: 'theme' } }) as Record<string, unknown>;
-    expect(theme).not.toHaveProperty('unsafeCSS');
+    expect(theme.unsafeCSS).toBe(DIFF_CSS);
   });
 
   it('does not set options the viewer owns', () => {

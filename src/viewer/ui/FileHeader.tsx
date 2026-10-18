@@ -6,6 +6,7 @@
  * for it and does not measure headers.
  */
 import { memo, useCallback } from 'react';
+import { CHEVRON_DOWN, CHEVRON_RIGHT } from '../../shared/github-tree-icons';
 import { isNoTokenError } from '../auth/requireToken';
 import type { FileSummary } from '../github/private';
 import { fileTarget } from '../state/compose';
@@ -132,7 +133,9 @@ export const FileHeader = memo(function FileHeader({ path }: { path: string }) {
         aria-expanded={!collapsed}
         onClick={toggleCollapsed}
       >
-        {collapsed ? '▸' : '▾'}
+        <svg className="icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+          <path fill="currentColor" d={collapsed ? CHEVRON_RIGHT : CHEVRON_DOWN} />
+        </svg>
       </button>
       <span className={`fh-badge fh-${summary.status}`} title={badge.title}>
         {badge.letter}
