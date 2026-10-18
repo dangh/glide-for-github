@@ -45,7 +45,8 @@ async function positions(page: Page, viewer: Viewer) {
       innerHeight,
       titleBottom: title ? title.getBoundingClientRect().bottom : null,
       sticky: sticky ? { display: getComputedStyle(sticky).display, height: sticky.getBoundingClientRect().height, style: sticky.getAttribute('style') } : null,
-      footerTop: document.querySelector('footer')?.getBoundingClientRect().top ?? null,
+      footerDisplay: (() => { const f = document.querySelector('footer[role="contentinfo"]'); return f ? getComputedStyle(f).display : null; })(),
+      wrapperBottom: wrapper ? wrapper.getBoundingClientRect().bottom : null,
     };
   });
   const inner = await viewer.frame().evaluate(() => {
@@ -159,14 +160,15 @@ test("page scrolling: GitHub's header scrolls away, the tree and file headers st
   expect(back.listTop).toBe(0);
   expect(back.sticky?.display).toBe('none');
 
-  // At the end of the list the wheel goes on to GitHub's footer.
+  // Like GitHub's own Files changed page, the page ends with the diffs: GitHub's footer is hidden.
   await viewer.scrollToFile((await viewer.order()).at(-1)!);
   await page.waitForTimeout(1000);
   await wheel(page, 300, 10);
   const end = await positions(page, viewer);
   expect(end.atBottom).toBe(true);
-  expect(end.footerTop).toBeLessThan(end.innerHeight);
-  await page.screenshot({ path: `${SHOTS}/page-footer.png` });
+  expect(end.footerDisplay).toBe('none');
+  expect(Math.abs(end.wrapperBottom! - end.innerHeight)).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: `${SHOTS}/page-end.png` });
 });
 
 test('page scrolling: a reload comes back to the same file', async ({ page, extContext }) => {

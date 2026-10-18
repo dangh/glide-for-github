@@ -1,6 +1,7 @@
 /**
  * The page's side of page scrolling (see src/shared/page-scroll.ts): the sticky iframe in its tall wrapper, GitHub's
- * sticky PR header (measured in `page`, hidden in `merged`), and the scroll channel to the viewer.
+ * sticky PR header (measured in `page`, hidden in `merged`), GitHub's footer (hidden: like GitHub's own Files changed
+ * page, the page ends with the diffs), and the scroll channel to the viewer.
  */
 import {
   listScroll,
@@ -17,11 +18,14 @@ export interface PageScroll {
   wrapper: HTMLElement;
   /** The page's end of a fresh scroll channel (one per `pierre:port` handshake); the previous one is closed. */
   connect(port: MessagePort): void;
-  /** After GitHub changed the page: re-finds its sticky header (re-hiding a re-rendered one in `merged`). */
+  /** After GitHub changed the page: re-finds its sticky header (re-hiding a re-rendered one in `merged`) and footer. */
   refresh(): void;
-  /** Stops listening, closes the channel and shows GitHub's header again. The caller removes the wrapper. */
+  /** Stops listening, closes the channel and shows GitHub's header and footer again. The caller removes the wrapper. */
   dispose(): void;
 }
+
+/** GitHub's site footer. */
+const FOOTER = 'footer[role="contentinfo"]';
 
 /** A wheel hand-off is dropped while the page has scrolled by itself this recently. */
 const OWN_SCROLL_MS = 200;
@@ -46,7 +50,7 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
    */
   let measured: { header: HTMLElement | null; width: number; height: number } | null = null;
   let resizeFrame = 0;
-  /** Headers hidden in `merged`, with their inline style to restore. */
+  /** GitHub's elements hidden here (footer; header in `merged`), with their inline style to restore. */
   const hidden = new Map<HTMLElement, string | null>();
 
   const layoutSizes = () => {
@@ -73,6 +77,7 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
 
   /** Where the iframe sticks: below GitHub's header, at 0 when it is hidden, else below any bar pinned to the top. */
   const measureStickTop = (): number => {
+    for (const footer of doc.querySelectorAll<HTMLElement>(FOOTER)) hide(footer);
     const header = findStickyHeader(anchor);
     if (header && layout === 'merged') {
       hide(header);

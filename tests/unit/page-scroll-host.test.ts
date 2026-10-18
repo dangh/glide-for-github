@@ -182,6 +182,41 @@ describe('page layout', () => {
     host.unmount();
   });
 
+  it("hides GitHub's footer while mounted, like GitHub's own Files changed page, and restores it exactly", () => {
+    const addFooter = () => {
+      const footer = document.createElement('footer');
+      footer.setAttribute('role', 'contentinfo');
+      footer.setAttribute('style', 'color: gray;');
+      document.body.append(footer);
+      return footer;
+    };
+    const footer = addFooter();
+    const before = document.body.innerHTML;
+    const host = mountViewer(document, ref, 'page');
+    expect(footer.style.getPropertyValue('display')).toBe('none');
+    expect(footer.style.getPropertyPriority('display')).toBe('important');
+
+    // GitHub re-rendered its footer: the new one is hidden too.
+    footer.remove();
+    const again = addFooter();
+    host.refresh();
+    expect(again.style.getPropertyValue('display')).toBe('none');
+
+    host.unmount();
+    expect(again.getAttribute('style')).toBe('color: gray;');
+    again.replaceWith(footer);
+    expect(document.body.innerHTML).toBe(before);
+  });
+
+  it("leaves GitHub's footer alone in the default layout", () => {
+    const footer = document.createElement('footer');
+    footer.setAttribute('role', 'contentinfo');
+    document.body.append(footer);
+    const host = mountViewer(document, ref);
+    expect(footer.hasAttribute('style')).toBe(false);
+    host.unmount();
+  });
+
   it('sticks at the top when GitHub has no sticky header (no hiding, nothing to measure)', () => {
     const host = mountViewer(document, ref, 'page');
     expect(host.iframe.style.top).toBe('0px');
