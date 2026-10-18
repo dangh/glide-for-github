@@ -36,6 +36,16 @@ export const REVIEW_EVENTS: { event: ReviewEvent; label: string; description: st
   },
 ];
 
+/** GitHub's label; a narrow toolbar shows the noun alone. */
+function SubmitLabel() {
+  return (
+    <span>
+      <span className="submit-verb">Submit </span>
+      <span className="submit-noun">review</span>
+    </span>
+  );
+}
+
 export const ReviewMenu = memo(function ReviewMenu() {
   const pending = usePr((s) => s.pendingReview?.count ?? 0);
   const [open, setOpen] = useState(false);
@@ -47,7 +57,7 @@ export const ReviewMenu = memo(function ReviewMenu() {
   return (
     <div className="popover review-menu" ref={root}>
       <button type="button" className="btn-primary" aria-haspopup="dialog" aria-expanded={open} data-testid="review-button" onClick={() => setOpen((o) => !o)}>
-        {pending > 0 ? `Review (${pending} pending)` : 'Submit review'}
+        {pending > 0 ? `Review (${pending} pending)` : <SubmitLabel />}
         <TriangleDownIcon />
       </button>
       {open && <ReviewPanel close={close} />}

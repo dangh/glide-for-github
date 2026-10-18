@@ -12,7 +12,7 @@ export const CommitRangePicker = memo(function CommitRangePicker() {
   const commits = usePr((s) => s.pr?.commits);
   const range = usePr((s) => s.range);
   const anchor = useRef<number | null>(null);
-  if (!commits) return <span className="pill pill-disabled">All commits</span>;
+  if (!commits) return <span className="pill pill-disabled range-picker">All commits</span>;
   const selected = commitIndexes(commits, range);
 
   return (

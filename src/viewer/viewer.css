@@ -57,8 +57,12 @@ button {
   height: 100%;
 }
 
-/* Toolbar: GitHub's /changes toolbar is 60 px, 28 px controls with 16 px above and below, flush with the content edges. */
+/*
+ * Toolbar: GitHub's /changes toolbar is 60 px, 28 px controls with 16 px above and below, flush with the content edges.
+ * Like GitHub's, it is the container its narrow layouts query: its width without the page gutters.
+ */
 .pierre-toolbar {
+  container: toolbar / inline-size;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -167,27 +171,40 @@ html[data-scroll-layout='merged'] .pierre-app {
   color: var(--pierre-muted);
 }
 
-/* The commit range button's text lines up with the title above it (GitHub's invisible button, 8 px padding). */
 .pr-summary-row {
   display: flex;
   align-items: center;
   min-width: 0;
-  height: 28px;
-  margin: -4px 0 0 -8px;
 }
 
-.pr-summary-row .range-picker > .pill {
-  background: none;
-  border-color: transparent;
-  box-shadow: none;
+/* The commit range button's text lines up with the title above it (GitHub's invisible button, 8 px padding). */
+@container toolbar (width >= 768px) {
+  .pr-summary-row {
+    height: 28px;
+    margin: -4px 0 0 -8px;
+  }
+
+  .pr-summary-row .range-picker > .pill {
+    background: none;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .pr-summary-row .range-picker > .pill > .icon:first-child {
+    display: none;
+  }
+
+  .pr-summary-row .range-picker > .pill:hover {
+    background: light-dark(#818b9826, #656c7633);
+  }
 }
 
-.pr-summary-row .range-picker > .pill > .icon:first-child {
-  display: none;
-}
-
-.pr-summary-row .range-picker > .pill:hover {
-  background: light-dark(#818b9826, #656c7633);
+/* Narrower, GitHub's sticky bar keeps only the commit range button, as the toolbar shows it before sticking. */
+@container toolbar (width <= 767px) {
+  .pr-state,
+  .pr-title-row {
+    display: none;
+  }
 }
 
 /* GitHub shows the branch summary from 1012 px. */
@@ -421,6 +438,33 @@ html:not([data-viewport~='lg']) .viewed-word {
 .btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/*
+ * GitHub's narrow toolbar (after the controls' own display rules): "Review" for "Submit review", no commit range from 544 px down, no viewed counter from
+ * 500 px down. Split/Unified, Wrap and Hide whitespace (not on GitHub's toolbar) stay in the Display menu.
+ */
+@container toolbar (width <= 767px) {
+  .diff-toggle,
+  .submit-verb {
+    display: none;
+  }
+
+  .submit-noun {
+    text-transform: capitalize;
+  }
+}
+
+@container toolbar (width <= 544px) {
+  .range-picker {
+    display: none;
+  }
+}
+
+@container toolbar (width <= 500px) {
+  .viewed-counter {
+    display: none;
+  }
 }
 
 /* Popovers */

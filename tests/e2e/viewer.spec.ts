@@ -348,6 +348,33 @@ test.describe('sandbox PR', () => {
     await expect.poll(async () => { const s = await sides(); return s.tree < s.main; }).toBe(true);
   });
 
+  test("a narrow toolbar drops controls like GitHub's and keeps its actions on screen", async ({ page }) => {
+    const viewer = await openPierre(page, SANDBOX, 'hash');
+    await resetSettings(viewer);
+    const toolbar = () =>
+      viewer.frame().evaluate(() => {
+        const shown = (s: string) => (document.querySelector(s)?.getClientRects().length ?? 0) > 0;
+        const review = document.querySelector<HTMLElement>('[data-testid="review-button"]')!;
+        const gear = document.querySelector('[data-testid="display-menu"]')!.getBoundingClientRect();
+        return {
+          toggles: shown('.diff-toggle'),
+          range: shown('[data-testid="range-picker"]'),
+          viewed: shown('[data-testid="viewed-counter"]'),
+          review: review.innerText,
+          fits: gear.right <= document.documentElement.clientWidth,
+        };
+      });
+    try {
+      await expect.poll(toolbar).toEqual({ toggles: true, range: true, viewed: true, review: 'Submit review', fits: true });
+      await page.setViewportSize({ width: 600, height: 900 });
+      await expect.poll(toolbar).toEqual({ toggles: false, range: true, viewed: true, review: 'Review', fits: true });
+      await page.setViewportSize({ width: 500, height: 900 });
+      await expect.poll(toolbar).toEqual({ toggles: false, range: false, viewed: false, review: 'Review', fits: true });
+    } finally {
+      await page.setViewportSize({ width: 1400, height: 900 });
+    }
+  });
+
   test("the file tree button hides and shows the tree like GitHub's, and is remembered", async ({ page }) => {
     let viewer = await openPierre(page, SANDBOX, 'hash');
     await resetSettings(viewer);

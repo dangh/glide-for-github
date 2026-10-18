@@ -1,10 +1,11 @@
 /**
  * Toolbar, laid out like GitHub's Files changed toolbar: file tree button, commit range, then viewed counter, Submit
  * review and the Display (settings) button; with the tree on the right, its button ends the toolbar instead. Outside
- * the merged bar, Split/Unified, Wrap and Hide whitespace sit after the commit range. With the merged bar
- * (page-scrolling experiment) the toolbar has no such toggles (they are in the Display menu, as on GitHub), and while
- * GitHub's title is scrolled away it shows GitHub's sticky PR header instead of the commit range: state label, then
- * title and number above the commit range and branch summary.
+ * the merged bar, Split/Unified, Wrap and Hide whitespace sit after the commit range while the toolbar is wide enough
+ * (they are also in the Display menu). With the merged bar (page-scrolling experiment) the toolbar has no such toggles,
+ * as on GitHub, and while GitHub's title is scrolled away it shows GitHub's sticky PR header instead of the commit
+ * range: state label, then title and number above the commit range and branch summary.
+ * What a narrow toolbar drops follows GitHub's container queries (viewer.css).
  * Each control subscribes to its own slice, so diff loading never re-renders the toolbar.
  */
 import { memo, useEffect, useState, type ReactNode } from 'react';
@@ -162,7 +163,7 @@ const DiffStyleToggle = memo(function DiffStyleToggle() {
   const diffStyle = useSettings((s) => resolveDiffChoice('diffStyle', s.settings.diff.diffStyle));
   const update = useSettings((s) => s.update);
   return (
-    <span className="seg" role="group" aria-label="Diff layout">
+    <span className="seg diff-toggle" role="group" aria-label="Diff layout">
       <button className={`pill ${diffStyle === 'split' ? 'pill-on' : ''}`} aria-pressed={diffStyle === 'split'} onClick={() => update({ diff: { diffStyle: 'split' } })}>
         Split
       </button>
@@ -181,7 +182,7 @@ const WrapToggle = memo(function WrapToggle() {
   const wrap = useSettings((s) => resolveDiffChoice('overflow', s.settings.diff.overflow) === 'wrap');
   const update = useSettings((s) => s.update);
   return (
-    <button className={`pill ${wrap ? 'pill-on' : ''}`} aria-pressed={wrap} onClick={() => update({ diff: { overflow: wrap ? 'scroll' : 'wrap' } })}>
+    <button className={`pill diff-toggle ${wrap ? 'pill-on' : ''}`} aria-pressed={wrap} onClick={() => update({ diff: { overflow: wrap ? 'scroll' : 'wrap' } })}>
       Wrap
     </button>
   );
@@ -191,7 +192,7 @@ const WhitespaceToggle = memo(function WhitespaceToggle() {
   const hide = useSettings((s) => s.settings.review.hideWhitespace);
   const update = useSettings((s) => s.update);
   return (
-    <button className={`pill ${hide ? 'pill-on' : ''}`} aria-pressed={hide} onClick={() => update({ review: { hideWhitespace: !hide } })}>
+    <button className={`pill diff-toggle ${hide ? 'pill-on' : ''}`} aria-pressed={hide} onClick={() => update({ review: { hideWhitespace: !hide } })}>
       Hide whitespace
     </button>
   );
