@@ -120,7 +120,7 @@ describe('viewer settings identity', () => {
     const withFonts = reconcileSettings(merged, fonts);
     expect(withFonts.fonts).toBe(fonts.fonts);
     expect(withFonts.diff).toBe(prev.diff);
-    const layout = { ...withFonts, layout: { treePosition: 'right' as const } };
+    const layout = { ...withFonts, layout: { treePosition: 'right' as const, showTree: true } };
     expect(reconcileSettings(withFonts, layout).layout).toBe(layout.layout);
     expect(SETTINGS_STORAGE_KEY).toBe('pierre.settings');
   });

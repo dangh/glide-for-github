@@ -113,7 +113,7 @@ describe('DEFAULT_SETTINGS', () => {
         showGitStatus: false,
       },
       fonts: { codeFontFamily: '', uiFontFamily: '', codeFontSize: 'default', codeFontFeatures: '' },
-      layout: { treePosition: 'left' },
+      layout: { treePosition: 'left', showTree: true },
       review: { hideWhitespace: false },
       experiments: { pageScroll: false, mergedBar: false },
       github: { replaceFilesTab: false },
@@ -346,14 +346,14 @@ describe('loadSettings', () => {
     fake.data[SETTINGS_STORAGE_KEY] = {
       diff: { changeColors: 'pink', fileHeaderStyle: 'github' },
       tree: { showGitStatus: 'yes' },
-      layout: { treePosition: 'top' },
+      layout: { treePosition: 'top', showTree: 'no' },
       fonts: { codeFontSize: 7, codeFontFamily: 12, uiFontFamily: null, codeFontFeatures: [] },
     };
     const s = await loadSettings();
     expect(s.diff.changeColors).toBe('default');
     expect(s.diff.fileHeaderStyle).toBe('default');
     expect(s.tree.showGitStatus).toBe(false);
-    expect(s.layout.treePosition).toBe('left');
+    expect(s.layout).toEqual({ treePosition: 'left', showTree: true });
     expect(s.fonts).toEqual(DEFAULT_SETTINGS.fonts);
   });
 
@@ -361,13 +361,13 @@ describe('loadSettings', () => {
     fake.data[SETTINGS_STORAGE_KEY] = {
       diff: { changeColors: 'theme', fileHeaderStyle: 'pierre' },
       tree: { showGitStatus: true },
-      layout: { treePosition: 'right' },
+      layout: { treePosition: 'right', showTree: false },
       fonts: { codeFontSize: 14, codeFontFamily: '"JetBrains Mono", monospace', uiFontFamily: 'Inter, sans-serif', codeFontFeatures: '"calt" 0, "liga" 1' },
     };
     const s = await loadSettings();
     expect(s.diff).toMatchObject({ changeColors: 'theme', fileHeaderStyle: 'pierre' });
     expect(s.tree.showGitStatus).toBe(true);
-    expect(s.layout.treePosition).toBe('right');
+    expect(s.layout).toEqual({ treePosition: 'right', showTree: false });
     expect(s.fonts).toEqual({ codeFontSize: 14, codeFontFamily: '"JetBrains Mono", monospace', uiFontFamily: 'Inter, sans-serif', codeFontFeatures: '"calt" 0, "liga" 1' });
   });
 

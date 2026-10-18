@@ -348,6 +348,35 @@ test.describe('sandbox PR', () => {
     await expect.poll(async () => { const s = await sides(); return s.tree < s.main; }).toBe(true);
   });
 
+  test("the file tree button hides and shows the tree like GitHub's, and is remembered", async ({ page }) => {
+    let viewer = await openPierre(page, SANDBOX, 'hash');
+    await resetSettings(viewer);
+    const toggle = () => viewer.locator.getByTestId('tree-toggle');
+    const layout = () =>
+      viewer.frame().evaluate(() => ({
+        treeShown: getComputedStyle(document.querySelector('.pierre-tree-pane')!).display !== 'none',
+        firstBoxX: document.querySelector('diffs-container')!.getBoundingClientRect().x,
+        toolbarX: document.querySelector('.pierre-toolbar')!.getBoundingClientRect().x,
+      }));
+    await expect(toggle()).toHaveAttribute('aria-label', 'Collapse file tree');
+    expect((await layout()).treeShown).toBe(true);
+
+    await toggle().click();
+    await expect(toggle()).toHaveAttribute('aria-label', 'Expand file tree');
+    await expect.poll(async () => (await layout()).treeShown).toBe(false);
+    // Like GitHub with its tree collapsed, the file boxes start where the toolbar does.
+    const collapsed = await layout();
+    expect(Math.abs(collapsed.firstBoxX - collapsed.toolbarX)).toBeLessThanOrEqual(1);
+
+    viewer = await openPierre(page, SANDBOX, 'hash');
+    await expect(toggle()).toHaveAttribute('aria-expanded', 'false');
+    expect((await layout()).treeShown).toBe(false);
+
+    await toggle().click();
+    await expect.poll(async () => (await layout()).treeShown).toBe(true);
+    await resetSettings(viewer);
+  });
+
   test('clicking the GitHub page around the viewer closes the Display menu', async ({ page }) => {
     const viewer = await openPierre(page, SANDBOX, 'hash');
     const panel = viewer.locator.locator('.display-menu .popover-panel');

@@ -2,7 +2,7 @@
 import { createElement, Profiler } from 'react';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FileSummary, PrData } from '../../src/viewer/github/private';
 import { useSettings } from '../../src/viewer/state/settings';
 import { usePageScroll } from '../../src/viewer/pageScroll';
@@ -63,6 +63,31 @@ describe('Toolbar', () => {
     await act(async () => usePr.getState().setViewedLocal('b.ts', true));
     expect(container.querySelector('[data-testid="viewed-counter"]')!.textContent).toBe('2 / 3 viewed');
     await act(async () => root.unmount());
+  });
+
+  it("toggles the file tree like GitHub's button: label, expanded state and the remembered setting", async () => {
+    const saved: unknown[] = [];
+    vi.stubGlobal('chrome', { storage: { sync: { get: async () => ({}), set: async (v: unknown) => void saved.push(v) } } });
+    usePr.getState().setPr(pr);
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(createElement(Toolbar)));
+    const toggle = () => container.querySelector<HTMLButtonElement>('[data-testid="tree-toggle"]')!;
+    expect(useSettings.getState().settings.layout.showTree).toBe(true);
+    expect(toggle().getAttribute('aria-label')).toBe('Collapse file tree');
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+
+    await act(async () => toggle().click());
+    expect(useSettings.getState().settings.layout.showTree).toBe(false);
+    expect(toggle().getAttribute('aria-label')).toBe('Expand file tree');
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+
+    await act(async () => toggle().click());
+    expect(useSettings.getState().settings.layout.showTree).toBe(true);
+    expect(saved.length).toBeGreaterThan(0);
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
   });
 
   it("shows the layout and wrap that 'default' resolves to (GitHub: Unified, wrapped)", async () => {

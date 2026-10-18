@@ -11,7 +11,7 @@ import { useSettings } from '../state/settings';
 import { usePr } from '../state/store';
 import { CommitRangePicker } from './CommitRangePicker';
 import { DisplayMenu } from './DisplayMenu';
-import { ProgressRing } from './icons';
+import { ProgressRing, SidebarCollapseIcon, SidebarExpandIcon } from './icons';
 import { ReviewMenu } from './ReviewMenu';
 
 const STATE_LABELS: Record<PrState, string> = { open: 'Open', closed: 'Closed', merged: 'Merged' };
@@ -38,6 +38,26 @@ const PrTitle = memo(function PrTitle() {
       </span>
       <span className="pr-number">#{number}</span>
     </span>
+  );
+});
+
+/** GitHub's file tree button: hides or shows the tree pane, remembered like any display setting. */
+const TreeToggle = memo(function TreeToggle() {
+  const shown = useSettings((s) => s.settings.layout.showTree);
+  const update = useSettings((s) => s.update);
+  const label = shown ? 'Collapse file tree' : 'Expand file tree';
+  return (
+    <button
+      type="button"
+      className="tree-toggle"
+      aria-label={label}
+      title={label}
+      aria-expanded={shown}
+      data-testid="tree-toggle"
+      onClick={() => update({ layout: { showTree: !shown } })}
+    >
+      {shown ? <SidebarExpandIcon /> : <SidebarCollapseIcon />}
+    </button>
   );
 });
 
@@ -97,6 +117,7 @@ const ViewedCounter = memo(function ViewedCounter() {
 export const Toolbar = memo(function Toolbar() {
   return (
     <div className="pierre-toolbar" role="toolbar">
+      <TreeToggle />
       <PrTitle />
       <CommitRangePicker />
       <DiffStyleToggle />

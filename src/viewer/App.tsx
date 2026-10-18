@@ -61,6 +61,7 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
   const diffSettings = useSettings((s) => s.settings.diff);
   const themeType = useSettings((s) => effectiveThemeType(s.settings.diff.themeType, s.colorMode));
   const treePosition = useSettings((s) => s.settings.layout.treePosition);
+  const showTree = useSettings((s) => s.settings.layout.showTree);
 
   // The pool is created once settings are known (its initial render options come from them).
   const pool = useMemo(() => (settingsLoaded ? createWorkerPool(useSettings.getState().settings) : undefined), [settingsLoaded]);
@@ -113,7 +114,8 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
         <Toolbar />
         <BatchBar />
         {/* DOM order follows the visual order (tree first or last), so keyboard focus order matches the screen. */}
-        <div className="pierre-body" data-tree-position={treePosition}>
+        {/* A hidden tree stays mounted (display: none), so its expanded folders and filter survive a collapse. */}
+        <div className="pierre-body" data-tree-position={treePosition} data-tree-hidden={showTree ? undefined : ''}>
           {treePosition === 'left' && <TreePane />}
           <main className="pierre-main">{pr && settingsLoaded ? <DiffPane rpc={rpc} /> : <div className="pierre-loading">Loading pull request…</div>}</main>
           {treePosition === 'right' && <TreePane />}

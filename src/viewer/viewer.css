@@ -165,6 +165,27 @@ button {
   opacity: 0.6;
 }
 
+/* GitHub's file tree button (measured on /changes): 28 px, 6 px radius, muted icon, gray while the tree is shown. */
+.tree-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--pierre-muted);
+  cursor: pointer;
+}
+
+.tree-toggle[aria-expanded='true'],
+.tree-toggle:hover {
+  background: light-dark(#818b9826, #656c7633);
+}
+
 .seg {
   display: inline-flex;
 }
@@ -356,6 +377,20 @@ button {
   display: flex;
   flex: 1;
   min-height: 0;
+}
+
+/* The toolbar's file tree button (layout.showTree). */
+.pierre-body[data-tree-hidden] .pierre-tree-pane {
+  display: none;
+}
+
+/* With no tree beside them the diffs start where the toolbar does, like GitHub's with its tree collapsed. */
+.pierre-body[data-tree-hidden] .pierre-diffs {
+  padding-left: 0;
+}
+
+html[data-scroll-layout] .pierre-body[data-tree-hidden] .pierre-diffs {
+  padding-inline: 0;
 }
 
 .pierre-tree-pane {
