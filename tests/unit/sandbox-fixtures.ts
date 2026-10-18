@@ -58,6 +58,8 @@ export function fakeRpc(override?: Override) {
     if (path === `${base}/page_data/threads`) return { data: threads.pages[0].data, link: threads.pages[0].link };
     if (path === `${base}/page_data/thread_previews`) return { data: previews.data, link: null };
     if (path === `${base}/page_data/thread_preview_positioning`) return { data: positioning.data, link: null };
+    // The sandbox PR is in no stack: GitHub's header then has `stack: null` (verified on react/react#37778).
+    if (path === `${base}/page_data/header`) return { data: { featureStates: { pullRequestStacks: 'ENABLED' }, stack: null }, link: null };
     throw { status: 0, code: 'not_allowed', message: `unexpected path ${path}` };
   };
 

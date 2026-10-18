@@ -4,7 +4,9 @@
  * the merged bar, Split/Unified, Wrap and Hide whitespace sit after the commit range while the toolbar is wide enough
  * (they are also in the Display menu). With the merged bar (page-scrolling experiment) the toolbar has no such toggles,
  * as on GitHub, and while GitHub's title is scrolled away it shows GitHub's sticky PR header instead of the commit
- * range: state label, then title and number above the commit range and branch summary.
+ * range: state label, then title and number above the stack button (a PR in a stack), commit range and branch summary.
+ * The stack button is only there: in every other toolbar GitHub's own title or sticky header shows it, as it does above
+ * GitHub's toolbar.
  * What a narrow toolbar drops follows GitHub's container queries (viewer.css).
  * Each control subscribes to its own slice, so diff loading never re-renders the toolbar.
  */
@@ -29,6 +31,7 @@ import {
   SidebarExpandIcon,
 } from './icons';
 import { ReviewMenu } from './ReviewMenu';
+import { StackMenu } from './StackMenu';
 
 /** GitHub's state labels (verified on react/react PRs in each state, 2026-10-19). */
 const STATE_LABELS: Record<PrState, { text: string; icon: ReactNode }> = {
@@ -83,7 +86,7 @@ const BranchSummary = memo(function BranchSummary() {
   const commits = `${branches.commits} ${branches.commits === 1 ? 'commit' : 'commits'}`;
   return (
     <span className="pr-branches" data-testid="pr-branches">
-      <span className="pr-branches-divider" />
+      <span className="summary-divider" />
       <span className="pr-branches-text">
         {actor && (
           <a className="pr-actor" href={github(actor)} target="_top">
@@ -136,6 +139,7 @@ const PrHeader = memo(function PrHeader() {
           <span className="pr-number">#{number}</span>
         </span>
         <span className="pr-summary-row">
+          <StackMenu />
           <CommitRangePicker />
           <BranchSummary />
         </span>

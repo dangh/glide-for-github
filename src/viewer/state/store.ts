@@ -10,7 +10,7 @@
  */
 import type { FileDiffMetadata } from '@pierre/diffs';
 import { create } from 'zustand';
-import type { FileSummary, PrData } from '../github/private';
+import type { FileSummary, PrData, PrStack } from '../github/private';
 import type { DiffSide, ThreadModel } from '../github/threads';
 import type { CommitRange } from './range';
 
@@ -94,6 +94,8 @@ export interface FileLoadResult {
 
 export interface PrState {
   pr: PrData | null;
+  /** The PR's stack (loaded after the PR; null while loading and when the PR is in no stack). */
+  stack: PrStack | null;
   /** File paths in GitHub's order. */
   order: string[];
   /** Current summaries by path (binary/tooLarge/prevPath are updated as entries load). */
@@ -115,6 +117,7 @@ export interface PrState {
   fatal: string | null;
 
   setPr(pr: PrData): void;
+  setStack(stack: PrStack | null): void;
   setFatal(message: string | null): void;
   /** Clears diffs and loading state (range or whitespace changed); summaries and viewed stay. */
   resetDiffs(): void;
@@ -138,6 +141,7 @@ export interface PrState {
 
 const initialData = () => ({
   pr: null,
+  stack: null as PrStack | null,
   order: [] as string[],
   files: new Map<string, FileSummary>(),
   diffs: new Map<string, FileDiffMetadata>(),
@@ -172,6 +176,8 @@ export const createPrStore = () =>
         headMoved: false,
         fatal: null,
       }),
+
+    setStack: (stack) => set({ stack }),
 
     setFatal: (fatal) => set({ fatal }),
 

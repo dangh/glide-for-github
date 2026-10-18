@@ -388,11 +388,14 @@ describe('freshness polling', () => {
       expect(routeCalls).toBeGreaterThan(0); // the commit's own PR reload
       // A reload after a write never takes the route prefetched during page load.
       expect(routeOpts.every((o) => (o as { prefetched?: boolean } | undefined)?.prefetched !== true)).toBe(true);
-      expect(headChecks).toBe(0);
+      // The reload reads the header once for the PR's stack; the head check comes on its own, after the debounce.
+      await vi.advanceTimersByTimeAsync(0);
+      const reloadReads = headChecks;
+      expect(reloadReads).toBe(1);
       await vi.advanceTimersByTimeAsync(2999);
-      expect(headChecks).toBe(0);
+      expect(headChecks).toBe(reloadReads);
       await vi.advanceTimersByTimeAsync(1);
-      expect(headChecks).toBe(1);
+      expect(headChecks).toBe(reloadReads + 1);
       stop();
     });
 

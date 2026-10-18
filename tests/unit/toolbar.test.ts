@@ -3,7 +3,7 @@ import { createElement, Profiler } from 'react';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { FileSummary, PrData } from '../../src/viewer/github/private';
+import type { FileSummary, PrData, PrStack } from '../../src/viewer/github/private';
 import { useSettings } from '../../src/viewer/state/settings';
 import { usePageScroll } from '../../src/viewer/pageScroll';
 import { usePr } from '../../src/viewer/state/store';
@@ -228,6 +228,67 @@ describe('Toolbar', () => {
     await act(async () => usePageScroll.setState({ stuck: false }));
     expect(header()).toBeNull();
     expect(toolbar.querySelector('[data-testid="range-picker"]')).not.toBeNull();
+    await unmount();
+    usePageScroll.setState({ layout: 'frame', stuck: false });
+  });
+
+  it("stuck with the merged bar, a stacked PR shows GitHub's stack button before the commit range; its menu opens each PR in Glide", async () => {
+    const stack: PrStack = {
+      number: 12,
+      position: 2,
+      size: 3,
+      owner: 'o',
+      repo: 'r',
+      base: 'main',
+      pulls: [
+        { number: 3, title: 'Top', headBranch: 'top', state: 'draft' },
+        { number: 1, title: 'Middle', headBranch: 'middle', state: 'open' },
+        { number: 2, title: 'Bottom', headBranch: 'bottom', state: 'merged' },
+      ],
+    };
+    usePr.getState().setPr({ ...pr, title: 'T', state: 'open' });
+    usePr.getState().setStack(stack);
+    const { toolbar, unmount } = await render();
+    const button = () => toolbar.querySelector<HTMLButtonElement>('[data-testid="stack-button"]');
+    // Elsewhere GitHub's own title or sticky header carries the stack button.
+    expect(button()).toBeNull();
+    await act(async () => usePageScroll.setState({ layout: 'page', stuck: true }));
+    expect(button()).toBeNull();
+
+    await act(async () => usePageScroll.setState({ layout: 'merged', stuck: true }));
+    const row = toolbar.querySelector('.pr-summary-row')!;
+    expect([...row.children].map((el) => el.className.split(' ')[0])).toEqual(['popover', 'summary-divider', 'popover']);
+    expect(button()!.textContent).toBe('2/3');
+    expect(button()!.getAttribute('aria-label')).toBe('Navigate pull request stack, position 2 of 3');
+    expect(row.children[2]!.querySelector('[data-testid="range-picker"]')).not.toBeNull();
+
+    await act(async () => button()!.click());
+    const panel = toolbar.querySelector('.stack-menu .popover-panel')!;
+    expect(panel.querySelector('.stack-menu-title')!.textContent).toBe('Stack #12');
+    const entries = [...panel.querySelectorAll<HTMLAnchorElement>('.stack-list a')];
+    expect(entries.map((a) => a.textContent)).toEqual(['Top#3 · top', 'Middle#1 · middle', 'Bottom#2 · bottom']);
+    expect(entries.map((a) => a.getAttribute('href'))).toEqual([
+      'https://github.com/o/r/pull/3#glide',
+      'https://github.com/o/r/pull/1#glide',
+      'https://github.com/o/r/pull/2#glide',
+    ]);
+    expect(entries.every((a) => a.target === '_top')).toBe(true);
+    expect(entries.map((a) => a.getAttribute('aria-current'))).toEqual([null, 'page', null]);
+    expect(entries.map((a) => a.querySelector('.stack-state')!.className)).toEqual([
+      'stack-state stack-state-draft',
+      'stack-state stack-state-open',
+      'stack-state stack-state-merged',
+    ]);
+    expect(document.activeElement).toBe(entries[1]);
+    expect(panel.querySelector('.stack-base')!.textContent).toBe('main');
+
+    // The current PR's entry only closes the menu.
+    await act(async () => entries[1]!.click());
+    expect(toolbar.querySelector('.stack-menu .popover-panel')).toBeNull();
+
+    await act(async () => usePr.getState().setStack(null));
+    expect(button()).toBeNull();
+    expect(toolbar.querySelector('.stack-divider')).toBeNull();
     await unmount();
     usePageScroll.setState({ layout: 'frame', stuck: false });
   });

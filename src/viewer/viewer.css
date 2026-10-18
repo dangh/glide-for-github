@@ -205,9 +205,174 @@ html[data-scroll-layout='merged'] .pierre-app {
 /* Narrower, GitHub's sticky bar keeps only the commit range button, as the toolbar shows it before sticking. */
 @container toolbar (width <= 767px) {
   .pr-state,
-  .pr-title-row {
+  .pr-title-row,
+  .stack-menu,
+  .stack-divider {
     display: none;
   }
+}
+
+/* GitHub's compact stack button (measured on /changes): invisible, muted, a 12 px stack icon. */
+.stack-menu > .pill {
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--pierre-muted);
+}
+
+.stack-menu > .pill:hover {
+  background: light-dark(#818b9826, #656c7633);
+}
+
+/* GitHub's large overlay (480 px): a header, then the stack's PRs, top first, joined by a line down to the base branch. */
+.stack-menu > .popover-panel {
+  width: 480px;
+  max-height: none;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  box-shadow:
+    0 0 0 1px light-dark(rgba(209, 217, 224, 0.25), #3d444d),
+    0 6px 12px -3px light-dark(rgba(37, 41, 46, 0.04), rgba(1, 4, 9, 0.4)),
+    0 6px 18px 0 light-dark(rgba(37, 41, 46, 0.12), rgba(1, 4, 9, 0.4));
+}
+
+.stack-menu-header {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid var(--pierre-border);
+}
+
+.stack-menu-title {
+  flex: 1;
+  padding: 6px 8px;
+  font-weight: 600;
+}
+
+.stack-menu-header .stack-menu-close {
+  width: 32px;
+  height: 32px;
+}
+
+.stack-list {
+  position: relative;
+  max-height: min(438px, 100vh - 160px);
+  overflow-y: auto;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+}
+
+.stack-list li {
+  position: relative;
+}
+
+.stack-list a {
+  display: flex;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+  isolation: isolate;
+}
+
+.stack-list a:hover,
+.stack-list a[aria-current] {
+  background: light-dark(#818b9826, #656c7633);
+}
+
+/* GitHub's current-item bar, in the list's 8 px gutter. */
+.stack-list a[aria-current]::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: -8px;
+  width: 4px;
+  border-radius: 6px;
+  background: light-dark(#0969da, #1f6feb);
+}
+
+/* The line from one PR's state icon down to the next entry. */
+.stack-list a::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 32px;
+  bottom: 0;
+  left: 15px;
+  width: 2px;
+  background: var(--pierre-border);
+}
+
+.stack-state {
+  display: flex;
+  flex: none;
+  width: 16px;
+  height: 20px;
+  align-items: center;
+}
+
+.stack-state-open {
+  color: var(--pierre-success);
+}
+
+.stack-state-draft {
+  color: var(--pierre-muted);
+}
+
+.stack-state-closed {
+  color: var(--pierre-danger);
+}
+
+.stack-state-merged {
+  color: var(--pierre-done);
+}
+
+.stack-state-queued {
+  color: var(--pierre-attention);
+}
+
+.stack-entry {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.stack-entry-title,
+.stack-entry-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stack-entry-title {
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.stack-entry-desc {
+  margin-top: 4px;
+  color: var(--pierre-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.stack-base {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  color: var(--pierre-muted);
+}
+
+.stack-base .branch-name {
+  color: inherit;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 /* GitHub shows the branch summary from 1012 px. */
@@ -223,7 +388,7 @@ html[data-viewport~='lg'] .pr-branches {
   display: flex;
 }
 
-.pr-branches-divider {
+.summary-divider {
   flex: none;
   height: 16px;
   margin: 0 4px;

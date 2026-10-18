@@ -5,12 +5,14 @@ import { useDismiss } from './dismiss';
 export function Popover({
   label,
   title,
+  ariaLabel,
   className,
   testId,
   children,
 }: {
   label: ReactNode;
   title?: string;
+  ariaLabel?: string;
   className?: string;
   testId?: string;
   children: (close: () => void) => ReactNode;
@@ -27,6 +29,7 @@ export function Popover({
         className="pill"
         aria-haspopup="true"
         aria-expanded={open}
+        aria-label={ariaLabel}
         title={title}
         data-testid={testId}
         onClick={() => setOpen((o) => !o)}

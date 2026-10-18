@@ -10,9 +10,11 @@ import {
   fetchDiffs,
   fetchFullFile,
   fetchPrData,
+  fetchStack,
   fetchThreads,
   loadEntryLines,
   nextLink,
+  parseStack,
 } from '../../src/viewer/github/private';
 import { base, decodePathsQuery, fakeRpc, fixture, ref } from './sandbox-fixtures';
 
@@ -358,5 +360,66 @@ describe('fetchThreads', () => {
     expect(nextLink(`<https://github.com${p}?after=x>; rel="prev", <https://github.com${p}?after=y>; rel="next"`, p)).toBe('after=y');
     expect(nextLink(`<${p}?after=z>; rel="next"`, p)).toBe('after=z');
     expect(nextLink(`<https://github.com/evil/x/pull/1/page_data/threads?after=y>; rel="next"`, p)).toBeNull();
+  });
+});
+
+/** `page_data/header` fields GitHub's stack button reads (shape from a live stacked PR; titles and branches invented). */
+const stackHeader = () => ({
+  featureStates: { pullRequestStacks: 'ENABLED', overview: 'UNAVAILABLE' },
+  stack: {
+    id: 1001,
+    number: 12,
+    position: 2,
+    size: 4,
+    baseBranch: 'main',
+    repositoryOwnerLogin: 'o',
+    repositoryName: 'r',
+    createdAt: '2026-10-01T00:00:00Z',
+    allPullsLocked: false,
+    pulls: [
+      { number: 14, title: 'Top', state: 'DRAFT', url: '/o/r/pull/14', headBranch: 'top', headOid: 'a'.repeat(40), isUnstackable: true },
+      { number: 13, title: 'Queued', state: 'QUEUED', url: '/o/r/pull/13', headBranch: 'queued', headOid: 'b'.repeat(40), isUnstackable: true },
+      { number: 11, title: 'Middle', state: 'OPEN', url: '/o/r/pull/11', headBranch: 'middle', headOid: 'c'.repeat(40), isUnstackable: true },
+      { number: 10, title: 'Bottom', state: 'SOMETHING_NEW', url: '/o/r/pull/10', headBranch: 'bottom', headOid: 'd'.repeat(40), isUnstackable: true },
+    ],
+  },
+});
+
+describe('parseStack / fetchStack', () => {
+  it("reads GitHub's stack: position from the bottom, the stack's PRs top first", () => {
+    expect(parseStack(stackHeader())).toEqual({
+      number: 12,
+      position: 2,
+      size: 4,
+      owner: 'o',
+      repo: 'r',
+      base: 'main',
+      pulls: [
+        { number: 14, title: 'Top', headBranch: 'top', state: 'draft' },
+        { number: 13, title: 'Queued', headBranch: 'queued', state: 'queued' },
+        { number: 11, title: 'Middle', headBranch: 'middle', state: 'open' },
+        { number: 10, title: 'Bottom', headBranch: 'bottom' },
+      ],
+    });
+  });
+
+  it('is null when GitHub shows no stack button: no stack, stacks not enabled, or an unknown shape', () => {
+    expect(parseStack({ ...stackHeader(), stack: null })).toBeNull();
+    expect(parseStack({ ...stackHeader(), featureStates: { pullRequestStacks: 'UNAVAILABLE' } })).toBeNull();
+    expect(parseStack({ stack: stackHeader().stack })).toBeNull();
+    const h = stackHeader();
+    h.stack.position = 0;
+    expect(parseStack(h)).toBeNull();
+    const t = stackHeader();
+    (t.stack.pulls[1] as { title: unknown }).title = null;
+    expect(parseStack(t)).toBeNull();
+    expect(parseStack(null)).toBeNull();
+  });
+
+  it('asks page_data/header', async () => {
+    const rpc = fakeRpc((path) => (path === `${base}/page_data/header` ? { data: stackHeader(), link: null } : undefined));
+    expect((await fetchStack(rpc, ref))?.number).toBe(12);
+    expect(rpc.calls).toEqual([{ method: 'get', args: [`${base}/page_data/header`] }]);
+    expect(await fetchStack(fakeRpc(), ref)).toBeNull();
   });
 });

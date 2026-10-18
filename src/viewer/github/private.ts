@@ -48,6 +48,34 @@ export interface PrBranches {
   commits: number;
 }
 
+/** A stacked PR's state, as its stack menu entry shows it; `queued` is GitHub's QUEUED (in the merge queue). */
+export type StackPullState = PrState | 'queued';
+const STACK_PULL_STATES: Record<string, StackPullState> = { ...PR_STATES, QUEUED: 'queued' };
+
+export interface StackPull {
+  number: number;
+  title: string;
+  headBranch: string;
+  /** Undefined for a state GitHub added since (the entry shows no state icon). */
+  state?: StackPullState;
+}
+
+/** The stack a PR belongs to (`page_data/header` → `stack`, R§1.5): GitHub's stack button and menu. */
+export interface PrStack {
+  /** `stack.number`: the menu's "Stack #N". */
+  number: number;
+  /** This PR's place, counted from the bottom of the stack (1 merges into `base`). */
+  position: number;
+  size: number;
+  /** The stack's repository; every PR of a stack is in it. */
+  owner: string;
+  repo: string;
+  /** The branch the bottom PR merges into. */
+  base: string;
+  /** Top of the stack first, as GitHub lists them. */
+  pulls: StackPull[];
+}
+
 export interface PrData {
   ref: PrRef;
   nodeId?: string;
@@ -430,6 +458,36 @@ export async function fetchHeadOid(rpc: Rpc, ref: PrRef): Promise<string> {
   const full = route.comparison?.fullDiff ?? route.pullRequest.comparison;
   if (!full) throw badPayload('route comparison');
   return full.headOid;
+}
+
+const isPosInt = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v > 0;
+const isString = (v: unknown): v is string => typeof v === 'string';
+
+/**
+ * The stack in a `page_data/header` payload, or null when GitHub would show no stack button: no stack, stacks not
+ * enabled for the repository (`featureStates.pullRequestStacks` other than ENABLED), or a shape this does not know.
+ */
+export function parseStack(header: unknown): PrStack | null {
+  const h = header as { featureStates?: { pullRequestStacks?: unknown }; stack?: Record<string, unknown> | null } | null;
+  if (h?.featureStates?.pullRequestStacks !== 'ENABLED' || !h.stack) return null;
+  const { number, position, size, baseBranch, repositoryOwnerLogin, repositoryName, pulls } = h.stack;
+  if (!isPosInt(number) || !isPosInt(position) || !isPosInt(size) || !Array.isArray(pulls)) return null;
+  if (!isString(baseBranch) || !isString(repositoryOwnerLogin) || !isString(repositoryName)) return null;
+  const parsed: StackPull[] = [];
+  for (const p of pulls as Record<string, unknown>[]) {
+    if (!isPosInt(p?.number) || !isString(p.title) || !isString(p.headBranch)) return null;
+    const state = isString(p.state) && Object.hasOwn(STACK_PULL_STATES, p.state) ? STACK_PULL_STATES[p.state] : undefined;
+    parsed.push({ number: p.number, title: p.title, headBranch: p.headBranch, ...(state ? { state } : {}) });
+  }
+  return { number, position, size, owner: repositoryOwnerLogin, repo: repositoryName, base: baseBranch, pulls: parsed };
+}
+
+/**
+ * The PR's stack (`parseStack` of `GET page_data/header`, the request GitHub's stack menu makes). The route JSON has
+ * no stack data. Null when the PR is in no stack.
+ */
+export async function fetchStack(rpc: Rpc, ref: PrRef): Promise<PrStack | null> {
+  return parseStack((await rpc.call('get', `${prPath(ref)}/page_data/header`)).data);
 }
 
 /**

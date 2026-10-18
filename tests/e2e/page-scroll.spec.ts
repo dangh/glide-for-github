@@ -431,3 +431,34 @@ test("merged bar: GitHub's sticky header is hidden, Glide's toolbar shows the ti
     .toEqual({ style: null, display: 'flex' });
   expect(page.url()).toBe(prUrl(REACT));
 });
+
+/** A merged public stack (github/gh-stack's own Stack #530): #529 is 4th of 5, #528 below it. */
+const STACKED = { owner: 'github', repo: 'gh-stack', number: 529 };
+
+test("merged bar: a stacked PR shows GitHub's stack button once stuck; its menu opens another PR of the stack in Glide", async ({ page, extContext }) => {
+  await setExperiments(extContext, { pageScroll: true, mergedBar: true }, page);
+  const viewer = await openPierre(page, STACKED, 'hash');
+  // GitHub's own header carries the button while it is on screen; Glide's bar adds its compact one once stuck.
+  await expect(page.locator('button[aria-label="Navigate pull request stack, position 4 of 5"]').first()).toHaveText('4/5');
+  const button = viewer.locator.getByTestId('stack-button');
+  await expect(button).toHaveCount(0);
+  await page.evaluate(() => window.scrollTo(0, 2000));
+  await expect(button).toHaveText('4/5');
+  await expect(button).toHaveAttribute('aria-label', 'Navigate pull request stack, position 4 of 5');
+
+  await button.click();
+  const entries = viewer.locator.locator('.stack-list a');
+  await expect(viewer.locator.locator('.stack-menu-title')).toHaveText('Stack #530');
+  await expect(entries).toHaveCount(5);
+  await expect(entries.locator('.stack-entry-desc')).toHaveText([/^#521 · /, /^#529 · /, /^#528 · /, /^#527 · /, /^#526 · /]);
+  await expect(entries.nth(1)).toHaveAttribute('aria-current', 'page');
+  await expect(viewer.locator.locator('.stack-base')).toHaveText('main');
+  await page.screenshot({ path: `${SHOTS}/merged-stack-menu.png`, clip: { x: 0, y: 0, width: 800, height: 480 } });
+
+  await entries.nth(2).click();
+  await page.waitForURL('https://github.com/github/gh-stack/pull/528#glide');
+  const next = new Viewer(page);
+  await next.ready();
+  await page.evaluate(() => window.scrollTo(0, 2000));
+  await expect(next.locator.getByTestId('stack-button')).toHaveText('3/5');
+});
