@@ -144,7 +144,10 @@ export function createPageScrollView(win: Window, layout: Exclude<ScrollLayout, 
       applyStyle();
     }
     const handOff = wheelHandOff(gesture.latched, stuck, dy, root.scrollTop, extent);
-    if (handOff !== 0) post({ type: 'scrollBy', dy: handOff });
+    if (handOff === 0) return;
+    // Where the list stopped goes first: its scroll event, still to come, would put the page back after the hand-off.
+    if (Math.abs(root.scrollTop - lastApplied) >= 1) onRootScroll();
+    post({ type: 'scrollBy', dy: handOff });
   };
 
   const onPageMessage = (event: MessageEvent) => {
