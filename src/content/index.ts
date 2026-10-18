@@ -1,9 +1,7 @@
-import { githubSettingsOf } from '../shared/github-settings';
-import { storedLayout } from './layout-source';
 import { createLifecycle } from './lifecycle';
-import { storedSetting } from './setting-source';
+import { storedSettings } from './settings-source';
 
-const lifecycle = createLifecycle(window, storedLayout(), storedSetting((item) => githubSettingsOf(item).replaceFilesTab));
+const lifecycle = createLifecycle(window, storedSettings());
 
 if (document.body) lifecycle.start();
 else document.addEventListener('DOMContentLoaded', () => lifecycle.start(), { once: true });

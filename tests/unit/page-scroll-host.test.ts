@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountViewer, setExtensionUrlResolver } from '../../src/content/host';
 import { createPageScroll } from '../../src/content/page-scroll';
 import { createLifecycle } from '../../src/content/lifecycle';
-import type { LayoutSource } from '../../src/content/layout-source';
+import { DEFAULT_CONTENT_SETTINGS, type SettingsSource } from '../../src/content/settings-source';
 import type { PageScrollMessage, ScrollLayout } from '../../src/shared/page-scroll';
 import type { PrRef } from '../../src/shared/pr-url';
 
@@ -196,8 +196,8 @@ describe('lifecycle with a layout source', () => {
   function source(initial: ScrollLayout | undefined) {
     let layout = initial;
     const listeners = new Set<() => void>();
-    const src: LayoutSource = {
-      get: () => layout,
+    const src: SettingsSource = {
+      get: () => layout && { ...DEFAULT_CONTENT_SETTINGS, layout },
       subscribe(fn) {
         listeners.add(fn);
         return () => void listeners.delete(fn);

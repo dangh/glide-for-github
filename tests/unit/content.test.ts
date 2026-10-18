@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { hideFilesTab, injectTab, removeTab, setTabActive } from '../../src/content/tab';
 import { mountViewer, setExtensionUrlResolver } from '../../src/content/host';
 import { createLifecycle } from '../../src/content/lifecycle';
-import { fixedSetting } from '../../src/content/setting-source';
+import { DEFAULT_CONTENT_SETTINGS, fixedSettings, type SettingsSource } from '../../src/content/settings-source';
 import { filesChangedUrl, glideUrl, type PrRef } from '../../src/shared/pr-url';
 
 const ref: PrRef = { owner: 'dangh', repo: 'pierre-sandbox', number: 1, page: 'changes' };
@@ -525,7 +525,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
     describe('lifecycle', () => {
       it('opens Glide in place of a directly loaded Files changed page, without a history entry', () => {
         const length = window.history.length;
-        createLifecycle(window, undefined, fixedSetting(true)).sync();
+        createLifecycle(window, fixedSettings({ replaceFilesTab: true })).sync();
         expect(window.location.pathname).toBe('/dangh/pierre-sandbox/pull/1/changes');
         expect(window.location.hash).toBe('#glide');
         expect(window.history.length).toBe(length);
@@ -536,7 +536,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
 
       it('hides Files changed on the other PR pages and puts Glide in its place', () => {
         go(conversation);
-        createLifecycle(window, undefined, fixedSetting(true)).sync();
+        createLifecycle(window, fixedSettings({ replaceFilesTab: true })).sync();
         expect(isHidden(files())).toBe(true);
         expect(files().nextElementSibling).toBe(pierreTabs()[0]);
         expect(viewers()).toHaveLength(0);
@@ -545,7 +545,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
 
       it('a click on a link to this PR\'s Files changed opens Glide on the current page instead', () => {
         go(conversation);
-        const life = createLifecycle(window, undefined, fixedSetting(true));
+        const life = createLifecycle(window, fixedSettings({ replaceFilesTab: true }));
         life.start();
         for (const href of [`${conversation}/files`, `${conversation}/changes`, `https://github.com${conversation}/changes`]) {
           go(conversation);
@@ -561,7 +561,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
 
       it("leaves links Glide does not replace to the browser: another PR, a range, a spot in the diff, a new tab, GitHub's page", () => {
         go(conversation);
-        const life = createLifecycle(window, undefined, fixedSetting(true));
+        const life = createLifecycle(window, fixedSettings({ replaceFilesTab: true }));
         life.start();
         const links = [
           link('/dangh/pierre-sandbox/pull/2/changes'),
@@ -579,7 +579,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
 
       it("keeps GitHub's page (and its tab) when chosen from Glide", () => {
         go(new URL(filesChangedUrl(ref)).pathname + '?glide=off');
-        createLifecycle(window, undefined, fixedSetting(true)).sync();
+        createLifecycle(window, fixedSettings({ replaceFilesTab: true })).sync();
         expect(window.location.hash).toBe('');
         expect(viewers()).toHaveLength(0);
         expect(isHidden(files())).toBe(false);
@@ -590,12 +590,15 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
         go(conversation);
         let value: boolean | undefined;
         const listeners = new Set<() => void>();
-        const source = { get: () => value, subscribe: (fn: () => void) => (listeners.add(fn), () => void listeners.delete(fn)) };
+        const source: SettingsSource = {
+          get: () => (value === undefined ? undefined : { ...DEFAULT_CONTENT_SETTINGS, replaceFilesTab: value }),
+          subscribe: (fn) => (listeners.add(fn), () => void listeners.delete(fn)),
+        };
         const set = (v: boolean) => {
           value = v;
           listeners.forEach((fn) => fn());
         };
-        const life = createLifecycle(window, undefined, source);
+        const life = createLifecycle(window, source);
         life.start();
         expect(isHidden(files())).toBe(false);
         set(true);
@@ -615,7 +618,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
 
       it('idempotent across GitHub re-rendering the strip', () => {
         go(conversation);
-        const life = createLifecycle(window, undefined, fixedSetting(true));
+        const life = createLifecycle(window, fixedSettings({ replaceFilesTab: true }));
         life.sync();
         const nav = document.querySelector('nav')!;
         const fresh = nav.cloneNode(true) as HTMLElement;
@@ -631,7 +634,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
 
       it('leaving the PR restores everything', () => {
         go(conversation);
-        const life = createLifecycle(window, undefined, fixedSetting(true));
+        const life = createLifecycle(window, fixedSettings({ replaceFilesTab: true }));
         life.sync();
         go('/dangh/pierre-sandbox/issues/1');
         life.sync();

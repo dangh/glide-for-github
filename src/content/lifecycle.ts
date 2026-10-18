@@ -1,7 +1,6 @@
 import { filesRedirect, isGlideActive, parsePrUrl, prKey, showsGithubFiles } from '../shared/pr-url';
 import { findContentAnchor, mountViewer, type ViewerHost } from './host';
-import { FRAME_LAYOUT, type LayoutSource } from './layout-source';
-import { fixedSetting, type SettingSource } from './setting-source';
+import { fixedSettings, type SettingsSource } from './settings-source';
 import { hideFilesTab, injectTab, removeTab, setTabActive } from './tab';
 
 const DEBOUNCE_MS = 50;
@@ -16,12 +15,7 @@ export interface Lifecycle {
 
 type NavigationTarget = { addEventListener(type: string, listener: () => void): void; removeEventListener(type: string, listener: () => void): void };
 
-/** `replaceFilesTab` is the "Replace Files changed with Glide" setting (`github.replaceFilesTab`). */
-export function createLifecycle(
-  win: Window & typeof globalThis = window,
-  layouts: LayoutSource = FRAME_LAYOUT,
-  replaceFilesTab: SettingSource<boolean> = fixedSetting(false),
-): Lifecycle {
+export function createLifecycle(win: Window & typeof globalThis = window, settings: SettingsSource = fixedSettings()): Lifecycle {
   const doc = win.document;
   let mounted: { key: string; host: ViewerHost } | null = null;
   let observer: MutationObserver | null = null;
@@ -42,7 +36,8 @@ export function createLifecycle(
       return;
     }
 
-    const replace = replaceFilesTab.get() === true;
+    const stored = settings.get();
+    const replace = stored?.replaceFilesTab === true;
     const glide = replace ? filesRedirect(href) : null;
     if (glide) {
       // Replace, not push: Back then skips GitHub's Files changed page instead of landing on it again.
@@ -63,9 +58,9 @@ export function createLifecycle(
       setTabActive(doc, false);
       return;
     }
-    // Until the experiments are read, the viewer waits (the source calls us once they are).
-    const layout = layouts.get();
-    if (!tab || !findContentAnchor(doc) || !layout) return;
+    // Until the settings are read, the viewer waits (the source calls us once they are).
+    if (!tab || !findContentAnchor(doc) || !stored) return;
+    const { layout } = stored;
 
     if (mounted && (mounted.host.layout !== layout || !mounted.host.refresh())) unmountViewer();
     mounted ??= { key, host: mountViewer(doc, ref, layout) };
@@ -83,7 +78,7 @@ export function createLifecycle(
     target instanceof win.Element ? target.closest<HTMLAnchorElement>('a[data-pierre-tab]') : null;
   /** A link to GitHub's Files changed page that opens Glide instead, while it replaces that page. */
   const replacedFilesLinkOf = (target: EventTarget | null) => {
-    if (replaceFilesTab.get() !== true || !(target instanceof win.Element)) return null;
+    if (settings.get()?.replaceFilesTab !== true || !(target instanceof win.Element)) return null;
     const link = target.closest<HTMLAnchorElement>('a[href]');
     if (!link || (link.target !== '' && link.target !== '_self') || link.hasAttribute('download')) return null;
     return filesRedirect(link.href) ? link : null;
@@ -166,9 +161,8 @@ export function createLifecycle(
     // which would leave an observer on <body> watching a detached node.
     observer = new MutationObserver(schedule);
     observer.observe(doc.documentElement, { childList: true, subtree: true });
-    // A changed experiment remounts an open viewer in its new layout.
-    cleanups.push(layouts.subscribe(sync));
-    cleanups.push(replaceFilesTab.subscribe(sync));
+    // A changed layout remounts an open viewer in it.
+    cleanups.push(settings.subscribe(sync));
 
     sync();
   }
