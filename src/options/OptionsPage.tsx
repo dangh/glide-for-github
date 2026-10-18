@@ -32,18 +32,20 @@ export function OptionsPage() {
       <DisplayStyle />
       <header className="options-header">
         <img className="options-icon" src="icons/icon.svg" width={40} height={40} alt="" />
-        <h1>{BRAND.name}</h1>
-        {VERSION && (
-          <a
-            className="options-version"
-            href={`https://github.com/dangh/glide-for-github/releases/tag/v${VERSION}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Release notes"
-          >
-            v{VERSION}
-          </a>
-        )}
+        <div className="options-title">
+          <h1>{BRAND.name}</h1>
+          {VERSION && (
+            <a
+              className="options-version"
+              href={`https://github.com/dangh/glide-for-github/releases/tag/v${VERSION}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Release notes"
+            >
+              v{VERSION}
+            </a>
+          )}
+        </div>
       </header>
       <TokenSettings />
       <section className="options-section" aria-labelledby="display-heading">

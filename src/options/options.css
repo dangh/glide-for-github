@@ -34,9 +34,14 @@ body {
   margin: 0;
 }
 
+/* The version sits on the title's baseline; the icon centers on the pair. */
+.options-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
 .options-version {
-  align-self: flex-end;
-  margin-bottom: 4px;
   color: var(--pierre-muted);
   font: 12px var(--pierre-mono);
   text-decoration: none;
