@@ -1,5 +1,6 @@
 import { isGlideActive, parsePrUrl, prKey } from '../shared/pr-url';
 import { findContentAnchor, mountViewer, type ViewerHost } from './host';
+import { FRAME_LAYOUT, type LayoutSource } from './layout-source';
 import { injectTab, removeTab, setTabActive } from './tab';
 
 const DEBOUNCE_MS = 50;
@@ -14,7 +15,7 @@ export interface Lifecycle {
 
 type NavigationTarget = { addEventListener(type: string, listener: () => void): void; removeEventListener(type: string, listener: () => void): void };
 
-export function createLifecycle(win: Window & typeof globalThis = window): Lifecycle {
+export function createLifecycle(win: Window & typeof globalThis = window, layouts: LayoutSource = FRAME_LAYOUT): Lifecycle {
   const doc = win.document;
   let mounted: { key: string; host: ViewerHost } | null = null;
   let observer: MutationObserver | null = null;
@@ -46,10 +47,12 @@ export function createLifecycle(win: Window & typeof globalThis = window): Lifec
       setTabActive(doc, false);
       return;
     }
-    if (!tab || !findContentAnchor(doc)) return;
+    // Until the experiments are read, the viewer waits (the source calls us once they are).
+    const layout = layouts.get();
+    if (!tab || !findContentAnchor(doc) || !layout) return;
 
-    if (mounted && !mounted.host.refresh()) unmountViewer();
-    mounted ??= { key, host: mountViewer(doc, ref) };
+    if (mounted && (mounted.host.layout !== layout || !mounted.host.refresh())) unmountViewer();
+    mounted ??= { key, host: mountViewer(doc, ref, layout) };
     setTabActive(doc, true);
   }
 
@@ -140,6 +143,8 @@ export function createLifecycle(win: Window & typeof globalThis = window): Lifec
     // which would leave an observer on <body> watching a detached node.
     observer = new MutationObserver(schedule);
     observer.observe(doc.documentElement, { childList: true, subtree: true });
+    // A changed experiment remounts an open viewer in its new layout.
+    cleanups.push(layouts.subscribe(sync));
 
     sync();
   }

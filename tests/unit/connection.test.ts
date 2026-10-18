@@ -15,12 +15,12 @@ function fakeWindow() {
       addEventListener: (_: string, l: Listener) => listeners.add(l),
       removeEventListener: (_: string, l: Listener) => listeners.delete(l),
     } as unknown as Window,
-    post(data: unknown, opts: { origin?: string; source?: unknown; port?: unknown } = {}) {
+    post(data: unknown, opts: { origin?: string; source?: unknown; port?: unknown; scrollPort?: unknown } = {}) {
       const event = {
         data,
         origin: opts.origin ?? 'https://github.com',
         source: opts.source === undefined ? parent : opts.source,
-        ports: opts.port === null ? [] : [opts.port ?? {}],
+        ports: opts.port === null ? [] : [opts.port ?? {}, ...(opts.scrollPort ? [opts.scrollPort] : [])],
       } as unknown as MessageEvent;
       for (const l of listeners) l(event);
     },
@@ -55,6 +55,24 @@ function fakeClients(answer: (n: number, method: string) => Promise<unknown> | '
 }
 
 describe('viewer connection', () => {
+  it('passes the scroll channel of a page-scrolling handshake on, and closes one nobody asked for', async () => {
+    const w = fakeWindow();
+    const { createClient } = fakeClients(async () => null);
+    const received: unknown[] = [];
+    const conn = createConnection(w.win, { createClient, onScrollPort: (p) => received.push(p) });
+    const scrollPort = { close() {} };
+    w.post({ type: 'pierre:port' }, { scrollPort });
+    w.post({ type: 'pierre:port' });
+    expect(received).toEqual([scrollPort]);
+    conn.dispose();
+
+    const unused = { closed: false, close() { this.closed = true; } };
+    const plain = createConnection(w.win, { createClient });
+    w.post({ type: 'pierre:port' }, { scrollPort: unused });
+    expect(unused.closed).toBe(true);
+    plain.dispose();
+  });
+
   it('accepts pierre:port only from github.com and the parent window, and reports the color mode', async () => {
     const w = fakeWindow();
     const { clients, createClient } = fakeClients(async (n) => `client ${n}`);

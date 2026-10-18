@@ -1,7 +1,10 @@
 import { createRoot } from 'react-dom/client';
 import { BRAND } from '../shared/brand';
+import { parseScrollLayout, restoreKey } from '../shared/page-scroll';
+import { prKey } from '../shared/pr-url';
 import { App } from './App';
 import { createConnection, parsePrParam, watchPort } from './connection';
+import { createPageScrollView } from './pageScroll';
 import { initBatchPersistence } from './state/batch';
 import { initDraftPersistence } from './state/drafts';
 import { startFreshness } from './state/freshness';
@@ -23,7 +26,12 @@ const prRef = parsePrParam(location.search);
 if (!prRef) {
   root.render(<div className="fatal">{BRAND.short}: missing pull request.</div>);
 } else {
-  const connection = createConnection(window);
+  const layout = parseScrollLayout(location.search);
+  if (layout !== 'frame') {
+    document.documentElement.dataset.scrollLayout = layout;
+    session.pageScroll = createPageScrollView(window, layout, restoreKey(prKey(prRef)));
+  }
+  const connection = createConnection(window, { onScrollPort: (port) => session.pageScroll?.setPort(port) });
   session.rpc = connection.rpc;
   initSettings();
   initBatchPersistence();

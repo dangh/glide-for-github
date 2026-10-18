@@ -337,6 +337,16 @@ button {
   overscroll-behavior: contain;
 }
 
+/*
+ * Page scrolling (experiment, src/viewer/pageScroll.ts): GitHub's page shows the scrollbar, the list scrolls only
+ * while the page has the viewer stuck (inline overflow-y), and a gesture starting at the list's edge chains to the page.
+ */
+html[data-scroll-layout] .pierre-diffs {
+  overflow-y: hidden;
+  overscroll-behavior: auto;
+  scrollbar-width: none;
+}
+
 .pierre-loading {
   padding: 24px;
   color: var(--pierre-muted);

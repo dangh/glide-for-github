@@ -1,5 +1,7 @@
 import { BRAND } from '../shared/brand';
+import { SCROLL_LAYOUT_PARAM, type ScrollLayout } from '../shared/page-scroll';
 import { prKey, type PrRef } from '../shared/pr-url';
+import { createPageScroll } from './page-scroll';
 import { findTabNav } from './tab';
 
 /** The viewer never gets shorter than this (small windows scroll the page instead). */
@@ -24,6 +26,7 @@ export function setExtensionUrlResolver(fn: (path: string) => string): void {
 
 export interface ViewerHost {
   iframe: HTMLIFrameElement;
+  layout: ScrollLayout;
   /** Removes the iframe, restores GitHub's content and tells the bridge to reset. Idempotent. */
   unmount(): void;
   /**
@@ -53,7 +56,8 @@ function originOf(url: string): string {
   return /^[a-z][a-z0-9+.-]*:\/\/[^/]+/i.exec(url)?.[0] ?? url;
 }
 
-export function mountViewer(doc: Document, ref: PrRef): ViewerHost {
+/** `layout` other than 'frame' is the page-scrolling experiment (src/shared/page-scroll.ts). */
+export function mountViewer(doc: Document, ref: PrRef, layout: ScrollLayout = 'frame'): ViewerHost {
   const win = doc.defaultView;
   const anchor = findContentAnchor(doc);
   if (!win || !anchor || !anchor.parentElement) throw new Error(`${BRAND.short}: PR tab content container not found`);
@@ -61,12 +65,16 @@ export function mountViewer(doc: Document, ref: PrRef): ViewerHost {
   let mounted = true;
 
   const iframe = doc.createElement('iframe');
-  iframe.setAttribute('src', resolveExtensionUrl('viewer.html?pr=' + encodeURIComponent(prKey(ref))));
+  const layoutParam = layout === 'frame' ? '' : `&${SCROLL_LAYOUT_PARAM}=${layout}`;
+  iframe.setAttribute('src', resolveExtensionUrl('viewer.html?pr=' + encodeURIComponent(prKey(ref)) + layoutParam));
   iframe.setAttribute('title', BRAND.short);
   iframe.setAttribute('data-pierre-viewer', '');
   iframe.style.cssText = `display:block;width:100%;border:0;min-height:${MIN_VIEWER_HEIGHT_PX}px;`;
+  const pageScroll = layout === 'frame' ? null : createPageScroll(doc, anchor, iframe, layout);
+  /** What sits in the page: the iframe, or the page-scroll wrapper holding it. */
+  const outer: HTMLElement = pageScroll?.wrapper ?? iframe;
   const fitHeight = () => {
-    if (!mounted || !iframe.isConnected) return;
+    if (!mounted || !iframe.isConnected || pageScroll) return;
     const height = viewerHeight(iframe, win);
     if (iframe.style.height !== height) iframe.style.height = height;
   };
@@ -75,7 +83,7 @@ export function mountViewer(doc: Document, ref: PrRef): ViewerHost {
   const hidden = new Map<HTMLElement, string | null>();
   const hideContent = () => {
     for (let el = anchor.nextElementSibling; el; el = el.nextElementSibling) {
-      if (el === iframe || !(el instanceof win.HTMLElement)) continue;
+      if (el === outer || !(el instanceof win.HTMLElement)) continue;
       if (!hidden.has(el)) hidden.set(el, el.getAttribute('style'));
       el.style.setProperty('display', 'none', 'important');
     }
@@ -86,10 +94,17 @@ export function mountViewer(doc: Document, ref: PrRef): ViewerHost {
   let channel = new MessageChannel();
   let loaded = false;
   const sendToViewer = () => {
+    const ports = [channel.port1];
+    if (pageScroll) {
+      // Page scrolling gets its own channel, renewed with every handshake (the viewer replaces both ports).
+      const scroll = new MessageChannel();
+      pageScroll.connect(scroll.port2);
+      ports.push(scroll.port1);
+    }
     iframe.contentWindow?.postMessage(
       { type: 'pierre:port', colorMode: doc.documentElement.getAttribute('data-color-mode') ?? undefined },
       extOrigin,
-      [channel.port1],
+      ports,
     );
   };
   const sendToBridge = () => win.postMessage({ type: 'pierre:bridge-port' }, win.location.origin, [channel.port2]);
@@ -120,19 +135,21 @@ export function mountViewer(doc: Document, ref: PrRef): ViewerHost {
   win.addEventListener('message', onBridgeReady);
 
   hideContent();
-  parent.append(iframe);
+  parent.append(outer);
   fitHeight();
   win.addEventListener('resize', fitHeight);
   sendToBridge();
 
   return {
     iframe,
+    layout,
     refresh() {
-      if (!mounted || !iframe.isConnected || findContentAnchor(doc) !== anchor || iframe.parentElement !== parent) {
+      if (!mounted || !iframe.isConnected || findContentAnchor(doc) !== anchor || outer.parentElement !== parent) {
         return false;
       }
       hideContent();
       fitHeight();
+      pageScroll?.refresh();
       return true;
     },
     unmount() {
@@ -141,7 +158,8 @@ export function mountViewer(doc: Document, ref: PrRef): ViewerHost {
       iframe.removeEventListener('load', onLoad);
       win.removeEventListener('message', onBridgeReady);
       win.removeEventListener('resize', fitHeight);
-      iframe.remove();
+      pageScroll?.dispose();
+      outer.remove();
       for (const [el, style] of hidden) {
         if (style === null) el.removeAttribute('style');
         else el.setAttribute('style', style);

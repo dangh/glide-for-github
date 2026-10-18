@@ -3,6 +3,7 @@
  */
 import type { CodeViewHandle } from '@pierre/diffs/react';
 import type { Rpc } from '../github/private';
+import type { PageScrollView } from '../pageScroll';
 import type { AnnotationMeta } from './items';
 import type { Loader } from './loader';
 
@@ -17,6 +18,8 @@ export interface Session {
   scrollToFile?(path: string): void;
   /** Marks a file as the current one in the tree (diff scroll position). */
   revealInTree?(path: string): void;
+  /** Page scrolling's list side, when the viewer was mounted with it (src/viewer/pageScroll.ts). */
+  pageScroll?: PageScrollView;
 }
 
 export const session: Session = {};

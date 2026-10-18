@@ -7,6 +7,7 @@ import { CodeView, type CodeViewHandle } from '@pierre/diffs/react';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { resolveFonts } from '../../shared/github-defaults';
 import { fetchFullFile, type PrData, type Rpc } from '../github/private';
+import type { ListAnchors } from '../pageScroll';
 import { createAnnotationSource } from '../state/annotations';
 import { targetFromRange } from '../state/compose';
 import { ItemSync, type AnnotationMeta, type AnnotationSource, type PierreItem } from '../state/items';
@@ -47,6 +48,21 @@ function viewportFiles(handle: Handle): { ids: string[]; current?: string } {
   const instance = handle.getInstance();
   if (!instance) return { ids: [] };
   return visibleFiles(usePr.getState().order, (id) => instance.getTopForItem(id), instance.getScrollTop(), instance.getHeight(), headerHeight(useSettings.getState().settings.diff.fileHeaderStyle));
+}
+
+/** The top visible file and how far the list is scrolled into it (an item `offset` of `-offset` scrolls back there). */
+function listAnchors(handle: Handle): ListAnchors {
+  return {
+    anchor() {
+      const instance = handle.getInstance();
+      const { current } = viewportFiles(handle);
+      const top = current === undefined ? undefined : instance?.getTopForItem(current);
+      return instance && current !== undefined && top !== undefined ? { path: current, offset: instance.getScrollTop() - top } : null;
+    },
+    scrollToAnchor({ path, offset }) {
+      if (handle.getItem(path)) handle.scrollTo({ type: 'item', id: path, align: 'start', offset: -offset });
+    },
+  };
 }
 
 /** CodeView callbacks get the item context last; the item id is the file path. */
@@ -167,6 +183,7 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
           handle.scrollTo({ type: 'item', id: path, align: 'start' });
         }
       : undefined;
+    session.pageScroll?.attach(handle?.getInstance()?.getContainerElement() ?? null, handle ? listAnchors(handle) : null);
   }, [treeSync]);
 
   const renderCustomHeader = useCallback((item: PierreItem) => <FileHeader path={item.id} />, []);

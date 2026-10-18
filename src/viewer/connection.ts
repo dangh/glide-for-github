@@ -5,6 +5,7 @@
  * post a replacement at any time (bridge-ready race). `createConnection` exposes one stable `rpc` facade:
  * calls wait for the first port, and a call that fails because its port was replaced (`closed`) is re-issued
  * on the new port, for reads and applySuggestions only (see `RETRY_ON_CLOSED`).
+ * With page scrolling (src/shared/page-scroll.ts) the message carries a second port, the scroll channel.
  */
 import { BRAND } from '../shared/brand';
 import { BridgeError, createRpcClient, RETRY_ON_CLOSED, type BridgeMethods, type RpcClient } from '../shared/rpc';
@@ -27,6 +28,8 @@ export interface ConnectionOptions {
   /** Only messages from this window are accepted (the embedding github.com page). Defaults to `win.parent`. */
   source?: MessageEventSource | null;
   createClient?: (port: MessagePort) => RpcClient<BridgeMethods>;
+  /** Receives the scroll channel of each handshake that has one (page scrolling). */
+  onScrollPort?: (port: MessagePort) => void;
 }
 
 export function createConnection(win: Window, options: ConnectionOptions = {}): Connection {
@@ -50,6 +53,11 @@ export function createConnection(win: Window, options: ConnectionOptions = {}): 
     const previous = client;
     client = createClient(port);
     previous?.close();
+    const scrollPort = event.ports[1];
+    if (scrollPort) {
+      if (options.onScrollPort) options.onScrollPort(scrollPort);
+      else scrollPort.close();
+    }
     resolveReady(typeof data.colorMode === 'string' ? data.colorMode : undefined);
     for (const wake of [...waiters]) wake();
   };

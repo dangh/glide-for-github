@@ -1,0 +1,212 @@
+// @vitest-environment jsdom
+// @vitest-environment-options {"url": "https://github.com/dangh/pierre-sandbox/pull/1#glide"}
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mountViewer, setExtensionUrlResolver } from '../../src/content/host';
+import { createLifecycle } from '../../src/content/lifecycle';
+import type { LayoutSource } from '../../src/content/layout-source';
+import type { PageScrollMessage, ScrollLayout } from '../../src/shared/page-scroll';
+import type { PrRef } from '../../src/shared/pr-url';
+
+const ref: PrRef = { owner: 'dangh', repo: 'pierre-sandbox', number: 1, page: 'changes' };
+const EXT = 'chrome-extension://abcdefghijklmnop/';
+const STICKY_STYLE = 'position: sticky; display: none';
+
+const rect = (top: number, height: number) => ({ top, height, bottom: top + height, left: 0, right: 0, width: 0, x: 0, y: top, toJSON() {} }) as DOMRect;
+
+/** Adds GitHub's sticky PR header (hidden until the title scrolls away; 60 px when shown) to the layout header. */
+function addStickyHeader(): HTMLElement {
+  const header = document.createElement('div');
+  header.setAttribute('data-component', 'PageHeader');
+  header.setAttribute('style', STICKY_STYLE);
+  header.getBoundingClientRect = () => rect(0, header.style.display === 'flex' ? 60 : 0);
+  document.querySelector('header')!.append(header);
+  return header;
+}
+
+let original: string;
+let wrapperTop = 261;
+
+beforeEach(() => {
+  setExtensionUrlResolver((path) => EXT + path);
+  vi.spyOn(window, 'postMessage').mockImplementation(() => {});
+  document.body.innerHTML = readFileSync(resolve(__dirname, '../fixtures/dom/pr-tabs-new.html'), 'utf8');
+  original = document.body.innerHTML;
+  wrapperTop = 261;
+  vi.spyOn(HTMLDivElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLDivElement) {
+    return this.hasAttribute('data-glide-scroll') ? rect(wrapperTop, 0) : rect(0, 0);
+  });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  document.body.innerHTML = '';
+});
+
+/** Loads the iframe and returns the viewer's end of the scroll channel and the messages the page sent on it. */
+function connectViewer(iframe: HTMLIFrameElement) {
+  const framePost = vi.spyOn(iframe.contentWindow!, 'postMessage').mockImplementation(() => {});
+  iframe.dispatchEvent(new Event('load'));
+  const transfer = (framePost.mock.calls.at(-1) as unknown as [unknown, string, MessagePort[]])[2];
+  const port = transfer[1]!;
+  const received: PageScrollMessage[] = [];
+  port.onmessage = (e) => received.push(e.data as PageScrollMessage);
+  return { transfer, port, received };
+}
+
+const settle = () => new Promise((r) => setTimeout(r, 20));
+
+describe('page layout', () => {
+  it('puts the iframe in a wrapper, sticky below GitHub\'s header, and unmount restores the page exactly', async () => {
+    const header = addStickyHeader();
+    const before = document.body.innerHTML;
+    const host = mountViewer(document, ref, 'page');
+    const wrapper = document.querySelector<HTMLElement>('[data-glide-scroll="page"]')!;
+    expect(host.iframe.parentElement).toBe(wrapper);
+    expect(host.iframe.getAttribute('src')).toBe(EXT + 'viewer.html?pr=' + encodeURIComponent('dangh/pierre-sandbox#1') + '&scroll=page');
+    expect(host.iframe.style.position).toBe('sticky');
+    expect(host.iframe.style.top).toBe('60px');
+    expect(host.iframe.style.height).toBe('calc(100vh - 60px)');
+    expect(header.getAttribute('style')).toBe(STICKY_STYLE);
+
+    host.unmount();
+    expect(document.querySelector('[data-glide-scroll]')).toBeNull();
+    expect(document.body.innerHTML).toBe(before);
+  });
+
+  it('hands the viewer a scroll channel; extents size the wrapper and page scrolls map to list offsets', async () => {
+    addStickyHeader();
+    const host = mountViewer(document, ref, 'page');
+    const wrapper = host.iframe.parentElement!;
+    const { transfer, port, received } = connectViewer(host.iframe);
+    expect(transfer).toHaveLength(2);
+
+    port.postMessage({ type: 'extent', extent: 5000 });
+    await settle();
+    // (calc() terms are re-ordered when serialized)
+    expect(wrapper.style.height).toMatch(/^calc\(.*5000px.*\)$/);
+    expect(wrapper.style.height).toContain('100vh - 60px');
+
+    wrapperTop = 60 - 1200;
+    window.dispatchEvent(new Event('scroll'));
+    await settle();
+    expect(received.at(-1)).toEqual({ type: 'scroll', top: 1200, stuck: true, ack: 0 });
+    host.unmount();
+  });
+
+  it('a list scroll moves the page to the same offset and acknowledges it, also when the page cannot move', async () => {
+    addStickyHeader();
+    const host = mountViewer(document, ref, 'page');
+    const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(((opts: ScrollToOptions) => {
+      wrapperTop -= opts.top ?? 0;
+    }) as typeof window.scrollBy);
+    const { port, received } = connectViewer(host.iframe);
+    port.postMessage({ type: 'extent', extent: 5000 });
+
+    port.postMessage({ type: 'scrollTo', top: 700, seq: 1 });
+    await settle();
+    expect(scrollBy).toHaveBeenLastCalledWith({ top: 261 - 60 + 700, behavior: 'instant' });
+    expect(received.at(-1)).toEqual({ type: 'scroll', top: 700, stuck: true, ack: 1 });
+
+    // Already there: no scroll, but the ack still arrives.
+    scrollBy.mockClear();
+    port.postMessage({ type: 'scrollTo', top: 700, seq: 2 });
+    await settle();
+    expect(scrollBy).not.toHaveBeenCalled();
+    expect(received.at(-1)).toEqual({ type: 'scroll', top: 700, stuck: true, ack: 2 });
+
+    // The rest of a wheel gesture at the list's end goes to the page as it is.
+    port.postMessage({ type: 'scrollBy', dy: 120 });
+    await settle();
+    expect(scrollBy).toHaveBeenLastCalledWith({ top: 120, behavior: 'instant' });
+    host.unmount();
+  });
+
+  it('ignores malformed messages on the scroll channel', async () => {
+    const host = mountViewer(document, ref, 'page');
+    const wrapper = host.iframe.parentElement!;
+    const { port } = connectViewer(host.iframe);
+    const height = wrapper.style.height;
+    for (const bad of [null, 'x', { type: 'extent', extent: -1 }, { type: 'extent', extent: 'big' }, { type: 'scrollTo', top: 1 }, { type: 'other' }]) {
+      port.postMessage(bad);
+    }
+    await settle();
+    expect(wrapper.style.height).toBe(height);
+    host.unmount();
+  });
+
+  it('sticks at the top when GitHub has no sticky header (no hiding, nothing to measure)', () => {
+    const host = mountViewer(document, ref, 'page');
+    expect(host.iframe.style.top).toBe('0px');
+    host.unmount();
+    expect(document.body.innerHTML).toBe(original);
+  });
+});
+
+describe('merged layout', () => {
+  it("hides GitHub's sticky header while mounted, sticks at 0, and restores the header on unmount", () => {
+    const header = addStickyHeader();
+    const host = mountViewer(document, ref, 'merged');
+    expect(host.iframe.getAttribute('src')).toContain('&scroll=merged');
+    expect(header.style.getPropertyValue('display')).toBe('none');
+    expect(header.style.getPropertyPriority('display')).toBe('important');
+    expect(host.iframe.style.top).toBe('0px');
+
+    // GitHub re-rendered its header: the new one is hidden too.
+    header.remove();
+    const again = addStickyHeader();
+    expect(host.refresh()).toBe(true);
+    expect(again.style.getPropertyPriority('display')).toBe('important');
+
+    host.unmount();
+    expect(again.getAttribute('style')).toBe(STICKY_STYLE);
+  });
+
+  it('without a header to hide it falls back to the page layout (nothing hidden)', () => {
+    const host = mountViewer(document, ref, 'merged');
+    expect(host.iframe.style.top).toBe('0px');
+    host.unmount();
+    expect(document.body.innerHTML).toBe(original);
+  });
+});
+
+describe('lifecycle with a layout source', () => {
+  function source(initial: ScrollLayout | undefined) {
+    let layout = initial;
+    const listeners = new Set<() => void>();
+    const src: LayoutSource = {
+      get: () => layout,
+      subscribe(fn) {
+        listeners.add(fn);
+        return () => void listeners.delete(fn);
+      },
+    };
+    return {
+      src,
+      set(next: ScrollLayout) {
+        layout = next;
+        for (const fn of listeners) fn();
+      },
+    };
+  }
+
+  it('waits for the layout, mounts in it, and remounts when it changes', () => {
+    const s = source(undefined);
+    const life = createLifecycle(window, s.src);
+    life.start();
+    expect(document.querySelector('iframe[data-pierre-viewer]')).toBeNull();
+    expect(document.querySelector('[data-pierre-tab]')).not.toBeNull();
+
+    s.set('page');
+    const first = document.querySelector('iframe[data-pierre-viewer]')!;
+    expect(first.parentElement!.getAttribute('data-glide-scroll')).toBe('page');
+
+    s.set('frame');
+    const second = document.querySelector('iframe[data-pierre-viewer]')!;
+    expect(second).not.toBe(first);
+    expect(document.querySelector('[data-glide-scroll]')).toBeNull();
+    expect(second.getAttribute('src')).not.toContain('scroll=');
+    life.stop();
+  });
+});
