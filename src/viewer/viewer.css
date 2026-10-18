@@ -378,8 +378,12 @@ button {
  * 4 px after the chevron in 12px/18px regular mono, +/- counts in 12px/600 UI font at the right with the actions,
  * 28 px Viewed and comment buttons with 16 px icons.
  */
+/*
+ * Inside the box's 1 px outline, the 28 px Viewed button and the chevron's 28 px hit box sit 6 px from every edge of
+ * the 42 px header: 7 px sides, and 1 px on top to balance the header's own 1 px bottom border.
+ */
 [data-file-header='github'] .fh {
-  padding: 0 9px;
+  padding: 1px 7px 0;
   border-radius: 6px 6px 0 0;
 }
 
