@@ -11,7 +11,7 @@
  *   ./scripts/e2e-profile.sh
  *   npm run e2e                                # builds dist/, then runs tests/e2e HEADED on DISPLAY (default :0)
  *   npm run e2e:headless                       # same, headless (CI)
- *   npm run e2e:token                          # once: paste a GitHub token into Pierre's prompt (write tests)
+ *   npm run e2e:token                          # once: paste a GitHub token into Glide's prompt (write tests)
  * Env: PIERRE_E2E_CHROME (Chrome for Testing binary; default: newest ~/.agent-browser/browsers/chrome-*),
  *      PIERRE_E2E_HEADLESS=1 (headless; the default is headed on $DISPLAY or :0, with WAYLAND_DISPLAY cleared).
  *

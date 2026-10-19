@@ -28,7 +28,7 @@ type FramePost = [unknown, string, unknown[]];
 const posted = (spy: { mock: { calls: unknown[][] } }, type: string) =>
   spy.mock.calls.filter((c) => (c[0] as { type?: string }).type === type) as unknown as FramePost[];
 
-/** Document HTML with the Pierre tab and viewer removed, to compare against the untouched fixture. */
+/** Document HTML with the Glide tab and viewer removed, to compare against the untouched fixture. */
 function bodyWithoutPierre(): string {
   const clone = document.body.cloneNode(true) as HTMLElement;
   clone.querySelectorAll('[data-pierre-tab], iframe[data-pierre-viewer]').forEach((e) => e.remove());
@@ -337,7 +337,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
       expect(bodyWithoutPierre()).toBe(original);
     });
 
-    it('mounts on #pierre, selects the tab, and unmounts when the hash goes', () => {
+    it('mounts on #glide, selects the tab, and unmounts when the hash goes', () => {
       const life = createLifecycle(window);
       life.sync();
       go('/dangh/pierre-sandbox/pull/1/changes#glide');
@@ -417,7 +417,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
       expect(pierreTabs()).toHaveLength(1);
     });
 
-    it('clicking the tab stays on the current page, adds #pierre, and mounts without navigating', () => {
+    it('clicking the tab stays on the current page, adds #glide, and mounts without navigating', () => {
       const life = createLifecycle(window);
       life.start();
       const tab = pierreTabs()[0] as HTMLAnchorElement;

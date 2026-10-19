@@ -2,10 +2,10 @@
 /**
  * One-time human step for the write e2e tests (`npm run e2e:token`): opens the e2e browser (the same Playwright
  * persistent context as tests/e2e/fixtures.ts: .e2e-profile + dist/) HEADED on DISPLAY (default :0), on the
- * sandbox PR's Pierre tab, opens Pierre's TokenPrompt (no write: a no-op token-gated action), and waits until a token is saved in the extension's
- * chrome.storage.local (key `pierre.tokens`) or 10 minutes pass.
+ * sandbox PR's Glide tab, opens Glide's TokenPrompt (no write: a no-op token-gated action), and waits until a token is
+ * saved in the extension's chrome.storage.local (key `pierre.tokens`) or 10 minutes pass.
  *
- * The token is typed by the human into Pierre's own prompt. This script never reads, prints or stores it: it
+ * The token is typed by the human into Glide's own prompt. This script never reads, prints or stores it: it
  * only checks whether the storage KEY exists (`chrome.storage.local.getKeys()`), never its value.
  * It persists across e2e runs because scripts/e2e-profile.sh keeps .e2e-profile's extension storage.
  */
@@ -39,7 +39,7 @@ function chromePath() {
 }
 
 /**
- * Opens Pierre's token prompt WITHOUT any GitHub write: a no-op action through the e2e inspection hook
+ * Opens Glide's token prompt WITHOUT any GitHub write: a no-op action through the e2e inspection hook
  * (`window.__pierre.review.withApi`), which asks for a token when none is stored. Not awaited (it settles when the
  * prompt is saved or cancelled).
  */
@@ -86,7 +86,7 @@ async function main() {
       return;
     }
     await openPrompt(frame);
-    console.log('token-setup: paste a GitHub token into the "Connect Pierre to GitHub" prompt and press Save (waiting up to 10 minutes).');
+    console.log('token-setup: paste a GitHub token into the "Connect Glide to GitHub" prompt and press Save (waiting up to 10 minutes).');
     while (Date.now() < deadline) {
       if (await tokenStored(page)) {
         console.log('token-setup: token saved in the e2e profile.');
