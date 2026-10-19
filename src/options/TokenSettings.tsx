@@ -93,7 +93,7 @@ export function TokenSettings() {
           No tokens saved.
         </p>
       ) : (
-        <ul className="token-list">
+        <ul className="box-list">
           {tokens.map((t) => (
             <TokenRow key={t.owner} token={t} onRemoved={refresh} />
           ))}

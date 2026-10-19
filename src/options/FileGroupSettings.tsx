@@ -7,6 +7,7 @@ import { ALL_GROUP, classify, compileGroups, groupsProblem, parseSiftImport, typ
 import { defaultGroups, loadFileGroups, onFileGroupsChange, saveFileGroups, sameGroups } from '../shared/file-groups-storage';
 import type { FileGroupSettings } from '../shared/settings';
 import type { Update } from '../viewer/ui/DisplaySettingsForm';
+import { RowActions, textRows } from './ListRow';
 
 const SAVE_DELAY_MS = 400;
 
@@ -34,8 +35,8 @@ function GroupEditor({ draft, index, count, onChange, onMove, onDelete }: {
 }) {
   const name = draft.label.trim() || `Group ${index + 1}`;
   return (
-    <li className="group-card" data-testid="group-card">
-      <div className="group-card-row">
+    <li data-testid="group-card">
+      <div className="group-row-head">
         <input
           type="text"
           className="group-label"
@@ -44,20 +45,13 @@ function GroupEditor({ draft, index, count, onChange, onMove, onDelete }: {
           value={draft.label}
           onChange={(e) => onChange({ ...draft, label: e.target.value })}
         />
-        <button type="button" className="btn" aria-label={`Move ${name} up`} disabled={index === 0} onClick={() => onMove(-1)}>
-          Up
-        </button>
-        <button type="button" className="btn" aria-label={`Move ${name} down`} disabled={index === count - 1} onClick={() => onMove(1)}>
-          Down
-        </button>
-        <button type="button" className="btn" aria-label={`Delete ${name}`} onClick={onDelete}>
-          Delete
-        </button>
+        <RowActions name={name} index={index} count={count} onMove={onMove} onDelete={onDelete} />
       </div>
       <textarea
         className="group-patterns"
         aria-label={`Patterns of ${name}`}
         spellCheck={false}
+        rows={textRows(draft.text, 2, 6)}
         value={draft.text}
         onChange={(e) => onChange({ ...draft, text: e.target.value })}
       />
@@ -274,7 +268,7 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
       </p>
       {draft && (
         <>
-          <ol className="group-list">
+          <ol className="box-list">
             {draft.map((d, i) => (
               <GroupEditor
                 key={d.id}

@@ -13,6 +13,12 @@ Newest first. Each release's GitHub notes are its section here (`scripts/release
   another look in the Display menu or on the options page (one box, a group rail, or off), and edit the rules there:
   a main file pattern and its related files, in the same folder, with `${basename}` for the main file's name.
 
+### Changed
+
+- The options page has far fewer boxes. File groups and related-files rules are each one list with a line between
+  rows, as on GitHub's settings pages, and a rule takes one short row. Up, Down and Delete are small arrow and trash
+  icons that name what they act on. Only the chosen related-files style has a frame.
+
 ### Fixes
 
 - A push to the pull request now shows GitHub's Refresh button in the toolbar within seconds, as on GitHub's own Files

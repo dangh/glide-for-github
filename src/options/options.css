@@ -68,12 +68,63 @@ body {
   margin: 4px 0 12px;
 }
 
-.token-list {
+/* GitHub's Box list: one bordered container per list, its rows split by dividers (tokens, file groups, related-files rules). */
+.box-list {
   list-style: none;
   margin: 0 0 12px;
   padding: 0;
   border: 1px solid var(--pierre-border);
-  border-radius: 8px;
+  border-radius: 6px;
+}
+
+.box-list > li {
+  padding: 8px 12px;
+}
+
+.box-list > li + li {
+  /* Primer's borderColor-muted. */
+  border-top: 1px solid color-mix(in srgb, var(--pierre-border) 70%, transparent);
+}
+
+/* A row's actions: Primer's small invisible icon buttons. */
+.row-actions {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+
+.row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--pierre-muted);
+  cursor: pointer;
+}
+
+.row-action:hover:not(:disabled) {
+  background: light-dark(#818b9826, #656c7633);
+  color: var(--pierre-fg);
+}
+
+.row-action-danger:hover:not(:disabled) {
+  background: light-dark(#ffebe9, #f851491a);
+  color: var(--pierre-danger);
+}
+
+.row-action:focus-visible {
+  outline: 2px solid var(--pierre-accent);
+  outline-offset: -2px;
+}
+
+.row-action:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .token-row {
@@ -81,11 +132,6 @@ body {
   grid-template-columns: minmax(160px, 2fr) 1fr 110px auto;
   align-items: center;
   gap: 12px;
-  padding: 8px 12px;
-}
-
-.token-row + .token-row {
-  border-top: 1px solid var(--pierre-border);
 }
 
 .token-note,
@@ -208,28 +254,17 @@ body {
   margin: 20px 0 0;
 }
 
-.group-list {
-  display: grid;
-  gap: 12px;
-  margin: 0 0 12px;
-  padding: 0;
-  list-style: none;
-}
-
-.group-card {
-  padding: 12px;
-  border: 1px solid var(--pierre-border);
-  border-radius: 6px;
-}
-
-.group-card-row {
+.group-row-head {
   display: flex;
+  align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .group-label {
   flex: 1;
+  min-width: 0;
+  height: 28px;
   font: inherit;
   font-weight: 600;
   padding: 3px 8px;
@@ -242,13 +277,12 @@ body {
 .group-patterns {
   display: block;
   width: 100%;
-  height: 120px;
-  padding: 6px 8px;
+  padding: 4px 8px;
   border: 1px solid var(--pierre-border);
   border-radius: 6px;
   background: var(--pierre-bg);
   color: inherit;
-  font: 12px/1.5 var(--pierre-mono);
+  font: 12px/18px var(--pierre-mono);
   resize: vertical;
 }
 
@@ -263,13 +297,13 @@ body {
   margin: 16px 0;
 }
 
+.group-probe .field,
 .group-probe .field input[type='text'] {
-  width: 360px;
+  min-width: 0;
 }
 
-.group-card .btn:disabled {
-  opacity: 0.5;
-  cursor: default;
+.group-probe .field input[type='text'] {
+  width: 360px;
 }
 
 .group-import summary {
@@ -278,6 +312,7 @@ body {
 }
 
 .group-import .group-patterns {
+  height: 120px;
   margin-bottom: 8px;
 }
 
@@ -297,14 +332,21 @@ body {
   flex-direction: column;
   gap: 6px;
   padding: 10px;
-  border: 1px solid var(--pierre-border);
+  border: 1px solid transparent;
   border-radius: 6px;
+  background: var(--pierre-bg-subtle);
   cursor: pointer;
 }
 
+/* Only the chosen card is framed (GitHub's selected radio card); the others sit on a faint background. */
 .related-style[data-checked] {
+  background: none;
   border-color: var(--pierre-accent);
   box-shadow: 0 0 0 1px var(--pierre-accent);
+}
+
+.related-style:not([data-checked]):hover {
+  border-color: var(--pierre-border);
 }
 
 .related-style-title {
@@ -428,18 +470,15 @@ body {
 
 .rp-viewed {
   margin-left: 2px;
-  padding: 0 4px;
-  border: 1px solid var(--pierre-border);
-  border-radius: 4px;
-  background: var(--pierre-bg);
+  color: var(--pierre-muted);
   font-family: var(--pierre-font);
   font-weight: 400;
 }
 
 .rp-tag {
   padding: 0 4px;
-  border: 1px solid var(--pierre-border);
   border-radius: 8px;
+  background: light-dark(#818b9826, #656c7633);
   color: var(--pierre-muted);
   font: 9px/1.4 var(--pierre-font);
 }
@@ -459,27 +498,16 @@ body {
 }
 
 .related-rules {
-  display: grid;
-  gap: 8px;
   max-width: 820px;
-  margin: 0 0 12px;
-  padding: 0;
-  list-style: none;
 }
 
-.related-rule {
+.box-list > .related-rule {
   display: grid;
   grid-template-columns: minmax(140px, 220px) auto 1fr auto;
   grid-template-areas: 'main arrow files actions';
   align-items: start;
   gap: 8px;
-  padding: 8px;
-  border: 1px solid var(--pierre-border);
-  border-radius: 6px;
-}
-
-.related-rule .group-label {
-  height: 28px;
+  padding: 6px 12px;
 }
 
 .related-rule-arrow {
@@ -488,40 +516,30 @@ body {
   line-height: 28px;
 }
 
-.related-patterns.group-patterns {
-  height: auto;
-  min-height: 28px;
-  padding: 4px 8px;
-}
-
 .related-rule .group-label {
   grid-area: main;
 }
 
+/* Sized to its lines (RuleEditor's rows), so no resize handle. */
 .related-rule .related-patterns {
   grid-area: files;
+  resize: none;
 }
 
-.related-rule-actions {
+.related-rule .row-actions {
   grid-area: actions;
-  display: flex;
-  gap: 4px;
 }
 
-@media (max-width: 720px) {
-  .related-rule {
+@media (max-width: 540px) {
+  .box-list > .related-rule {
     grid-template-columns: 1fr auto;
     grid-template-areas: 'main actions' 'files files';
+    gap: 6px 8px;
   }
 
   .related-rule-arrow {
     display: none;
   }
-}
-
-.related-rule .btn:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 
 .related-probe {
