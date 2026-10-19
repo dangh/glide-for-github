@@ -15,12 +15,12 @@
  *   force-pushed back to its pre-test head from a /tmp clone).
  * The token is used only inside the extension (Pierre's own code); the tests never read its value.
  */
-import type { Frame, Locator, Page, Request, Route } from '@playwright/test';
+import type { BrowserContext, Frame, Locator, Page, Request, Route } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { expect, openPierre, prUrl, SANDBOX, test, type Viewer } from './fixtures';
+import { expect, extensionId, openPierre, prUrl, SANDBOX, test, type Viewer } from './fixtures';
 
 const FILE = 'src/util/math.ts';
 const PREFIX = 'pierre-e2e-';
@@ -246,6 +246,36 @@ async function confirmedInViewer(viewer: Viewer, text: string) {
     )
     .toBe(true);
 }
+
+/**
+ * These tests drive Split view's additions/deletions columns, but the default follows GitHub (Unified, wrapped).
+ * Pin Split + scroll for this file and put the stored settings back afterwards.
+ */
+async function storedSettings(context: BrowserContext, next?: unknown): Promise<unknown> {
+  const ext = await context.newPage();
+  try {
+    await ext.goto(`chrome-extension://${extensionId()}/options.html`);
+    return await ext.evaluate(async (value) => {
+      const before = (await chrome.storage.sync.get('pierre.settings'))['pierre.settings'];
+      if (value === null) await chrome.storage.sync.remove('pierre.settings');
+      else if (value !== undefined) await chrome.storage.sync.set({ 'pierre.settings': value });
+      return before ?? null;
+    }, next);
+  } finally {
+    await ext.close();
+  }
+}
+
+let savedSettings: unknown;
+test.beforeAll(async ({ extContext }) => {
+  savedSettings = await storedSettings(extContext);
+  const pinned = { ...(savedSettings as Record<string, Record<string, unknown>> | null) };
+  pinned.diff = { ...pinned.diff, diffStyle: 'split', overflow: 'scroll' };
+  await storedSettings(extContext, pinned);
+});
+test.afterAll(async ({ extContext }) => {
+  await storedSettings(extContext, savedSettings);
+});
 
 test.describe('threads and the inline composer', () => {
   test('typing keeps focus, caret and text while files load and re-render (read-only)', async ({ page }) => {
@@ -807,6 +837,8 @@ test.describe('viewed sync (Task 10)', () => {
       });
 
       await test.step('token refused (GitHub\'s FORBIDDEN answer, simulated locally) → the GitHub session, no prompt', async () => {
+        // Without a stored token the step above already went through the session; there is no token to refuse.
+        if (!(await tokenStored(viewer.frame()))) return;
         // The stored fine-grained token IS accepted for markFileAsViewed (seen above), so GitHub's refusal of a token
         // ("Resource not accessible by personal access token") is played locally; the session write is real.
         const refuse = async (route: Route) => {
