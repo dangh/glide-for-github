@@ -11,6 +11,7 @@ import {
   groupTabs,
   groupView,
   initFileGroups,
+  renamedGroups,
   shownPaths,
   useFileGroups,
 } from '../../src/viewer/state/fileGroups';
@@ -86,9 +87,43 @@ const pr = (number: number): PrData => ({
   threadMarkers: { threads: [], byPath: {} },
 });
 
-function memoryStorage(items: Record<string, unknown> = {}): GroupsStorage {
-  return { get: async () => items, set: async () => undefined, remove: async () => undefined, subscribe: () => () => undefined };
+function memoryStorage(items: Record<string, unknown> = {}): GroupsStorage & { replace(next: Record<string, unknown>): void } {
+  const listeners = new Set<(keys: string[]) => void>();
+  return {
+    get: async () => items,
+    set: async () => undefined,
+    remove: async () => undefined,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    replace(next) {
+      items = next;
+      for (const l of listeners) l(Object.keys(next));
+    },
+  };
 }
+
+const stored = (list: FileGroup[]) =>
+  Object.fromEntries([[FILE_GROUPS_KEY, list.length], ...list.map((g, i) => [`${FILE_GROUPS_KEY}.${i}`, { label: g.label, patterns: g.patterns.join('\n') }])]);
+
+describe('renamed groups', () => {
+  it('a label gone, and one new label with the same patterns: a rename', () => {
+    const next = groups.map((g) => (g.label === 'Docs' ? { ...g, label: 'Documentation' } : g));
+    expect(renamedGroups(groups, next)).toEqual(new Map([['Docs', 'Documentation']]));
+  });
+
+  it('renamed and edited at once: the label in the same place, when the list kept its length', () => {
+    const next = groups.map((g) => (g.label === 'Docs' ? { label: 'Documentation', patterns: ['*.md', '*.rst'] } : g));
+    expect(renamedGroups(groups, next)).toEqual(new Map([['Docs', 'Documentation']]));
+  });
+
+  it('a group deleted, or deleted and another added elsewhere, is no rename', () => {
+    expect(renamedGroups(groups, groups.filter((g) => g.label !== 'Docs'))).toEqual(new Map());
+    const swapped = [...groups.filter((g) => g.label !== 'Docs'), { label: 'Adr', patterns: ['adr/'] }];
+    expect(renamedGroups(groups, swapped)).toEqual(new Map());
+  });
+});
 
 describe('per pull request memory', () => {
   let off: () => void = () => undefined;
@@ -129,6 +164,24 @@ describe('per pull request memory', () => {
     useFileGroups.getState().choose('Tests');
     store.getState().setPr(pr(1));
     expect(useFileGroups.getState().choice).toBe('Tests');
+  });
+
+  it('a renamed group stays picked, on this PR and in the memory of other PRs', async () => {
+    const storage = memoryStorage(stored(groups));
+    const store = createPrStore();
+    off = initFileGroups(store, storage);
+    await new Promise((r) => setTimeout(r, 0));
+    sessionStorage.setItem(groupMemoryKey(pr(2).ref), 'Docs');
+    sessionStorage.setItem(groupMemoryKey(pr(3).ref), 'Tests');
+    store.getState().setPr(pr(1));
+    useFileGroups.getState().choose('Docs');
+
+    storage.replace(stored(groups.map((g) => (g.label === 'Docs' ? { ...g, label: 'Documentation' } : g))));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(useFileGroups.getState().choice).toBe('Documentation');
+    expect(sessionStorage.getItem(groupMemoryKey(pr(1).ref))).toBe('Documentation');
+    expect(sessionStorage.getItem(groupMemoryKey(pr(2).ref))).toBe('Documentation');
+    expect(sessionStorage.getItem(groupMemoryKey(pr(3).ref))).toBe('Tests');
   });
 
   it('loads the stored groups, then follows the viewer stores', async () => {

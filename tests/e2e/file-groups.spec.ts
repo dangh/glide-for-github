@@ -496,6 +496,7 @@ test.describe('file groups', () => {
 
   test('editing a group in the options changes the tabs live', async ({ page, extContext }) => {
     const viewer = await openPierre(page, REACT, 'hash');
+    await tab(viewer, 'Docs').click();
     const options = await extensionPage(extContext);
     try {
       const section = options.locator('section', { has: options.getByRole('heading', { name: 'File groups' }) });
@@ -508,7 +509,8 @@ test.describe('file groups', () => {
       await section.getByRole('textbox', { name: 'Name of group 3' }).fill('Documentation');
       await expect(section.getByRole('status')).toHaveText('Saved');
       await page.bringToFront();
-      await expect(tab(viewer, 'Documentation')).toBeVisible();
+      // The renamed group stays open.
+      await expect(tab(viewer, 'Documentation')).toHaveAttribute('aria-selected', 'true');
       const counts = await tabCounts(viewer);
       expect(counts.Documentation).toBe(5);
       expect(counts.Compiler).toBeGreaterThan(0);
