@@ -499,6 +499,30 @@ test.describe('file groups', () => {
     }
   });
 
+  test("the open group's diffs are requested first, then the rest of the PR (Sift's load the open tab first)", async ({ page, extContext }) => {
+    await setSettings(extContext, 'fileGroups', { defaultGroup: 'Tests' });
+    const requested: string[] = [];
+    const onRequest = (request: { url(): string }) => {
+      const url = new URL(request.url());
+      if (!url.pathname.endsWith('/page_data/diff_entries')) return;
+      for (const path of (url.searchParams.get('paths') ?? '').split(',').filter(Boolean).map(decodeURIComponent)) {
+        if (!requested.includes(path)) requested.push(path);
+      }
+    };
+    page.on('request', onRequest);
+    try {
+      const viewer = await openPierre(page, REACT, 'hash');
+      await viewer.allFetched();
+      const tests = (await listState(viewer)).inList;
+      expect(tests).toHaveLength(80);
+      expect(requested).toHaveLength(167);
+      expect(requested.slice(0, 80).sort()).toEqual([...tests].sort());
+    } finally {
+      page.off('request', onRequest);
+      await writeGlideSync(extContext, {});
+    }
+  });
+
   test('editing a group in the options changes the tabs live', async ({ page, extContext }) => {
     const viewer = await openPierre(page, REACT, 'hash');
     await tab(viewer, 'Docs').click();
