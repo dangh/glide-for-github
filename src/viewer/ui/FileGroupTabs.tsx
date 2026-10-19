@@ -18,6 +18,7 @@ import { session } from '../state/session';
 import { usePr } from '../state/store';
 import { useDismiss } from './dismiss';
 import { CheckIcon, TriangleDownIcon } from './icons';
+import { viewerRoot } from '../rootEl';
 
 const MOVES: Record<string, (i: number, n: number) => number> = {
   ArrowRight: (i, n) => (i + 1) % n,
@@ -121,7 +122,7 @@ function GroupMenu({ tabs, active, choose, hidden }: { tabs: GroupTab[]; active:
     };
     place();
     const observer = new ResizeObserver(place);
-    observer.observe(document.documentElement);
+    observer.observe(viewerRoot.el);
     observer.observe(panel);
     const items = [...panel.querySelectorAll<HTMLElement>('[role="menuitemradio"]')];
     const target = focusOnOpen.current === 'last' ? items.at(-1) : (items.find((i) => i.getAttribute('aria-checked') === 'true') ?? items[0]);
@@ -153,7 +154,7 @@ function GroupMenu({ tabs, active, choose, hidden }: { tabs: GroupTab[]; active:
 
   const onMenuKey = (e: KeyboardEvent) => {
     const items = [...(menu.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? [])];
-    const at = items.indexOf(document.activeElement as HTMLElement);
+    const at = items.indexOf(viewerRoot.scope.activeElement as HTMLElement);
     const move = MENU_MOVES[e.key];
     if (move) {
       e.preventDefault();
@@ -241,7 +242,7 @@ export const FileGroupTabs = memo(function FileGroupTabs() {
   useLayoutEffect(() => {
     if (wasCompact.current === compact) return;
     wasCompact.current = compact;
-    if (!slot.current?.contains(document.activeElement)) return;
+    if (!slot.current?.contains(viewerRoot.scope.activeElement)) return;
     const target = compact
       ? slot.current.querySelector<HTMLElement>('[data-testid="file-groups-button"]')
       : list.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');

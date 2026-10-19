@@ -6,6 +6,7 @@
  * dialog has its own Cancel.
  */
 import { useEffect, type RefObject } from 'react';
+import { viewerRoot } from './../rootEl';
 
 export function useDismiss(
   open: boolean,
@@ -24,14 +25,14 @@ export function useDismiss(
       if (e.key === 'Escape') close();
     };
     const onBlur = () => {
-      if (!document.querySelector('[aria-modal="true"]')) close();
+      if (!viewerRoot.scope.querySelector('[aria-modal="true"]')) close();
     };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
+    viewerRoot.scope.addEventListener('mousedown', onDown as EventListener);
+    viewerRoot.scope.addEventListener('keydown', onKey as EventListener);
     window.addEventListener('blur', onBlur);
     return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
+      viewerRoot.scope.removeEventListener('mousedown', onDown as EventListener);
+      viewerRoot.scope.removeEventListener('keydown', onKey as EventListener);
       window.removeEventListener('blur', onBlur);
     };
   }, [open, root, close, keepFor]);

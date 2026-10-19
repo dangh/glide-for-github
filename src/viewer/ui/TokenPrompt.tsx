@@ -13,6 +13,7 @@ import { cancelPrompt, completePrompt, useTokenPrompt, type TokenPromptRequest }
 import { DEFAULT_OWNER_KEY, removeToken, setToken } from '../auth/tokens';
 import { GithubApi } from '../github/api';
 import { isWriteError } from '../github/errors';
+import { viewerRoot } from '../rootEl';
 
 export const CLASSIC_TOKEN_URL = 'https://github.com/settings/tokens/new?scopes=repo&description=' + encodeURIComponent(BRAND.name);
 const FINE_GRAINED_TOKEN_URL = 'https://github.com/settings/personal-access-tokens/new';
@@ -81,7 +82,7 @@ function TokenDialog({ request, standalone }: DialogProps) {
   // Focus management: password field first (owner field in standalone mode), Tab trapped inside, focus returned to the opener on close.
   useEffect(() => {
     alive.current = true;
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const opener = viewerRoot.scope.activeElement instanceof HTMLElement ? viewerRoot.scope.activeElement : null;
     (isStandalone ? dialog.current?.querySelector<HTMLInputElement>('input[name="pierre-token-owner"]') : field.current)?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -96,7 +97,7 @@ function TokenDialog({ request, standalone }: DialogProps) {
       if (items.length === 0) return;
       const first = items[0]!;
       const last = items[items.length - 1]!;
-      const active = document.activeElement;
+      const active = viewerRoot.scope.activeElement;
       const outside = !(active instanceof Node) || !dialog.current.contains(active);
       if (e.shiftKey && (active === first || outside)) {
         e.preventDefault();
@@ -106,10 +107,10 @@ function TokenDialog({ request, standalone }: DialogProps) {
         first.focus();
       }
     };
-    document.addEventListener('keydown', onKey, true);
+    viewerRoot.scope.addEventListener('keydown', onKey as EventListener, true);
     return () => {
       alive.current = false;
-      document.removeEventListener('keydown', onKey, true);
+      viewerRoot.scope.removeEventListener('keydown', onKey as EventListener, true);
       opener?.focus?.();
     };
   }, [cancel, isStandalone]);

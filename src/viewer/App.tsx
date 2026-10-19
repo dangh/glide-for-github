@@ -24,6 +24,7 @@ import { FatalError, Notice } from './ui/Notice';
 import { TokenPromptHost } from './ui/TokenPrompt';
 import { Toolbar } from './ui/Toolbar';
 import { TreePane } from './ui/TreePane';
+import { viewerRoot } from './rootEl';
 
 const workerRenderOptions = (diff: DisplaySettings['diff']) => {
   const d = resolveDiff(diff);
@@ -35,15 +36,18 @@ const workerRenderOptions = (diff: DisplaySettings['diff']) => {
   };
 };
 
+/** SPIKE (in-page): how highlighting runs; `'main'` is no pool (main-thread highlighting). */
+export const workerSpike: { factory?: (() => Worker) | 'main'; poolSize?: number } = {};
+
 /** Pierre's worker pool, or undefined (main-thread highlighting) when workers cannot be created. */
 function createWorkerPool(settings: DisplaySettings): WorkerPoolManager | undefined {
   try {
-    if (typeof Worker === 'undefined') return undefined;
+    if (typeof Worker === 'undefined' || workerSpike.factory === 'main') return undefined;
     const url = chrome.runtime.getURL('pierre-worker.js');
     return getOrCreateWorkerPoolSingleton({
       poolOptions: {
-        workerFactory: () => new Worker(url, { type: 'module' }),
-        poolSize: Math.max(2, Math.min(4, (navigator.hardwareConcurrency || 4) - 1)),
+        workerFactory: workerSpike.factory ?? (() => new Worker(url, { type: 'module' })),
+        poolSize: workerSpike.poolSize ?? Math.max(2, Math.min(4, (navigator.hardwareConcurrency || 4) - 1)),
         // A failing pool falls back to main-thread highlighting on its own; keep the console quiet.
         onWorkerError: (event) => event.preventDefault(),
       },
@@ -107,7 +111,7 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
   useEffect(() => () => session.loader?.cancel(), []);
 
   useEffect(() => {
-    const root = document.documentElement;
+    const root = viewerRoot.el;
     root.dataset.theme = themeType;
     root.style.colorScheme = themeType === 'system' ? 'light dark' : themeType;
   }, [themeType]);
@@ -142,7 +146,7 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
         </div>
         <Notice />
         <CommitDialogHost />
-        <TokenPromptHost />
+        {viewerRoot.scope instanceof Document && <TokenPromptHost />}
       </div>
     </WorkerPoolContext.Provider>
   );

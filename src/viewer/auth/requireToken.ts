@@ -11,6 +11,7 @@ import { noTokenError, WriteError } from '../github/errors';
 import type { PrRef } from '../../shared/pr-url';
 import { usePr } from '../state/store';
 import { getToken } from './tokens';
+import { viewerRoot } from '../rootEl';
 
 export type NoTokenError = WriteError & { kind: 'no-token' };
 
@@ -65,6 +66,9 @@ export async function requireToken(owner: string, reason?: string, options: Requ
     const stored = await getToken(owner);
     if (stored) return new GithubApi(stored, ref);
   }
+
+  // Page scripts can read an open shadow root. Keep token entry on an extension page.
+  if (viewerRoot.scope instanceof ShadowRoot) throw new Error('Connect GitHub in Glide extension options before using review actions in this spike.');
 
   const key = owner.toLowerCase();
   const existing = pending.get(key);

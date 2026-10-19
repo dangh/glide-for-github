@@ -10,6 +10,7 @@ import { errorMessage } from '../state/review';
 import { commitSuggestions, DEFAULT_COMMIT_MESSAGE, suggestionRefs } from '../state/suggestions';
 import { sameSuggestion, usePr, type SuggestionRef } from '../state/store';
 import { reloadPullRequest } from './Notice';
+import { viewerRoot } from '../rootEl';
 
 const useCommitDialog = create<{ refs: SuggestionRef[] | null }>(() => ({ refs: null }));
 
@@ -105,8 +106,8 @@ function CommitDialog({ refs }: { refs: SuggestionRef[] }) {
       e.stopPropagation();
       if (!busyRef.current) close();
     };
-    document.addEventListener('keydown', onKey, true);
-    return () => document.removeEventListener('keydown', onKey, true);
+    viewerRoot.scope.addEventListener('keydown', onKey as EventListener, true);
+    return () => viewerRoot.scope.removeEventListener('keydown', onKey as EventListener, true);
   }, []);
 
   const commit = async (event?: React.FormEvent) => {
