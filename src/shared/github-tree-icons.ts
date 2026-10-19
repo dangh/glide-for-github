@@ -132,6 +132,12 @@ export const GITHUB_TREE_CSS = `
   --trees-item-padding-x-override: 0px;
   --trees-item-row-gap-override: 8px;
 }
+[data-type="item"] {
+  padding-inline-end: 8px;
+}
+[data-item-section="decoration"] {
+  min-width: max-content;
+}
 [data-file-tree-virtualized-scroll="true"] {
   padding-inline: var(--glide-tree-start, 1px) var(--glide-tree-end, 16px);
 }
