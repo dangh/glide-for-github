@@ -27,6 +27,14 @@ export interface PageScroll {
 /** GitHub's site footer. */
 const FOOTER = 'footer[role="contentinfo"]';
 
+/**
+ * At a fractional device pixel ratio (browser zoom) Chrome can drop an out-of-process iframe's outermost device pixel
+ * column, and the viewer's content runs to its frame's edges in `frame` and `page`: so that column was a file box's
+ * border. The iframe reaches 1 px into GitHub's gutters on each side and the viewer keeps 1 px clear inside each edge
+ * (viewer.css `--gutter`), so its content still lines up with GitHub's.
+ */
+export const FRAME_OVERHANG = 'margin-left:-1px;margin-right:-1px;width:calc(100% + 2px);';
+
 /** A wheel hand-off is dropped while the page has scrolled by itself this recently. */
 const OWN_SCROLL_MS = 200;
 
@@ -55,9 +63,9 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
 
   /**
    * `merged`: the iframe reaches past GitHub's page gutters to the viewport's edges, so its toolbar spans the viewport
-   * once stuck, like GitHub's; the viewer keeps the gutters around its content.
+   * once stuck, like GitHub's; the viewer keeps the gutters around its content. `page`: FRAME_OVERHANG.
    */
-  let bleed = '';
+  let bleed = layout === 'merged' ? '' : FRAME_OVERHANG;
 
   const layoutSizes = () => {
     const sizes = stickySizes(stickTop, extent);

@@ -24,6 +24,9 @@ Newest first. Each release's GitHub notes are its section here (`scripts/release
   the new side's line numbers directly, through changed lines, empty sides and expander rows.
 - No more "ResizeObserver loop completed with undelivered notifications" in Glide's errors on chrome://extensions:
   Chrome's harmless resize report is marked handled.
+- File boxes keep their right border when the page is zoomed, for one to 90% on a Retina Mac. A box that reached the
+  edge of the diff list or of Glide's frame lost its border there. The boxes still line up with the toolbar and with
+  GitHub's page above.
 
 ## 0.3.1 (2026-10-19)
 

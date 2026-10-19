@@ -2,7 +2,7 @@ import { BRAND } from '../shared/brand';
 import { SCROLL_LAYOUT_PARAM, type ScrollLayout } from '../shared/page-scroll';
 import { prKey, type PrRef } from '../shared/pr-url';
 import { reachedBreakpoints, type ViewportMessage } from '../shared/viewport';
-import { createPageScroll } from './page-scroll';
+import { createPageScroll, FRAME_OVERHANG } from './page-scroll';
 import { findTabNav } from './tab';
 
 /** The viewer never gets shorter than this (small windows scroll the page instead). */
@@ -72,7 +72,7 @@ export function mountViewer(doc: Document, ref: PrRef, layout: ScrollLayout = 'f
   iframe.setAttribute('data-pierre-viewer', '');
   // A cross-origin frame may write the clipboard (copy branch name, copy path) only when its embedder delegates it.
   iframe.setAttribute('allow', 'clipboard-write');
-  iframe.style.cssText = `display:block;width:100%;border:0;min-height:${MIN_VIEWER_HEIGHT_PX}px;`;
+  iframe.style.cssText = `display:block;border:0;min-height:${MIN_VIEWER_HEIGHT_PX}px;${FRAME_OVERHANG}`;
   const pageScroll = layout === 'frame' ? null : createPageScroll(doc, anchor, iframe, layout);
   /** What sits in the page: the iframe, or the page-scroll wrapper holding it. */
   const outer: HTMLElement = pageScroll?.wrapper ?? iframe;

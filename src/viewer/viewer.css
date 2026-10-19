@@ -80,8 +80,14 @@ button {
 /*
  * Merged bar (page-scrolling experiment): the iframe spans the viewport (src/content/page-scroll.ts), so GitHub's page
  * gutters (Primer's container: 16 px, 24 px from 768 px, 32 px from 1012 px) move inside it. `data-viewport` lists the
- * breakpoints GitHub's viewport reaches (src/shared/viewport.ts).
+ * breakpoints GitHub's viewport reaches (src/shared/viewport.ts). Without it the iframe reaches 1 px past GitHub's
+ * content edges instead (FRAME_OVERHANG, src/content/page-scroll.ts): Chrome can drop the frame's outermost device
+ * pixel column at a fractional device pixel ratio, so nothing is drawn there.
  */
+:root {
+  --gutter: 1px;
+}
+
 html[data-scroll-layout='merged'] {
   --gutter: 16px;
 }
@@ -94,7 +100,7 @@ html[data-scroll-layout='merged'][data-viewport~='lg'] {
   --gutter: 32px;
 }
 
-html[data-scroll-layout='merged'] .pierre-app {
+.pierre-app {
   padding-inline: var(--gutter);
 }
 
@@ -797,13 +803,20 @@ html:not([data-viewport~='lg']) .viewed-word {
   display: none;
 }
 
-/* With no tree beside them the diffs start where the toolbar does, like GitHub's with its tree collapsed. */
+/*
+ * With no tree beside them the diffs start where the toolbar does, like GitHub's with its tree collapsed. A file box
+ * never touches the edge of the list's scroll container, though: at a fractional device pixel ratio (browser zoom)
+ * Chrome snaps the container's clip and the box's border to different device pixels and drops the border. So on a
+ * side without padding the list reaches 1 px further, into `--gutter`, and keeps that 1 px clear.
+ */
 .pierre-body[data-tree-hidden] .pierre-diffs {
-  padding-left: 0;
+  padding-left: 1px;
+  margin-left: -1px;
 }
 
 html[data-scroll-layout] .pierre-body[data-tree-hidden] .pierre-diffs {
-  padding-inline: 0;
+  padding-inline: 1px;
+  margin-inline: -1px;
 }
 
 .pierre-tree-pane {
@@ -831,7 +844,8 @@ html[data-scroll-layout] .pierre-body[data-tree-hidden] .pierre-diffs {
 }
 
 .pierre-body[data-tree-position='right'] .pierre-diffs {
-  padding-left: 0;
+  padding-left: 1px;
+  margin-left: -1px;
 }
 
 .pierre-tree {
@@ -868,7 +882,8 @@ html[data-scroll-layout] .pierre-diffs {
 
 /* No list scrollbar to keep the file boxes off: the side facing the page edge lines up with the toolbar. */
 html[data-scroll-layout] .pierre-body[data-tree-position='left'] .pierre-diffs {
-  padding-right: 0;
+  padding-right: 1px;
+  margin-right: -1px;
 }
 
 

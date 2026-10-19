@@ -304,14 +304,17 @@ describe('merged layout', () => {
     expect(observers.size).toBe(0);
   });
 
-  it('page layout keeps the iframe inside the gutters', () => {
+  it('page and frame layouts keep the iframe inside the gutters, but for 1 px on each side', () => {
     addStickyHeader();
-    const host = mountViewer(document, ref, 'page');
-    wrapperX = { left: 32, right: 1553, viewport: 1585 };
-    resizeAll();
-    expect(host.iframe.style.marginLeft).toBe('');
-    expect(host.iframe.style.width).toBe('100%');
-    host.unmount();
+    for (const layout of ['page', 'frame'] as const) {
+      const host = mountViewer(document, ref, layout);
+      wrapperX = { left: 32, right: 1553, viewport: 1585 };
+      resizeAll();
+      expect(host.iframe.style.marginLeft).toBe('-1px');
+      expect(host.iframe.style.marginRight).toBe('-1px');
+      expect(host.iframe.style.width).toBe('calc(100% + 2px)');
+      host.unmount();
+    }
   });
 
   it('without a header to hide it falls back to the page layout (nothing hidden)', () => {
