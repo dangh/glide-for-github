@@ -18,7 +18,6 @@ import { usePr } from './state/store';
 import { BatchBar, CommitDialogHost } from './ui/ApplySuggestions';
 import { DiffPane } from './ui/DiffPane';
 import { DisplayStyle } from './ui/DisplayStyle';
-import { FileGroupTabs } from './ui/FileGroupTabs';
 import { FatalError, Notice } from './ui/Notice';
 import { TokenPromptHost } from './ui/TokenPrompt';
 import { Toolbar } from './ui/Toolbar';
@@ -113,7 +112,6 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
       <div className="pierre-app">
         <DisplayStyle />
         <Toolbar />
-        <FileGroupTabs />
         <BatchBar />
         {/* DOM order follows the visual order (tree first or last), so keyboard focus order matches the screen. */}
         {/* A hidden tree stays mounted (display: none), so its expanded folders and filter survive a collapse. */}

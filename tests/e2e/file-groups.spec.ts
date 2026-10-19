@@ -75,6 +75,84 @@ const listState = (viewer: Viewer) =>
     return { inList, order, selected: document.querySelector('[role="tab"][aria-selected="true"]')?.textContent ?? null };
   });
 
+/**
+ * The toolbar's visible controls and whether any is cut off or overlaps another: each must sit inside the toolbar's
+ * content box (inside the page gutters) and inside the window. `form` says which form the file groups show.
+ */
+const toolbarLayout = (viewer: Viewer) =>
+  viewer.frame().evaluate(() => {
+    const bar = document.querySelector<HTMLElement>('.pierre-toolbar')!;
+    const cs = getComputedStyle(bar);
+    const box = bar.getBoundingClientRect();
+    const left = Math.max(0, box.left + parseFloat(cs.paddingLeft));
+    const right = Math.min(document.documentElement.clientWidth, box.right - parseFloat(cs.paddingRight));
+    const CONTROLS = 'button, a, .viewed-counter, .pr-state, .pr-number, .toolbar-divider';
+    const visible = (el: Element) => el.checkVisibility({ visibilityProperty: true, opacityProperty: true }) && el.getBoundingClientRect().width > 0;
+    const all = [...bar.querySelectorAll(CONTROLS)].filter((el) => visible(el) && !el.closest('.popover-panel'));
+    // Leaves only: a control holding another (the merged title link holds nothing; a tab list's tabs are leaves).
+    const leaves = all.filter((el) => !all.some((o) => o !== el && el.contains(o)));
+    const name = (el: Element) => (el.getAttribute('aria-label') || el.textContent || el.className).trim().slice(0, 30);
+    const problems: string[] = [];
+    /** The part of `el` left visible by the ancestors that clip it (the branch summary cuts off its end). */
+    const shownRect = (el: Element) => {
+      const r = el.getBoundingClientRect();
+      let { left: l, right: rt } = r;
+      for (let p = el.parentElement; p && p !== bar; p = p.parentElement) {
+        if (getComputedStyle(p).overflowX === 'visible') continue;
+        const c = p.getBoundingClientRect();
+        l = Math.max(l, c.left);
+        rt = Math.min(rt, c.right);
+      }
+      return { left: l, right: rt, top: r.top, bottom: r.bottom };
+    };
+    const rects = leaves.map((el) => ({ el, r: shownRect(el) })).filter(({ r }) => r.right - r.left > 0.5);
+    for (const { el, r } of rects) {
+      if (r.left < left - 0.5 || r.right > right + 0.5) problems.push(`${name(el)} outside [${Math.round(left)}, ${Math.round(right)}]: ${Math.round(r.left)}-${Math.round(r.right)}`);
+    }
+    // The merged title's row overlaps the commit range row under it by 4 px, as GitHub's sticky title does.
+    const row = (el: Element) => (el.closest('.pr-title-row') ? 'title' : el.closest('.pr-summary-row') ? 'summary' : null);
+    for (let i = 0; i < rects.length; i++) {
+      for (let j = i + 1; j < rects.length; j++) {
+        const rows = [row(rects[i]!.el), row(rects[j]!.el)];
+        if (rows.includes('title') && rows.includes('summary')) continue;
+        const a = rects[i]!.r;
+        const b = rects[j]!.r;
+        // Tabs share their 1 px borders by design.
+        const overlap = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+        const vertical = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        if (overlap > 1.5 && vertical > 1.5) problems.push(`${name(rects[i]!.el)} overlaps ${name(rects[j]!.el)} by ${Math.round(overlap)} px`);
+      }
+    }
+    const slot = document.querySelector('[data-testid="file-groups"]');
+    return {
+      problems,
+      form: !slot ? 'none' : slot.hasAttribute('data-compact') ? 'menu' : 'tabs',
+      width: Math.round(box.width),
+    };
+  });
+
+/** Every width from GitHub's narrowest phone layout up: the ones where GitHub's toolbar changes, and the gaps between. */
+const WIDTHS = [320, 360, 414, 480, 500, 544, 600, 700, 767, 768, 840, 900, 1012, 1100, 1180, 1280, 1400, 1600];
+
+async function sweep(viewer: Viewer, label: string, prepare?: () => Promise<void>) {
+  const page = viewer.page;
+  const forms: Record<number, string> = {};
+  try {
+    for (const width of WIDTHS) {
+      await page.setViewportSize({ width, height: 900 });
+      await prepare?.();
+      // Resize observers and GitHub's own layout settle over a few frames.
+      await page.waitForTimeout(250);
+      const layout = await toolbarLayout(viewer);
+      expect(layout.problems, `${label} at ${width} px`).toEqual([]);
+      forms[width] = layout.form;
+    }
+  } finally {
+    await page.setViewportSize({ width: 1400, height: 900 });
+  }
+  return forms;
+}
+
 let saved: Record<string, unknown> = {};
 
 test.beforeAll(async ({ extContext }) => {
@@ -99,6 +177,140 @@ test.describe('file groups', () => {
     // All is today's view: every file in the list.
     const state = await listState(viewer);
     expect(state.inList).toEqual(state.order);
+  });
+
+  test('the tabs sit in the toolbar row, left of the viewed counter; there is no row of their own', async ({ page }) => {
+    const viewer = await openPierre(page, REACT, 'hash');
+    const place = await viewer.frame().evaluate(() => {
+      const bar = document.querySelector('.pierre-toolbar')!;
+      const tabs = document.querySelector('[role="tablist"]')!;
+      const viewed = document.querySelector('[data-testid="viewed-counter"]')!.getBoundingClientRect();
+      const r = tabs.getBoundingClientRect();
+      return { inBar: bar.contains(tabs), gap: Math.round(viewed.left - r.right), middle: Math.round(r.top + r.height / 2 - (viewed.top + viewed.height / 2)), height: Math.round(r.height), rows: document.querySelectorAll('.pierre-app > .file-groups').length };
+    });
+    // Sift's spacing: 12 px before the viewed counter, centred on the row, 28 px tall.
+    expect(place).toEqual({ inBar: true, gap: 12, middle: 0, height: 28, rows: 0 });
+  });
+
+  for (const tree of ['left', 'right'] as const) {
+    test(`toolbar with the tree ${tree}: tabs when they fit, else the menu, and nothing is cut off or overlaps from 320 px up`, async ({ page, extContext }) => {
+      await setSettings(extContext, 'layout', { treePosition: tree });
+      try {
+        const viewer = await openPierre(page, REACT, 'hash');
+        const forms = await sweep(viewer, `frame, tree ${tree}`);
+        expect(forms[320]).toBe('menu');
+        // At 1100 px Split/Unified, Wrap and Hide whitespace make room (they are in the Display menu too).
+        expect(forms[1100]).toBe('tabs');
+        expect(forms[1600]).toBe('tabs');
+        const toggles = () => viewer.frame().evaluate(() => [...document.querySelectorAll('.diff-toggle')].some((el) => el.getClientRects().length > 0));
+        await page.setViewportSize({ width: 1100, height: 900 });
+        await expect.poll(toggles).toBe(false);
+        await page.setViewportSize({ width: 1600, height: 900 });
+        await expect.poll(toggles).toBe(true);
+        await page.setViewportSize({ width: 1400, height: 900 });
+      } finally {
+        await writeGlideSync(extContext, {});
+      }
+    });
+  }
+
+  test('narrow: a menu button with the open group and its count; keyboard and ARIA like a menu', async ({ page }) => {
+    const viewer = await openPierre(page, REACT, 'hash');
+    await tab(viewer, 'Tests').click();
+    try {
+      await page.setViewportSize({ width: 700, height: 900 });
+      const button = viewer.locator.getByTestId('file-groups-button');
+      await expect(viewer.locator.getByRole('button', { name: 'File group: Tests 80' })).toBeVisible();
+      await expect(button).toHaveAttribute('aria-haspopup', 'menu');
+      await expect(button).toHaveAttribute('aria-expanded', 'false');
+      // The hidden tabs are out of the accessibility tree and the Tab order.
+      await expect(viewer.locator.getByRole('tablist', { name: 'File groups' })).toHaveCount(0);
+      const menu = viewer.locator.getByRole('menu', { name: 'File groups' });
+      const item = (name: string) => menu.getByRole('menuitemradio', { name: new RegExp(`^${name} \\d+$`) });
+
+      // Enter opens it on the open group; arrows, Home and End move; Enter picks, closes and focuses the button.
+      await button.focus();
+      await page.keyboard.press('Enter');
+      await expect(button).toHaveAttribute('aria-expanded', 'true');
+      await expect(item('Tests')).toBeFocused();
+      await expect(item('Tests')).toHaveAttribute('aria-checked', 'true');
+      const items = (await menu.getByRole('menuitemradio').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
+      expect(items).toEqual(['All 167', 'Source 59', 'Tests 80', 'Docs 5', 'Manifest 23']);
+      await page.keyboard.press('ArrowDown');
+      await expect(item('Docs')).toBeFocused();
+      await page.keyboard.press('End');
+      await expect(item('Manifest')).toBeFocused();
+      await page.keyboard.press('ArrowDown');
+      await expect(item('All')).toBeFocused();
+      await page.keyboard.press('Home');
+      await page.keyboard.press('ArrowDown');
+      await expect(item('Source')).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(menu).toHaveCount(0);
+      await expect(button).toBeFocused();
+      await expect(viewer.locator.getByRole('button', { name: 'File group: Source 59' })).toBeVisible();
+      expect((await listState(viewer)).inList).toHaveLength(59);
+
+      // Up opens it on the last group; typing a letter jumps to a group; Escape closes and keeps the group.
+      await page.keyboard.press('ArrowUp');
+      await expect(item('Manifest')).toBeFocused();
+      await page.keyboard.press('d');
+      await expect(item('Docs')).toBeFocused();
+      await page.keyboard.press('Escape');
+      await expect(menu).toHaveCount(0);
+      await expect(button).toBeFocused();
+      await expect(button).toHaveAccessibleName('File group: Source 59');
+
+      // A click picks too; a click outside closes.
+      await viewer.locator.getByTestId('file-groups-button').click();
+      await item('Docs').click();
+      await expect(viewer.locator.getByRole('button', { name: 'File group: Docs 5' })).toBeVisible();
+      expect((await listState(viewer)).inList).toHaveLength(5);
+      await viewer.locator.getByTestId('file-groups-button').click();
+      await expect(menu).toBeVisible();
+      await viewer.locator.getByTestId('viewed-counter').click();
+      await expect(menu).toHaveCount(0);
+
+      // At 320 px the menu stays inside the window.
+      await page.setViewportSize({ width: 320, height: 900 });
+      await viewer.locator.getByTestId('file-groups-button').click();
+      const inside = await viewer.frame().evaluate(() => {
+        const r = document.querySelector('[role="menu"]')!.getBoundingClientRect();
+        return r.left >= 0 && r.right <= document.documentElement.clientWidth;
+      });
+      expect(inside).toBe(true);
+      await page.keyboard.press('Escape');
+
+      // Wide again: the tabs come back with the same group open, and focus moves to it from the button.
+      await viewer.locator.getByTestId('file-groups-button').focus();
+      await page.setViewportSize({ width: 1400, height: 900 });
+      await expect(tab(viewer, 'Docs')).toHaveAttribute('aria-selected', 'true');
+      await expect(tab(viewer, 'Docs')).toBeFocused();
+    } finally {
+      await page.setViewportSize({ width: 1400, height: 900 });
+    }
+  });
+
+  test('merged bar, before and after it sticks: tabs or menu, nothing cut off or overlapping from 320 px up', async ({ page, extContext }) => {
+    await setSettings(extContext, 'experiments', { pageScroll: true, mergedBar: true });
+    try {
+      const viewer = await openPierre(page, REACT, 'hash');
+      const top = await sweep(viewer, 'merged, top', async () => {
+        await page.evaluate(() => window.scrollTo(0, 0));
+      });
+      const stuck = await sweep(viewer, 'merged, stuck', async () => {
+        // Past GitHub's header, so the viewer is stuck to the top of the window.
+        await page.evaluate(() => window.scrollTo(0, scrollY + document.querySelector('iframe[data-pierre-viewer]')!.getBoundingClientRect().top + 600));
+        await expect.poll(() => viewer.frame().evaluate(() => document.querySelector('.pierre-toolbar')!.hasAttribute('data-stuck'))).toBe(true);
+      });
+      expect(top[320]).toBe('menu');
+      expect(top[1100]).toBe('tabs');
+      // Stuck, the long title (react#37778's) gives way first, as GitHub's sticky title does beside Sift's tabs.
+      expect(stuck[320]).toBe('menu');
+      expect(stuck[1100]).toBe('tabs');
+    } finally {
+      await writeGlideSync(extContext, {});
+    }
   });
 
   test('Tests filters the tree and the diffs, instantly, and loaded diffs stay loaded; viewed stays global', async ({ page }) => {
