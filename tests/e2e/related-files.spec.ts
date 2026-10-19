@@ -220,10 +220,21 @@ test.describe('related files', () => {
     await viewer.locator.getByTestId('display-menu').click();
     const select = viewer.locator.getByRole('combobox', { name: 'Related files', exact: true });
     await expect(select).toHaveValue('nested');
+    /** The gap above remote/package-lock.json, and how far it and its main file are drawn from where CodeView laid them out. */
+    const gap = async () => {
+      const [main, lock] = await boxes(viewer, ['remote/package.json', 'remote/package-lock.json']);
+      return main && lock ? { gap: Math.round(lock.top - main.bottom), drift: [main.drift, lock.drift] } : null;
+    };
+    await viewer.scrollToFile('remote/package.json');
+    await expect.poll(gap).toEqual({ gap: 0, drift: [0, 0] });
     await select.selectOption('rail');
     await expect.poll(() => listItems(viewer)).toContain('/related/package.json');
+    await expect.poll(gap).toEqual({ gap: 16, drift: [0, 0] });
+    await select.selectOption('box');
+    await expect.poll(gap).toEqual({ gap: 0, drift: [0, 0] });
     await select.selectOption('nested');
     await expect.poll(() => listItems(viewer)).not.toContain('/related/package.json');
+    await expect.poll(gap).toEqual({ gap: 0, drift: [0, 0] });
     await page.keyboard.press('Escape');
   });
 
