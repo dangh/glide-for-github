@@ -59,6 +59,10 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
   const range = usePr((s) => s.range);
   const settingsLoaded = useSettings((s) => s.loaded);
   const groupsLoaded = useFileGroups((s) => s.loaded);
+  const hasGroups = useFileGroups((s) => s.groups.length > 0);
+  const groupsEnabled = useSettings((s) => s.settings.fileGroups.enabled);
+  const fileCount = usePr((s) => s.order.length);
+  const showGroupPanel = groupsEnabled && groupsLoaded && hasGroups && fileCount > 0;
   const hideWhitespace = useSettings((s) => s.settings.review.hideWhitespace);
   const diffSettings = useSettings((s) => s.settings.diff);
   const themeType = useSettings((s) => effectiveThemeType(s.settings.diff.themeType, s.colorMode));
@@ -117,7 +121,14 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
         <BatchBar />
         {/* DOM order follows the visual order (tree first or last), so keyboard focus order matches the screen. */}
         {/* A hidden tree stays mounted (display: none), so its expanded folders and filter survive a collapse. */}
-        <div className="pierre-body" data-tree-position={treePosition} data-tree-hidden={showTree ? undefined : ''}>
+        <div
+          className="pierre-body"
+          id="file-group-panel"
+          role={showGroupPanel ? 'tabpanel' : undefined}
+          aria-label={showGroupPanel ? 'Changed files' : undefined}
+          data-tree-position={treePosition}
+          data-tree-hidden={showTree ? undefined : ''}
+        >
           {treePosition === 'left' && <TreePane />}
           {/* The list waits for the file groups too, so it never shows other groups' files first (Sift's no-flash fix). */}
           <main className="pierre-main">

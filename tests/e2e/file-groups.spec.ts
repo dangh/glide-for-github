@@ -188,6 +188,8 @@ test.describe('file groups', () => {
       const r = tabs.getBoundingClientRect();
       return { inBar: bar.contains(tabs), gap: Math.round(viewed.left - r.right), middle: Math.round(r.top + r.height / 2 - (viewed.top + viewed.height / 2)), height: Math.round(r.height), rows: document.querySelectorAll('.pierre-app > .file-groups').length };
     });
+    await expect(tab(viewer, 'All')).toHaveAttribute('aria-controls', 'file-group-panel');
+    await expect(viewer.locator.getByRole('tabpanel', { name: 'Changed files' })).toHaveAttribute('id', 'file-group-panel');
     // Sift's spacing: 12 px before the viewed counter, centred on the row, 28 px tall.
     expect(place).toEqual({ inBar: true, gap: 12, middle: 0, height: 28, rows: 0 });
   });
@@ -655,6 +657,7 @@ test.describe('file groups', () => {
     await setSettings(extContext, 'fileGroups', { enabled: false }, page);
     try {
       await expect(viewer.locator.getByTestId('file-groups')).toHaveCount(0);
+      await expect(viewer.locator.getByRole('tabpanel')).toHaveCount(0);
       await expect.poll(async () => (await listState(viewer)).inList.length).toBe(167);
     } finally {
       await writeGlideSync(extContext, {});

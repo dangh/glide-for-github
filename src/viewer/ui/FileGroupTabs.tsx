@@ -282,6 +282,7 @@ export const FileGroupTabs = memo(function FileGroupTabs() {
               className="file-group"
               data-group={label}
               aria-selected={selected}
+              aria-controls="file-group-panel"
               tabIndex={selected ? 0 : -1}
               onPointerDown={() => (restoreSearch.current = session.keepTreeSearch?.())}
               onClick={() => {
