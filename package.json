@@ -8,6 +8,7 @@
   },
   "description": "Chrome extension that adds a Glide tab to GitHub PR pages, powered by Pierre",
   "scripts": {
+    "postinstall": "patch-package",
     "build": "node build.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
@@ -18,7 +19,7 @@
     "zip": "node scripts/zip.mjs"
   },
   "dependencies": {
-    "@pierre/diffs": "^1.5.2",
+    "@pierre/diffs": "1.5.2",
     "@pierre/trees": "^1.0.0-beta.6",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
@@ -33,6 +34,7 @@
     "chrome-webstore-upload-cli": "4.0.2",
     "esbuild": "^0.28.2",
     "jsdom": "^29.1.1",
+    "patch-package": "8.0.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   }

@@ -1,0 +1,116 @@
+diff --git a/node_modules/@pierre/diffs/dist/components/CodeView.js b/node_modules/@pierre/diffs/dist/components/CodeView.js
+index 140f94f..b125c08 100644
+--- a/node_modules/@pierre/diffs/dist/components/CodeView.js
++++ b/node_modules/@pierre/diffs/dist/components/CodeView.js
+@@ -232,6 +232,18 @@ var CodeView = class CodeView {
+ 	getItemTopOffset() {
+ 		return this.getLayout().paddingTop + this.header.height;
+ 	}
++	getGapBefore(index) {
++		const { gap, gapBefore } = this.getLayout();
++		const item = this.items[index];
++		const previous = this.items[index - 1];
++		if (gapBefore == null || item == null || previous == null) return gap;
++		return gapBefore(item.item.id, previous.item.id) ?? gap;
++	}
++	syncItemGap(item, isFirstRendered) {
++		const offset = isFirstRendered ? 0 : this.getGapBefore(item.index) - this.getLayout().gap;
++		const marginTop = offset === 0 ? "" : `${offset}px`;
++		if (item.element.style.marginTop !== marginTop) item.element.style.marginTop = marginTop;
++	}
+ 	computeMetricsCache(itemMetrics) {
+ 		this.itemMetricsCache = {
+ 			hunkLineCount: itemMetrics?.hunkLineCount ?? DEFAULT_CODE_VIEW_FILE_METRICS.hunkLineCount,
+@@ -718,21 +730,22 @@ var CodeView = class CodeView {
+ 	*/
+ 	appendItemsInternal(inputs, render = true) {
+ 		if (inputs.length === 0) return;
+-		const layout = this.getLayout();
+-		let nextTop = this.items.length === 0 ? 0 : this.scrollHeight + layout.gap;
+-		const appendedTop = nextTop;
++		let bottom = this.items.length === 0 ? 0 : this.scrollHeight;
++		let appendedTop;
+ 		for (let index = 0; index < inputs.length; index++) {
+ 			const input = inputs[index];
+ 			if (input == null) throw new Error("CodeView.appendItemsInternal: missing input item");
+ 			if (this.idToItem.has(input.id)) throw new Error(`CodeView.addItem: duplicate id "${input.id}"`);
+-			const item = this.createItem(input, this.items.length, nextTop);
++			const item = this.createItem(input, this.items.length, 0);
+ 			this.items.push(item);
++			item.top = item.index === 0 ? 0 : bottom + this.getGapBefore(item.index);
++			appendedTop ??= item.top;
+ 			this.idToItem.set(item.item.id, item);
+ 			this.instanceToItem.set(item.instance, item);
+ 			item.height = prepareItemInstance(item);
+-			nextTop += item.height + layout.gap;
++			bottom = item.top + item.height;
+ 		}
+-		this.scrollHeight = nextTop - layout.gap;
++		this.scrollHeight = bottom;
+ 		this.scrollDirty = true;
+ 		if (render) {
+ 			if (this.canSkipRenderForAppend(appendedTop)) this.syncContainerHeight();
+@@ -1662,6 +1675,7 @@ var CodeView = class CodeView {
+ 			if (item.element == null) {
+ 				item.element = this.acquireElement();
+ 				syncRenderedItemOrder(this.stickyContainer, item.element, prevElement);
++				this.syncItemGap(item, itemIndex === startingIndex);
+ 				instance.virtualizedSetup();
+ 				if (renderItem(item, item.element)) {
+ 					item.renderedOptionsRevision = this.renderOptionsRevision;
+@@ -1670,6 +1684,7 @@ var CodeView = class CodeView {
+ 				prevElement = item.element;
+ 			} else {
+ 				syncRenderedItemOrder(this.stickyContainer, item.element, prevElement);
++				this.syncItemGap(item, itemIndex === startingIndex);
+ 				if (renderItem(item, void 0, item.renderedOptionsRevision !== this.renderOptionsRevision)) {
+ 					item.renderedOptionsRevision = this.renderOptionsRevision;
+ 					updatedItems.add(item);
+@@ -1780,7 +1795,7 @@ var CodeView = class CodeView {
+ 				this.validateRenderedItemHeight(item);
+ 			}
+ 			currentTop += item.instance.getVirtualizedHeight();
+-			if (index < this.items.length - 1) currentTop += this.getLayout().gap;
++			if (index < this.items.length - 1) currentTop += this.getGapBefore(index + 1);
+ 		}
+ 		if (heightChanged && currentTop != null) {
+ 			this.scrollDirty = true;
+@@ -2055,12 +2070,11 @@ var CodeView = class CodeView {
+ 			this.scrollHeight = 0;
+ 			return;
+ 		}
+-		const layout = this.getLayout();
+ 		let runningTop = 0;
+ 		if (startIndex > 0) {
+ 			const previousItem = this.items[startIndex - 1];
+ 			if (previousItem == null) throw new Error("CodeView.recomputeLayout: invalid dirty index");
+-			runningTop = previousItem.top + previousItem.height + layout.gap;
++			runningTop = previousItem.top + previousItem.height + this.getGapBefore(startIndex);
+ 		}
+ 		for (let index = startIndex; index < this.items.length; index++) {
+ 			const item = this.items[index];
+@@ -2069,7 +2083,7 @@ var CodeView = class CodeView {
+ 			if (item.type === "diff") item.height = item.instance.updateCodeViewLayout(item.item.fileDiff, runningTop, reset, item.item.annotations ?? []);
+ 			else item.height = item.instance.updateCodeViewLayout(item.item.file, runningTop, reset, item.item.annotations ?? []);
+ 			runningTop += item.height;
+-			if (index < this.items.length - 1) runningTop += layout.gap;
++			if (index < this.items.length - 1) runningTop += this.getGapBefore(index + 1);
+ 		}
+ 		if (runningTop !== this.scrollHeight) this.scrollDirty = true;
+ 		this.scrollHeight = runningTop;
+diff --git a/node_modules/@pierre/diffs/dist/types.d.ts b/node_modules/@pierre/diffs/dist/types.d.ts
+index b469f0a..e9c25e2 100644
+--- a/node_modules/@pierre/diffs/dist/types.d.ts
++++ b/node_modules/@pierre/diffs/dist/types.d.ts
+@@ -700,6 +700,11 @@ interface CodeViewLayout {
+   paddingBottom: number;
+   /** Vertical gap between virtualized CodeView items. */
+   gap: number;
++  /**
++   * The gap above item `id`, which comes right after `previousId`; `undefined` keeps `gap`. A new function relays out
++   * every item, so keep it stable while its answers stay the same.
++   */
++  gapBefore?: (id: string, previousId: string) => number | undefined;
+ }
+ interface SmoothScrollSettings {
+   /**
