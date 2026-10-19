@@ -60,15 +60,17 @@ export async function loadFileGroups(storage: GroupsStorage = chromeSync()): Pro
   return groupsFromItems(await storage.get(null));
 }
 
-/** Stores `groups` (the defaults are stored as nothing). Rejects groups `groupsProblem` rejects or too big to sync. */
+/** Every key a stored set of groups can use: the count and up to `GROUPS_MAX` groups. */
+const ALL_KEYS = [FILE_GROUPS_KEY, ...Array.from({ length: GROUPS_MAX }, (_, i) => itemKey(i))];
+
+/**
+ * Stores `groups` (the defaults are stored as nothing). Rejects groups `groupsProblem` rejects or too big to sync.
+ * The write is issued before anything is awaited, so a save started as the options page closes still lands.
+ */
 export async function saveFileGroups(groups: readonly FileGroup[], storage: GroupsStorage = chromeSync()): Promise<void> {
   const problem = groupsProblem(groups);
   if (problem) throw new Error(problem);
-  const stored = Object.keys(await storage.get(null)).filter(isGroupsKey);
-  if (sameGroups(groups, DEFAULT_FILE_GROUPS)) {
-    if (stored.length > 0) await storage.remove(stored);
-    return;
-  }
+  if (sameGroups(groups, DEFAULT_FILE_GROUPS)) return storage.remove(ALL_KEYS);
   const items: Record<string, unknown> = { [FILE_GROUPS_KEY]: groups.length };
   for (const [i, g] of groups.entries()) {
     const item = { label: g.label.trim(), patterns: g.patterns.map((p) => p.trim()).filter(Boolean).join('\n') };
@@ -76,7 +78,7 @@ export async function saveFileGroups(groups: readonly FileGroup[], storage: Grou
     items[itemKey(i)] = item;
   }
   await storage.set(items);
-  const leftovers = stored.filter((k) => !(k in items));
+  const leftovers = Object.keys(await storage.get(null)).filter((k) => isGroupsKey(k) && !(k in items));
   if (leftovers.length > 0) await storage.remove(leftovers);
 }
 

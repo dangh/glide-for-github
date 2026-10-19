@@ -120,8 +120,32 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
   /** What storage holds, by draft id (renames and deletions of the default group follow from it). */
   const saved = useRef<DraftGroup[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /** A valid edit waiting out SAVE_DELAY_MS; written at once if the page is closed or hidden first. */
+  const pending = useRef<DraftGroup[] | null>(null);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+
+  const commit = (next: DraftGroup[]) => {
+    clearTimeout(timer.current);
+    pending.current = null;
+    const previous = saved.current;
+    saveFileGroups(fromDraft(next)).then(
+      () => {
+        saved.current = next;
+        setStatus({ kind: 'saved' });
+        // The default group follows a rename, and All replaces it once it is deleted.
+        const current = settingsRef.current.defaultGroup;
+        const was = previous.find((d) => d.label.trim().toLowerCase() === current.toLowerCase());
+        if (current === ALL_GROUP || !was) return;
+        const now = next.find((d) => d.id === was.id);
+        const label = now ? now.label.trim() : ALL_GROUP;
+        if (label !== current) update({ fileGroups: { defaultGroup: label } });
+      },
+      (err: unknown) => setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) }),
+    );
+  };
+  const commitRef = useRef(commit);
+  commitRef.current = commit;
 
   useEffect(() => {
     const adopt = (groups: FileGroup[]) => {
@@ -136,9 +160,17 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
     };
     void loadFileGroups().then(adopt, () => adopt(defaultGroups()));
     const off = onFileGroupsChange(adopt);
+    const flush = () => {
+      if (pending.current) commitRef.current(pending.current);
+    };
+    const onHidden = () => document.visibilityState === 'hidden' && flush();
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onHidden);
     return () => {
       off();
-      clearTimeout(timer.current);
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onHidden);
+      flush();
     };
   }, []);
 
@@ -146,26 +178,12 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
 
   const save = (next: DraftGroup[]) => {
     clearTimeout(timer.current);
+    pending.current = null;
     const problem = groupsProblem(fromDraft(next));
     if (problem) return setStatus({ kind: 'error', message: problem });
     setStatus({ kind: 'idle' });
-    timer.current = setTimeout(() => {
-      const previous = saved.current;
-      saveFileGroups(fromDraft(next)).then(
-        () => {
-          saved.current = next;
-          setStatus({ kind: 'saved' });
-          // The default group follows a rename, and All replaces it once it is deleted.
-          const current = settingsRef.current.defaultGroup;
-          const was = previous.find((d) => d.label.trim().toLowerCase() === current.toLowerCase());
-          if (current === ALL_GROUP || !was) return;
-          const now = next.find((d) => d.id === was.id);
-          const label = now ? now.label.trim() : ALL_GROUP;
-          if (label !== current) update({ fileGroups: { defaultGroup: label } });
-        },
-        (err: unknown) => setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) }),
-      );
-    }, SAVE_DELAY_MS);
+    pending.current = next;
+    timer.current = setTimeout(() => commit(next), SAVE_DELAY_MS);
   };
 
   const edit = (next: DraftGroup[]) => {

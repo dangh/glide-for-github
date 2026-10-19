@@ -538,6 +538,22 @@ test.describe('file groups', () => {
     }
   });
 
+  test('an edit made just before the options page closes is saved', async ({ extContext }) => {
+    const options = await extensionPage(extContext);
+    try {
+      const section = options.locator('section', { has: options.getByRole('heading', { name: 'File groups' }) });
+      await section.getByRole('textbox', { name: 'Name of group 3' }).fill('Documentation');
+      // Closed well inside the 0.4 s the editor waits for more typing.
+      await options.close();
+      const again = await extensionPage(extContext);
+      const reopened = again.locator('section', { has: again.getByRole('heading', { name: 'File groups' }) });
+      await expect(reopened.getByRole('textbox', { name: 'Name of group 3' })).toHaveValue('Documentation');
+      await again.close();
+    } finally {
+      await writeGlideSync(extContext, {});
+    }
+  });
+
   test('turned off, there are no tabs and every file shows', async ({ page, extContext }) => {
     const viewer = await openPierre(page, REACT, 'hash');
     await tab(viewer, 'Tests').click();

@@ -65,6 +65,16 @@ describe('file groups storage', () => {
     expect(data).toEqual({});
   });
 
+  it('writes before it reads anything, so a save started as the options page closes is not lost', () => {
+    const { data, storage } = fakeSync({ [FILE_GROUPS_KEY]: 3 });
+    const stalled: GroupsStorage = { ...storage, get: () => new Promise(() => undefined) };
+    void saveFileGroups(custom, stalled);
+    expect(data[FILE_GROUPS_KEY]).toBe(2);
+    expect(data[`${FILE_GROUPS_KEY}.1`]).toEqual({ label: 'Tests', patterns: '*.test.*\n# a comment' });
+    void saveFileGroups(DEFAULT_FILE_GROUPS, stalled);
+    expect(data[FILE_GROUPS_KEY]).toBeUndefined();
+  });
+
   it('removes items a shorter list leaves behind', async () => {
     const { data, storage } = fakeSync();
     await saveFileGroups([...custom, { label: 'Docs', patterns: ['*.md'] }], storage);
