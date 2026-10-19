@@ -17,7 +17,7 @@ import { isLockFile } from '../../shared/related-files';
 import { isNoTokenError } from '../auth/requireToken';
 import type { FileSummary } from '../github/private';
 import { fileTarget } from '../state/compose';
-import { groupItemMain, useRole, type Role } from '../state/relatedFiles';
+import { useRole, type Role } from '../state/relatedFiles';
 import { errorMessage, FilesViewedError, setFilesViewed } from '../state/review';
 import { session } from '../state/session';
 import { commentCount, isCollapsed, threadsByPath, usePr, type FileLoadState } from '../state/store';
@@ -163,11 +163,6 @@ export const FileHeader = memo(function FileHeader({ path }: { path: string }) {
   const collapsed = usePr((s) => isCollapsed(s, path));
   const comments = usePr((s) => commentCount(threadsByPath(s.threads).get(path)));
   const height = useSettings((s) => headerHeight(s.settings.diff.fileHeaderStyle));
-  /** Right under a header with nothing below it (a 'box' summary, a collapsed main file): the gap above takes its color. */
-  const underHeader = usePr((s) => {
-    if (role?.kind === 'member') return role.style === 'box' && groupItemMain(role.above) !== undefined;
-    return role?.kind === 'companion' && role.above === role.main && isCollapsed(s, role.main);
-  });
 
   const toggleCollapsed = useCallback(() => {
     const s = usePr.getState();
@@ -195,7 +190,6 @@ export const FileHeader = memo(function FileHeader({ path }: { path: string }) {
       data-viewed={viewed || undefined}
       data-related={variant}
       data-last={last ? '' : undefined}
-      data-under-header={underHeader ? '' : undefined}
       data-collapsed={collapsed ? '' : undefined}
       style={{ height }}
     >

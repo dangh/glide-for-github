@@ -6,6 +6,7 @@ import { filePaddingBottom, hunkSeparatorHeight, resolveDiffChoice } from '../..
 import { DEFAULT_SETTINGS, toDiffOptions, treeNeedsGitStatus, type DiffSettings, type TreeSettings } from '../../shared/settings';
 import type { FileSummary } from '../github/private';
 import type { AnnotationMeta } from './items';
+import type { GapBefore } from './relatedFiles';
 import { effectiveThemeType } from './settings';
 import { commentCount, threadsByPath, type PrState } from './store';
 
@@ -60,16 +61,21 @@ export function createDiffOptionsBuilder() {
         loadDiffFiles?: FileDiffContentsLoader;
         interactions?: DiffViewOptions;
         lineHeight: number;
+        gapBefore?: GapBefore;
         options: DiffViewOptions;
       }
     | undefined;
-  /** `interactions`: gutter "+" / line selection wiring (Task 9); pass a stable object. `lineHeight`: code row px. */
+  /**
+   * `interactions`: gutter "+" / line selection wiring (Task 9); pass a stable object. `lineHeight`: code row px.
+   * `gapBefore`: the related files layout's (state/relatedFiles.ts).
+   */
   return (
     diff: DiffSettings,
     colorMode: string | undefined,
     loadDiffFiles?: FileDiffContentsLoader,
     interactions?: DiffViewOptions,
     lineHeight: number = DEFAULT_LINE_HEIGHT,
+    gapBefore?: GapBefore,
   ): DiffViewOptions => {
     if (
       last &&
@@ -77,17 +83,20 @@ export function createDiffOptionsBuilder() {
       last.colorMode === colorMode &&
       last.loadDiffFiles === loadDiffFiles &&
       last.interactions === interactions &&
-      last.lineHeight === lineHeight
+      last.lineHeight === lineHeight &&
+      last.gapBefore === gapBefore
     )
       return last.options;
+    const base = toDiffOptions<AnnotationMeta>({ ...DEFAULT_SETTINGS, diff });
     const options: DiffViewOptions = {
-      ...toDiffOptions<AnnotationMeta>({ ...DEFAULT_SETTINGS, diff }),
+      ...base,
+      ...(gapBefore && base.layout ? { layout: { ...base.layout, gapBefore } } : {}),
       themeType: effectiveThemeType(diff.themeType, colorMode),
       itemMetrics: itemMetricsFor(lineHeight, diff),
       ...(loadDiffFiles ? { loadDiffFiles } : {}),
       ...interactions,
     };
-    last = { diff, colorMode, ...(loadDiffFiles ? { loadDiffFiles } : {}), ...(interactions ? { interactions } : {}), lineHeight, options };
+    last = { diff, colorMode, ...(loadDiffFiles ? { loadDiffFiles } : {}), ...(interactions ? { interactions } : {}), lineHeight, ...(gapBefore ? { gapBefore } : {}), options };
     return options;
   };
 }

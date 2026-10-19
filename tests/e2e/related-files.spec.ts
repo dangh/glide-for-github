@@ -31,6 +31,49 @@ const reveal = (viewer: Viewer, id: string) =>
 
 const header = (viewer: Viewer, path: string) => viewer.locator.locator(`.fh[data-path="${path}"]`);
 
+const setCollapsed = (viewer: Viewer, path: string, collapsed: boolean) =>
+  viewer.frame().evaluate(([p, c]) => window.__pierre!.store.getState().setCollapsed(p, c), [path, collapsed] as const);
+
+/** A main file's item in 'box' and 'rail': its group's summary line (where the tree scrolls to). */
+const listItemFor = (path: string) => (path.endsWith('package.json') ? `/related/${path}` : path);
+
+/**
+ * Each item's box (its `diffs-container`) and header, in the viewer's px, and `drift`: how far the box is drawn from
+ * where CodeView laid the item out (`getTopForItem`), which every scroll offset relies on.
+ */
+const boxes = (viewer: Viewer, ids: readonly string[]) =>
+  viewer.frame().evaluate((list) => {
+    const view = window.__pierre!.session.codeView!.getInstance()!;
+    const root = view.getContainerElement()!;
+    const origin = root.getBoundingClientRect().top - root.scrollTop;
+    return list.map((id) => {
+      const fh = document.querySelector<HTMLElement>(`.fh[data-path="${CSS.escape(id)}"]`);
+      const box = fh?.closest('diffs-container');
+      if (!fh || !box) return null;
+      const b = box.getBoundingClientRect();
+      const h = fh.getBoundingClientRect();
+      return { id, top: b.top, bottom: b.bottom, headerTop: h.top, headerBottom: h.bottom, drift: Math.round(b.top - origin - view.getTopForItem(id)!) };
+    });
+  }, ids);
+
+/** Where a scroll to `id` landed: its header's distance from the top it should be at (the list's end clamps it). */
+const scrolledTo = (viewer: Viewer, id: string) =>
+  viewer.frame().evaluate((target) => {
+    const view = window.__pierre!.session.codeView!.getInstance()!;
+    const root = view.getContainerElement()!;
+    const fh = document.querySelector<HTMLElement>(`.fh[data-path="${CSS.escape(target)}"]`);
+    const box = fh?.closest('diffs-container');
+    if (!fh || !box) return { found: false };
+    const itemTop = view.getTopForItem(target)!;
+    const scrollTop = Math.min(itemTop, root.scrollHeight - root.clientHeight);
+    const rootTop = root.getBoundingClientRect().top;
+    return {
+      found: true,
+      offset: Math.round(root.scrollTop - scrollTop),
+      drift: Math.round(box.getBoundingClientRect().top - (rootTop + itemTop - root.scrollTop)),
+    };
+  }, id);
+
 async function shoot(page: Page, name: string) {
   await page.mouse.move(5, 5);
   await page.waitForTimeout(300);
@@ -177,10 +220,21 @@ test.describe('related files', () => {
     await viewer.locator.getByTestId('display-menu').click();
     const select = viewer.locator.getByRole('combobox', { name: 'Related files', exact: true });
     await expect(select).toHaveValue('nested');
+    /** The gap above remote/package-lock.json, and how far it and its main file are drawn from where CodeView laid them out. */
+    const gap = async () => {
+      const [main, lock] = await boxes(viewer, ['remote/package.json', 'remote/package-lock.json']);
+      return main && lock ? { gap: Math.round(lock.top - main.bottom), drift: [main.drift, lock.drift] } : null;
+    };
+    await viewer.scrollToFile('remote/package.json');
+    await expect.poll(gap).toEqual({ gap: 0, drift: [0, 0] });
     await select.selectOption('rail');
     await expect.poll(() => listItems(viewer)).toContain('/related/package.json');
+    await expect.poll(gap).toEqual({ gap: 16, drift: [0, 0] });
+    await select.selectOption('box');
+    await expect.poll(gap).toEqual({ gap: 0, drift: [0, 0] });
     await select.selectOption('nested');
     await expect.poll(() => listItems(viewer)).not.toContain('/related/package.json');
+    await expect.poll(gap).toEqual({ gap: 0, drift: [0, 0] });
     await page.keyboard.press('Escape');
   });
 
@@ -338,6 +392,75 @@ test.describe('related files', () => {
       await writeGlideSync(extContext, {});
     }
   });
+
+  for (const style of ['nested', 'box'] as const) {
+    for (const scheme of ['light', 'dark'] as const) {
+      test(`${style}, ${scheme}: one box, its parts touching, and a 42 px main header, collapsed and expanded`, async ({ page, extContext }) => {
+        await setSettings(extContext, 'relatedFiles', { style });
+        try {
+          await page.emulateMedia({ colorScheme: scheme });
+          const viewer = await openPierre(page, VSCODE, 'hash');
+          await viewer.allFetched();
+          const main = 'remote/package.json';
+          const lock = 'remote/package-lock.json';
+          const parts = style === 'box' ? [`/related/${main}`, main, lock] : [main, lock];
+          await viewer.scrollToFile(main);
+          await expect.poll(async () => (await boxes(viewer, parts)).every((b) => b !== null)).toBe(true);
+
+          const check = async (name: string) => {
+            await shoot(page, `${style}-${scheme}-${name}`);
+            const got = (await boxes(viewer, parts)).map((b) => b!);
+            for (const b of got) expect(b.drift, `${b.id}: drawn where CodeView laid it out`).toBe(0);
+            expect(got.slice(1).map((b, i) => Math.round(b.top - got[i]!.bottom)), 'no band between the parts').toEqual(got.slice(1).map(() => 0));
+            const head = got[0]!;
+            expect(Math.round(head.headerBottom - head.headerTop), 'the box header is any header').toBe(42);
+            return got;
+          };
+
+          await setCollapsed(viewer, lock, true);
+          await setCollapsed(viewer, main, true);
+          const collapsed = await check('main-collapsed');
+          const mainBox = collapsed.find((b) => b.id === main)!;
+          expect(Math.round(mainBox.bottom - mainBox.top), 'a collapsed main file is its header alone').toBe(42);
+
+          await setCollapsed(viewer, main, false);
+          await expect.poll(async () => (await viewer.item(main))?.lines ?? 0).toBeGreaterThan(0);
+          const expanded = await check('main-expanded');
+          const headerTop = expanded[0]!.headerTop;
+
+          // Opening and closing the lock file below leaves the box where it is.
+          await header(viewer, lock).locator('.fh-chevron').click();
+          await expect.poll(async () => (await viewer.item(lock))?.lines ?? 0).toBeGreaterThan(0);
+          expect((await check('lock-expanded'))[0]!.headerTop).toBe(headerTop);
+          await header(viewer, lock).locator('.fh-chevron').click();
+          await expect.poll(async () => (await viewer.item(lock))?.collapsed).toBe(true);
+          expect((await check('lock-collapsed'))[0]!.headerTop).toBe(headerTop);
+        } finally {
+          await page.emulateMedia({ colorScheme: null });
+          await writeGlideSync(extContext, {});
+        }
+      });
+    }
+  }
+
+  for (const style of ['nested', 'box', 'rail'] as const) {
+    test(`${style}: the tree scrolls every file's header to the top, also below a group`, async ({ page, extContext }) => {
+      await setSettings(extContext, 'relatedFiles', { style });
+      try {
+        await page.setViewportSize({ width: 1400, height: 500 });
+        const viewer = await openPierre(page, VSCODE, 'hash');
+        await viewer.allFetched();
+        for (const path of [SNAPSHOT, 'package.json', 'remote/package-lock.json', 'package-lock.json', 'remote/package.json']) {
+          await viewer.scrollToFile(path);
+          const target = style === 'nested' ? path : listItemFor(path);
+          await expect.poll(() => scrolledTo(viewer, target), { message: `${path} at the top` }).toEqual({ found: true, offset: 0, drift: 0 });
+        }
+      } finally {
+        await page.setViewportSize({ width: 1400, height: 900 });
+        await writeGlideSync(extContext, {});
+      }
+    });
+  }
 
   for (const style of ['box', 'rail', 'off'] as const) {
     test(`${style}: the diff list and its headers`, async ({ page, extContext }) => {
