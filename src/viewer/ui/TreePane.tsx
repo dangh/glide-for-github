@@ -7,7 +7,8 @@
  * A file group switch swaps the tree's paths in place (`resetPaths`), keeping the search and each folder's expansion;
  * a click on a group tab, which blurs and so closes the search, reopens it (`session.keepTreeSearch`).
  * Related files sit right after their main file, indented and dimmed (state/relatedTree.ts); a change of relations
- * re-sorts the same way, and swaps the stylesheet the tree's shadow root holds for them.
+ * re-sorts the same way, and swaps the stylesheet the tree's shadow root holds for them. The pane's width and its
+ * resize handle are TreePaneFrame's.
  */
 import type { FileTreeDirectoryHandle, GitStatusEntry } from '@pierre/trees';
 import { FileTree, useFileTree } from '@pierre/trees/react';
@@ -22,6 +23,7 @@ import { effectiveThemeType, useSettings } from '../state/settings';
 import { usePr } from '../state/store';
 import { chainExpanded, folderChains, noteExpansion } from '../state/treeFolders';
 import { decorationFor, gitStatusEntries } from '../state/view';
+import { TreePaneFrame } from './TreePaneFrame';
 
 type TreeModel = ReturnType<typeof useFileTree>['model'];
 const ancestorsOf = (path: string): string[] => {
@@ -193,10 +195,10 @@ export const TreePane = memo(function TreePane() {
   const colorScheme = themeType === 'system' ? 'light dark' : themeType;
 
   // Like the diff list, the tree waits for the file groups so it never shows another group's files first.
-  if (!pr || !groupsLoaded || !settingsLoaded) return <aside className="pierre-tree-pane" />;
+  if (!pr || !groupsLoaded || !settingsLoaded) return <TreePaneFrame />;
   return (
-    <aside className="pierre-tree-pane" data-testid="tree">
+    <TreePaneFrame testId="tree">
       <Tree key={`${pr.headOid}:${key}`} paths={shown} relations={relations} gitStatus={gitStatus} settings={settings} colorScheme={colorScheme} />
-    </aside>
+    </TreePaneFrame>
   );
 });

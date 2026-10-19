@@ -819,13 +819,58 @@ html[data-scroll-layout] .pierre-body[data-tree-hidden] .pierre-diffs {
   margin-inline: -1px;
 }
 
+/* The inline width (TreePaneFrame) is the tree's, as GitHub's pane width is; the 1 px divider comes on top. */
 .pierre-tree-pane {
-  width: 300px;
+  box-sizing: content-box;
   flex: none;
+  position: relative;
   border-right: 1px solid var(--pierre-border);
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+/*
+ * The divider's resize handle, measured on GitHub's (Primer's PageLayout drag handle): 5 px centered on the 1 px
+ * divider, the pane's full height, a faint band on hover and the accent while dragging.
+ */
+.tree-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -3px;
+  width: 5px;
+  z-index: 1;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.tree-resizer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: light-dark(#818b981f, #656c7633);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.tree-resizer:hover::before {
+  opacity: 1;
+}
+
+.tree-resizer[data-dragging]::before,
+.tree-resizer:focus-visible::before {
+  background: light-dark(#0969da, #1f6feb);
+  opacity: 1;
+  transition: none;
+}
+
+/* While dragging, the pointer keeps the resize cursor over the tree and the diffs, and selects no text. */
+html[data-tree-resizing],
+html[data-tree-resizing] * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 /*
@@ -836,6 +881,11 @@ html[data-scroll-layout] .pierre-body[data-tree-hidden] .pierre-diffs {
 .pierre-body[data-tree-position='right'] .pierre-tree-pane {
   border-right: 0;
   border-left: 1px solid var(--pierre-border);
+}
+
+.pierre-body[data-tree-position='right'] .tree-resizer {
+  right: auto;
+  left: -3px;
 }
 
 .pierre-body[data-tree-position='right'] .pierre-tree {
