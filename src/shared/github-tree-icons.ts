@@ -148,7 +148,8 @@ export const GITHUB_TREE_CSS = `
 }
 [data-file-tree-search-container] {
   position: relative;
-  padding: 16px var(--glide-tree-end, 16px) 0 var(--glide-tree-start, 1px);
+  /* Match the rows, whose scroll container reserves its scrollbar gutter. */
+  padding: 16px calc(var(--glide-tree-end, 16px) + var(--trees-scrollbar-gutter-measured, var(--trees-scrollbar-gutter))) 0 var(--glide-tree-start, 1px);
   margin-bottom: 16px;
 }
 [data-file-tree-search-container]::before {
@@ -164,6 +165,7 @@ export const GITHUB_TREE_CSS = `
 }
 [data-file-tree-search-input] {
   box-sizing: border-box;
+  min-width: 0;
   height: 32px;
   line-height: 30px;
   margin-block: 0;
