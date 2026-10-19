@@ -9,6 +9,7 @@ import { createPageScrollView, type PageScrollView } from './pageScroll';
 import { initBatchPersistence } from './state/batch';
 import { initDraftPersistence } from './state/drafts';
 import { initFileGroups, useFileGroups } from './state/fileGroups';
+import { initRelatedFiles, useRelatedRules } from './state/relatedFiles';
 import { startFreshness } from './state/freshness';
 import * as review from './state/review';
 import { session } from './state/session';
@@ -18,10 +19,17 @@ import { usePr } from './state/store';
 declare global {
   interface Window {
     /** Inspection hooks for e2e/perf tests (extension page only; never reachable from github.com). */
-    __pierre?: { store: typeof usePr; settings: typeof useSettings; session: typeof session; review: typeof review; fileGroups: typeof useFileGroups };
+    __pierre?: {
+      store: typeof usePr;
+      settings: typeof useSettings;
+      session: typeof session;
+      review: typeof review;
+      fileGroups: typeof useFileGroups;
+      relatedRules: typeof useRelatedRules;
+    };
   }
 }
-window.__pierre = { store: usePr, settings: useSettings, session, review, fileGroups: useFileGroups };
+window.__pierre = { store: usePr, settings: useSettings, session, review, fileGroups: useFileGroups, relatedRules: useRelatedRules };
 
 const root = createRoot(document.getElementById('root')!);
 const prRef = parsePrParam(location.search);
@@ -47,6 +55,7 @@ if (!prRef) {
   initBatchPersistence();
   initDraftPersistence();
   initFileGroups();
+  initRelatedFiles();
   startFreshness();
   // No port from the content script (extension updated, content script gone): say so instead of loading forever.
   watchPort(connection.ready, (message) => {

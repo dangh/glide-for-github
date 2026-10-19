@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FileSummary, PrData } from '../../src/viewer/github/private';
 import { ItemSync, placeholderDiff, type AnnotationSource, type FileAnnotation, type PierreItem } from '../../src/viewer/state/items';
+import { groupItemId } from '../../src/viewer/state/relatedFiles';
 import { createPrStore } from '../../src/viewer/state/store';
 
 const file = (path: string, extra: Partial<FileSummary> = {}): FileSummary => ({
@@ -120,5 +121,28 @@ describe('CodeView items', () => {
     // Unchanged items are the same objects, so the CodeView keeps their layout.
     expect(all[1]).toBe(updates[0]);
     expect(sync.mount(['b.ts'])[0]).toBe(all[1]);
+  });
+
+  it('a group item mounts as a collapsed header-only item, and items for files outside the PR are skipped', () => {
+    const { sync } = setup();
+    const items = sync.mount([groupItemId('a.ts'), 'a.ts', groupItemId('gone.ts'), 'c.ts']);
+    expect(items.map((i) => [i.id, i.collapsed])).toEqual([
+      [groupItemId('a.ts'), true],
+      ['a.ts', false],
+      ['c.ts', false],
+    ]);
+    expect(items[0]!.fileDiff.hunks).toEqual([]);
+    expect(items[0]!.fileDiff.cacheKey).not.toBe(items[1]!.fileDiff.cacheKey);
+    expect(sync.mount([groupItemId('a.ts')])[0]).toBe(items[0]);
+  });
+
+  it('a folded companion is collapsed until opened, and follows its folded state', () => {
+    const { store, sync, sink, updates } = setup();
+    store.getState().setFolded(new Set(['c.ts']));
+    sync.sync(store.getState(), sink);
+    expect(updates.map((u) => [u.id, u.collapsed])).toEqual([['c.ts', true]]);
+    store.getState().setCollapsed('c.ts', false);
+    sync.sync(store.getState(), sink);
+    expect(updates.at(-1)).toMatchObject({ id: 'c.ts', collapsed: false });
   });
 });

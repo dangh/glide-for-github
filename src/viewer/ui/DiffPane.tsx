@@ -1,25 +1,27 @@
 /**
  * The open file group's files in one virtualized Pierre CodeView (uncontrolled: items are seeded once, then updated
  * one by one with `updateItem`, see state/items.ts). A group switch hands the CodeView the new group's items with
- * `setItems`: items it already has keep their layout, and loaded diffs stay loaded.
+ * `setItems`: items it already has keep their layout, and loaded diffs stay loaded. Related files
+ * (state/relatedFiles.ts) order the items, companions after their main file, and add 'box' and 'rail' group items;
+ * a change of style or rules goes through `setItems` the same way.
  */
 import type { DiffLineAnnotation, FileDiffLoadedFiles, FileDiffMetadata, LineAnnotation, SelectedLineRange } from '@pierre/diffs';
 import { CodeView, type CodeViewHandle } from '@pierre/diffs/react';
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import { resolveFonts } from '../../shared/github-defaults';
 import { fetchFullFile, type PrData, type Rpc } from '../github/private';
 import type { ListAnchors } from '../pageScroll';
 import { createAnnotationSource } from '../state/annotations';
 import { targetFromRange } from '../state/compose';
-import { currentGroup, useActiveGroup } from '../state/fileGroups';
 import { ItemSync, type AnnotationMeta, type AnnotationSource, type PierreItem } from '../state/items';
 import { rangeOids } from '../state/range';
+import { currentRelated, groupItemId, groupItemMain, itemFile, useRelated } from '../state/relatedFiles';
 import { session } from '../state/session';
 import { useSettings } from '../state/settings';
-import { usePr } from '../state/store';
+import { isCollapsed, usePr } from '../state/store';
 import { createDiffOptionsBuilder, createSettle, headerHeight, visibleFiles, type DiffViewOptions } from '../state/view';
 import { Composer, openComposerAt } from './Composer';
-import { FileHeader } from './FileHeader';
+import { FileHeader, GroupHeader } from './FileHeader';
 import { Thread } from './Thread';
 
 type Handle = CodeViewHandle<AnnotationMeta, undefined>;
@@ -117,11 +119,14 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
 
   const loadDiffFiles = useMemo(() => (pr ? createFileLoader(rpc, pr) : undefined), [rpc, pr]);
 
+  /** The gap between items, for viewer.css: related files draw their box or rail across it. */
+  const gapStyle = useMemo(() => ({ '--pierre-gap': `${diffSettings.layoutGap}px` }) as CSSProperties, [diffSettings.layoutGap]);
+
   const buildOptions = useMemo(createDiffOptionsBuilder, []);
   const options = buildOptions(diffSettings, colorMode, loadDiffFiles, INTERACTIONS, lineHeight);
 
   // Seeded once per PR; later changes go through `sync` → updateItem.
-  const initialItems = useMemo<PierreItem[]>(() => (pr ? sync.seed(usePr.getState(), currentGroup().shown) : []), [pr, sync]);
+  const initialItems = useMemo<PierreItem[]>(() => (pr ? sync.seed(usePr.getState(), currentRelated().items) : []), [pr, sync]);
 
   useEffect(() => {
     if (!pr) return;
@@ -160,31 +165,31 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
         // The next few files below the viewport too, so scrolling down finds them loaded.
         const order = sync.mountedPaths;
         const next = order.indexOf(current!) + ids.length;
-        session.viewport = [...ids, ...order.slice(next, next + PRIORITY_AHEAD)];
+        session.viewport = [...ids, ...order.slice(next, next + PRIORITY_AHEAD)].map(itemFile);
         session.loader?.prioritize(session.viewport);
       }
       // Every scroll frame restarts the quiet period, so the tree only updates once scrolling pauses.
-      if (current && performance.now() >= quietUntil.current) treeSync.push(current);
+      if (current && performance.now() >= quietUntil.current) treeSync.push(itemFile(current));
     });
   }, [treeSync, sync]);
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
-  // A group switch: its files load next, and the list keeps its place when the file at its top is in the new group,
-  // else starts at the top.
-  const { shown } = useActiveGroup();
+  // A group switch (or a change of related files): its files load next, and the list keeps its place when the item at
+  // its top is still listed, else starts at the top.
+  const { items } = useRelated();
   useEffect(() => {
-    session.loader?.prefer(shown);
+    session.loader?.prefer(items);
     const handle = handleRef.current;
     const instance = handle?.getInstance();
-    if (!handle || !instance || sync.mountedPaths === shown) return;
+    if (!handle || !instance || sync.mountedPaths === items) return;
     const anchors = listAnchors(handle, sync);
     const anchor = anchors.anchor();
-    instance.setItems(sync.mount(shown));
+    instance.setItems(sync.mount(items));
     session.pageScroll?.expectListScroll();
-    if (anchor && shown.includes(anchor.path)) anchors.scrollToAnchor(anchor);
+    if (anchor && items.includes(anchor.path)) anchors.scrollToAnchor(anchor);
     else handle.scrollTo({ type: 'position', position: 0 });
     onViewport();
-  }, [shown, sync, onViewport]);
+  }, [items, sync, onViewport]);
 
   // The first viewport once items exist. (Loader restarts replay `session.viewport` themselves.)
   useEffect(() => {
@@ -201,22 +206,30 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
           quietUntil.current = performance.now() + SCROLL_QUIET_MS;
           treeSync.cancel();
           session.pageScroll?.expectListScroll();
-          handle.scrollTo({ type: 'item', id: path, align: 'start' });
+          // A folded companion unfolds; a 'box' or 'rail' main file shows with its group's header.
+          const s = usePr.getState();
+          if (s.folded.has(path) && isCollapsed(s, path)) s.setCollapsed(path, false);
+          const group = groupItemId(path);
+          handle.scrollTo({ type: 'item', id: currentRelated().roles.has(group) ? group : path, align: 'start' });
         }
       : undefined;
     session.pageScroll?.attach(handle?.getInstance()?.getContainerElement() ?? null, handle ? listAnchors(handle, sync) : null);
   }, [treeSync, sync]);
 
-  const renderCustomHeader = useCallback((item: PierreItem) => <FileHeader path={item.id} />, []);
+  const renderCustomHeader = useCallback(
+    (item: PierreItem) => (groupItemMain(item.id) === undefined ? <FileHeader path={item.id} /> : <GroupHeader id={item.id} />),
+    [],
+  );
 
   if (!pr) return <div className="pierre-diffs pierre-diffs-empty" />;
   return (
     <>
-      {shown.length === 0 && <div className="pierre-empty-group">No files in this group.</div>}
+      {items.length === 0 && <div className="pierre-empty-group">No files in this group.</div>}
       <CodeView<AnnotationMeta, undefined>
         key={pr.headOid}
         ref={setHandle}
         className="pierre-diffs"
+        style={gapStyle}
         initialItems={initialItems}
         options={options}
         onScroll={onViewport}

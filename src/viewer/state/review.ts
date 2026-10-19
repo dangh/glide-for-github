@@ -8,7 +8,7 @@
  * resolve state), then threads are refetched in the background and merged (`mergeThreads`) so a refetch that
  * does not have the new comment yet never makes it disappear.
  */
-import { requireToken, type RequireTokenOptions } from '../auth/requireToken';
+import { isNoTokenError, requireToken, type RequireTokenOptions } from '../auth/requireToken';
 import { getToken } from '../auth/tokens';
 import { GithubApi, type ReactionContent, type ReviewEvent } from '../github/api';
 import { isAuthError, WriteError } from '../github/errors';
@@ -528,6 +528,31 @@ export async function setFileViewed(path: string, viewed: boolean): Promise<void
   } finally {
     if (viewedOps.get(path) === op) viewedOps.delete(path);
   }
+}
+
+/** Some files of a group could not be marked (or unmarked) viewed; `paths` are those files, already reverted. */
+export class FilesViewedError extends Error {
+  constructor(
+    readonly paths: string[],
+    cause: unknown,
+  ) {
+    super(errorMessage(cause), { cause });
+  }
+}
+
+/**
+ * Marks every file of `paths` viewed / not viewed (a group of related files), each through `setFileViewed` (so GitHub's
+ * page follows) and all at once. Files already in that state are left alone. A file GitHub refuses is reverted alone;
+ * the rest stay. Rejects with a `FilesViewedError` naming the files that failed, or with the token prompt's cancel
+ * error when that is every failure.
+ */
+export async function setFilesViewed(paths: readonly string[], viewed: boolean): Promise<void> {
+  const results = await Promise.allSettled(paths.map((path) => setFileViewed(path, viewed)));
+  const failed = paths.filter((_, i) => results[i]!.status === 'rejected');
+  if (failed.length === 0) return;
+  const reasons = results.flatMap((r) => (r.status === 'rejected' ? [r.reason as unknown] : []));
+  if (reasons.every(isNoTokenError)) throw reasons[0];
+  throw new FilesViewedError(failed, reasons.find((r) => !isNoTokenError(r)));
 }
 
 /** Message for an error shown inline. */

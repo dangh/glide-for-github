@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { App } from '../../src/viewer/App';
 import { fetchPrData } from '../../src/viewer/github/private';
 import { useFileGroups } from '../../src/viewer/state/fileGroups';
+import { useRelatedRules } from '../../src/viewer/state/relatedFiles';
 import { startLoader } from '../../src/viewer/state/controller';
 import { useSettings } from '../../src/viewer/state/settings';
 import { usePr } from '../../src/viewer/state/store';
@@ -26,13 +27,16 @@ afterEach(async () => {
   vi.clearAllMocks();
 });
 
-it('waits for stored groups before issuing the first diff requests', async () => {
+it('waits for stored groups and related-files rules before issuing the first diff requests', async () => {
   const rpc = fakeRpc();
   usePr.getState().setPr(await fetchPrData(rpc, ref));
   useSettings.setState({ loaded: true });
   useFileGroups.setState({ loaded: false });
+  useRelatedRules.setState({ loaded: false });
   await act(async () => root.render(createElement(App, { prRef: ref, rpc })));
   expect(startLoader).not.toHaveBeenCalled();
   await act(async () => useFileGroups.setState({ loaded: true }));
+  expect(startLoader).not.toHaveBeenCalled();
+  await act(async () => useRelatedRules.setState({ loaded: true }));
   expect(startLoader).toHaveBeenCalledTimes(1);
 });

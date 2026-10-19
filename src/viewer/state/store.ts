@@ -110,8 +110,10 @@ export interface PrState {
   headMoved: boolean;
   /** Suggestions added to the batch ("Add suggestion to batch"), in the order added. */
   suggestionBatch: SuggestionRef[];
-  /** User collapse overrides by path (absent = default: collapsed iff viewed). */
+  /** User collapse overrides by path (absent = default: collapsed iff viewed or folded). */
   collapsed: Map<string, boolean>;
+  /** Files that start collapsed even when not viewed: companions folded under their main file (state/relatedFiles.ts). */
+  folded: ReadonlySet<string>;
   notice: Notice | null;
   /** Full-pane error (PR data could not be read). */
   fatal: string | null;
@@ -126,6 +128,7 @@ export interface PrState {
   applyLoads(results: readonly FileLoadResult[]): void;
   setViewedLocal(path: string, viewed: boolean): void;
   setCollapsed(path: string, collapsed: boolean | undefined): void;
+  setFolded(folded: ReadonlySet<string>): void;
   setThreads(threads: ThreadModel[]): void;
   upsertThread(thread: ThreadModel): void;
   removeComment(databaseId: number): void;
@@ -154,6 +157,7 @@ const initialData = () => ({
   headMoved: false,
   suggestionBatch: [] as SuggestionRef[],
   collapsed: new Map<string, boolean>(),
+  folded: new Set<string>() as ReadonlySet<string>,
   notice: null,
   fatal: null,
 });
@@ -229,6 +233,8 @@ export const createPrStore = () =>
         return { collapsed };
       }),
 
+    setFolded: (folded) => set((s) => (s.folded === folded ? s : { folded })),
+
     setThreads: (threads) => set({ threads }),
 
     upsertThread: (thread) =>
@@ -286,9 +292,9 @@ export const createPrStore = () =>
 /** The viewer's store. */
 export const usePr = createPrStore();
 
-/** Whether a file's item is collapsed: the user's override, else viewed files are collapsed. */
-export function isCollapsed(s: Pick<PrState, 'collapsed' | 'viewed'>, path: string): boolean {
-  return s.collapsed.get(path) ?? s.viewed.has(path);
+/** Whether a file's item is collapsed: the user's override, else viewed and folded files are collapsed. */
+export function isCollapsed(s: Pick<PrState, 'collapsed' | 'viewed' | 'folded'>, path: string): boolean {
+  return s.collapsed.get(path) ?? (s.viewed.has(path) || s.folded.has(path));
 }
 
 const threadsByPathCache = new WeakMap<ThreadModel[], Map<string, ThreadModel[]>>();

@@ -63,7 +63,7 @@ describe('DisplaySettingsForm', () => {
     expect(field('Light theme').value).toBe('default');
   });
 
-  it('lists "Default (GitHub)" first in every select except Tree position, selected by default', async () => {
+  it('lists "Default (GitHub)" first in every select except Tree position and Related files, selected by default', async () => {
     await mount();
     const selects = [...container.querySelectorAll('select')];
     expect(selects.length).toBeGreaterThan(15);
@@ -71,6 +71,11 @@ describe('DisplaySettingsForm', () => {
       const label = select.closest('label')?.querySelector('span')?.textContent;
       if (label === 'Tree position') {
         expect([...select.options].map((o) => o.value)).toEqual(['left', 'right']);
+        continue;
+      }
+      if (label === 'Related files') {
+        expect([...select.options].map((o) => o.textContent)).toEqual(['Nested', 'One box', 'Group rail', 'Off']);
+        expect(select.value).toBe('nested');
         continue;
       }
       expect(select.options[0]!.value, label ?? '').toBe('default');

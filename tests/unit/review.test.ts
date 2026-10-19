@@ -20,7 +20,7 @@ import {
   type CommentTarget,
 } from '../../src/viewer/state/compose';
 import { ItemSync, type PierreItem } from '../../src/viewer/state/items';
-import { discardReview, mergeThreads, resetReviewCaches, setFileViewed, submitNewComment, submitReview } from '../../src/viewer/state/review';
+import { discardReview, FilesViewedError, mergeThreads, resetReviewCaches, setFileViewed, setFilesViewed, submitNewComment, submitReview } from '../../src/viewer/state/review';
 import { session } from '../../src/viewer/state/session';
 import { createPrStore, draftKey, isCollapsed, usePr } from '../../src/viewer/state/store';
 import { batchKeyName, initBatchPersistence } from '../../src/viewer/state/batch';
@@ -380,6 +380,45 @@ describe('review submission, viewed, apply suggestion (global store)', () => {
       ]);
       expect(usePr.getState().viewed.has('b.ts')).toBe(false);
       expect(useTokenPrompt.getState().queue).toHaveLength(0);
+    });
+
+    it('a group: marks every file not viewed yet on GitHub, all at once, and unmarks them all', async () => {
+      const ops = graphql({
+        MarkViewed: () => json(200, { data: { markFileAsViewed: { pullRequest: { id: 'PR_node' } } } }),
+        UnmarkViewed: () => json(200, { data: { unmarkFileAsViewed: { pullRequest: { id: 'PR_node' } } } }),
+      });
+      usePr.getState().setViewedLocal('b.ts', true);
+      await setFilesViewed(['a.ts', 'b.ts'], true);
+      expect(ops).toEqual([{ op: 'MarkViewed', variables: { input: { pullRequestId: 'PR_node', path: 'a.ts' } } }]);
+      expect([...usePr.getState().viewed].sort()).toEqual(['a.ts', 'b.ts']);
+      await setFilesViewed(['a.ts', 'b.ts'], false);
+      expect(ops.slice(1).map((o) => [o.op, o.variables.input])).toEqual([
+        ['UnmarkViewed', { pullRequestId: 'PR_node', path: 'a.ts' }],
+        ['UnmarkViewed', { pullRequestId: 'PR_node', path: 'b.ts' }],
+      ]);
+      expect(usePr.getState().viewed.size).toBe(0);
+    });
+
+    it('a group through the session: one file_review call per file', async () => {
+      setTokenStorage(fakeArea());
+      const calls = fakeRpc(async () => null);
+      await setFilesViewed(['a.ts', 'b.ts'], true);
+      expect(calls).toEqual([
+        ['markViewed', 'o', 'r', 1, 'a.ts'],
+        ['markViewed', 'o', 'r', 1, 'b.ts'],
+      ]);
+    });
+
+    it('a group where GitHub refuses one file: that file is reverted and named, the others stay viewed', async () => {
+      setTokenStorage(fakeArea());
+      fakeRpc(async (_method, ...args) => {
+        if (args[3] === 'b.ts') throw new BridgeError({ status: 422, message: 'nope' });
+        return null;
+      });
+      const err = await setFilesViewed(['a.ts', 'b.ts'], true).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(FilesViewedError);
+      expect((err as FilesViewedError).paths).toEqual(['b.ts']);
+      expect([...usePr.getState().viewed]).toEqual(['a.ts']);
     });
 
     it('reverts when the session fallback fails too', async () => {

@@ -14,6 +14,7 @@
 import { getSingularPatch, type CodeViewDiffItem, type DiffLineAnnotation, type FileDiffMetadata } from '@pierre/diffs';
 import { buildPatch } from '../github/convert';
 import type { FileSummary } from '../github/private';
+import { groupItemMain } from './relatedFiles';
 import type { DraftKey, PrState } from './store';
 import { isCollapsed } from './store';
 
@@ -37,6 +38,19 @@ export function placeholderDiff(summary: FileSummary): FileDiffMetadata {
     diff = getSingularPatch(buildPatch(summary, []));
     diff.cacheKey = `placeholder:${summary.digest}:${summary.prevPath ?? ''}`;
     placeholders.set(summary, diff);
+  }
+  return diff;
+}
+
+const groupPlaceholders = new WeakMap<FileSummary, FileDiffMetadata>();
+
+/** A group item's diff ('box', 'rail'): header-only, its main file's, under its own cache key. */
+function groupPlaceholder(summary: FileSummary): FileDiffMetadata {
+  let diff = groupPlaceholders.get(summary);
+  if (!diff) {
+    diff = getSingularPatch(buildPatch(summary, []));
+    diff.cacheKey = `group:${summary.digest}:${summary.path}`;
+    groupPlaceholders.set(summary, diff);
   }
   return diff;
 }
@@ -86,17 +100,22 @@ export class ItemSync {
   /** The paths last passed to `mount`. */
   mountedPaths: readonly string[] = [];
   private lastDeps: unknown[] = [];
+  private files: PrState['files'] = new Map();
+  /** Group items (state/relatedFiles.ts): always collapsed, their header renders the group; built once per main file. */
+  private groups = new Map<string, PierreItem>();
 
   constructor(private readonly annotations: AnnotationSource = noAnnotations) {}
 
   /** The state slices item inputs can depend on; when none changed, `sync` skips the per-file pass. */
   private deps(state: PrState): unknown[] {
-    return [state.order, state.files, state.diffs, state.viewed, state.collapsed, state.threads, state.drafts];
+    return [state.order, state.files, state.diffs, state.viewed, state.collapsed, state.folded, state.threads, state.drafts];
   }
 
   /** Items for `paths` (default: every file), which are then the mounted ones. */
   seed(state: PrState, paths: readonly string[] = state.order): PierreItem[] {
     this.last.clear();
+    this.groups.clear();
+    this.files = state.files;
     this.lastDeps = this.deps(state);
     for (const path of state.order) {
       const inputs = itemInputs(state, path, this.annotations);
@@ -109,12 +128,24 @@ export class ItemSync {
   mount(paths: readonly string[]): PierreItem[] {
     const items: PierreItem[] = [];
     for (const path of paths) {
-      const entry = this.last.get(path);
-      if (entry) items.push(entry.item);
+      const item = this.last.get(path)?.item ?? this.groupItem(path);
+      if (item) items.push(item);
     }
     this.mounted = new Set(items.map((i) => i.id));
     this.mountedPaths = paths;
     return items;
+  }
+
+  private groupItem(id: string): PierreItem | undefined {
+    const main = groupItemMain(id);
+    const summary = main === undefined ? undefined : this.files.get(main);
+    if (!summary) return undefined;
+    let item = this.groups.get(id);
+    if (!item) {
+      item = { id, type: 'diff', fileDiff: groupPlaceholder(summary), collapsed: true, annotations: [], version: 1 };
+      this.groups.set(id, item);
+    }
+    return item;
   }
 
   /** Returns the mounted paths that were updated. */
@@ -122,6 +153,7 @@ export class ItemSync {
     const deps = this.deps(state);
     if (deps.every((d, i) => d === this.lastDeps[i])) return [];
     this.lastDeps = deps;
+    this.files = state.files;
     const updated: string[] = [];
     for (const path of state.order) {
       const prev = this.last.get(path);

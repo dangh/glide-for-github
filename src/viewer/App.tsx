@@ -13,6 +13,7 @@ import type { Rpc } from './github/private';
 import { startLoader } from './state/controller';
 import { useFileGroups } from './state/fileGroups';
 import { loadPr } from './state/load';
+import { useRelatedRules } from './state/relatedFiles';
 import { session } from './state/session';
 import { effectiveThemeType, useSettings } from './state/settings';
 import { usePr } from './state/store';
@@ -58,7 +59,10 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
   const fatal = usePr((s) => s.fatal);
   const range = usePr((s) => s.range);
   const settingsLoaded = useSettings((s) => s.loaded);
-  const groupsLoaded = useFileGroups((s) => s.loaded);
+  const fileGroupsLoaded = useFileGroups((s) => s.loaded);
+  const rulesLoaded = useRelatedRules((s) => s.loaded);
+  // The list and the loader wait for the related-files rules too, so companions never jump into place.
+  const groupsLoaded = fileGroupsLoaded && rulesLoaded;
   const hasGroups = useFileGroups((s) => s.groups.length > 0);
   const groupsEnabled = useSettings((s) => s.settings.fileGroups.enabled);
   const fileCount = usePr((s) => s.order.length);

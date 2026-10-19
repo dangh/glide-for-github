@@ -6,12 +6,17 @@
  * Decoration changes (viewed, comments, renames) re-render the mounted rows via `model.render({})`.
  * A file group switch swaps the tree's paths in place (`resetPaths`), keeping the search and each folder's expansion;
  * a click on a group tab, which blurs and so closes the search, reopens it (`session.keepTreeSearch`).
+ * Related files sit right after their main file, indented and dimmed (state/relatedTree.ts); a change of relations
+ * re-sorts the same way, and swaps the stylesheet the tree's shadow root holds for them.
  */
 import type { FileTreeDirectoryHandle, GitStatusEntry } from '@pierre/trees';
 import { FileTree, useFileTree } from '@pierre/trees/react';
 import { memo, useEffect, useMemo, useRef } from 'react';
+import type { Relations } from '../../shared/related-files';
 import { DEFAULT_SETTINGS, toTreeOptions, type TreeSettings } from '../../shared/settings';
 import { useActiveGroup, useFileGroups } from '../state/fileGroups';
+import { useRelated, useRelatedRules } from '../state/relatedFiles';
+import { relatedSort, relatedTreeCss } from '../state/relatedTree';
 import { session } from '../state/session';
 import { effectiveThemeType, useSettings } from '../state/settings';
 import { usePr } from '../state/store';
@@ -31,13 +36,42 @@ const directoryOf = (m: TreeModel, dir: string): FileTreeDirectoryHandle | undef
   return item?.isDirectory() ? (item as FileTreeDirectoryHandle) : undefined;
 };
 
-function Tree({ paths, gitStatus, settings, colorScheme }: { paths: readonly string[]; gitStatus: GitStatusEntry[] | undefined; settings: TreeSettings; colorScheme: string }) {
+/** The tree's stylesheet for related files, in its open shadow root (`unsafeCSS` is fixed when the tree is created). */
+function setRelatedCss(model: TreeModel, css: string) {
+  const root = model.getFileTreeContainer()?.shadowRoot;
+  if (!root) return;
+  let style = root.querySelector<HTMLStyleElement>('style[data-related-files]');
+  if (!style) {
+    style = document.createElement('style');
+    style.dataset.relatedFiles = '';
+    root.append(style);
+  }
+  if (style.textContent !== css) style.textContent = css;
+}
+
+function Tree({
+  paths,
+  relations,
+  gitStatus,
+  settings,
+  colorScheme,
+}: {
+  paths: readonly string[];
+  relations: Relations;
+  gitStatus: GitStatusEntry[] | undefined;
+  settings: TreeSettings;
+  colorScheme: string;
+}) {
   /** True while the diff scroll position updates the selection: that selection must not scroll the diff. */
   const syncing = useRef(false);
   const modelRef = useRef<TreeModel | null>(null);
+  const relationsRef = useRef(relations);
+  relationsRef.current = relations;
+  const sort = useMemo(() => relatedSort(() => relationsRef.current), []);
 
   const { model } = useFileTree({
     paths,
+    sort,
     ...(gitStatus ? { gitStatus } : {}),
     ...toTreeOptions({ ...DEFAULT_SETTINGS, tree: settings }),
     renderRowDecoration: ({ item }) => (item.kind === 'file' ? decorationFor(usePr.getState(), item.path) : null),
@@ -52,9 +86,11 @@ function Tree({ paths, gitStatus, settings, colorScheme }: { paths: readonly str
   // A group switch: the new paths, with each folder row as the user last left it in any group (rows of merged
   // single-child folders included, however the new group merges them: state/treeFolders.ts).
   const shownPaths = useRef(paths);
+  const sortedBy = useRef(relations);
   const expansion = useRef(new Map<string, boolean>());
   useEffect(() => {
-    if (shownPaths.current === paths) return;
+    if (shownPaths.current === paths && sortedBy.current === relations) return;
+    sortedBy.current = relations;
     const flatten = settings.flattenEmptyDirectories;
     noteExpansion(folderChains(shownPaths.current, flatten), (dir) => directoryOf(model, dir)?.isExpanded(), expansion.current);
     shownPaths.current = paths;
@@ -76,7 +112,15 @@ function Tree({ paths, gitStatus, settings, colorScheme }: { paths: readonly str
       model.setSearch('');
       model.setSearch(query);
     }
-  }, [model, paths, settings.flattenEmptyDirectories]);
+  }, [model, paths, relations, settings.flattenEmptyDirectories]);
+
+  // The shadow root exists once the tree has rendered; a frame later covers the first mount.
+  useEffect(() => {
+    const css = relatedTreeCss(relations);
+    setRelatedCss(model, css);
+    const frame = requestAnimationFrame(() => setRelatedCss(model, css));
+    return () => cancelAnimationFrame(frame);
+  }, [model, relations]);
 
   // Diff scroll position → tree selection.
   useEffect(() => {
@@ -136,7 +180,10 @@ function Tree({ paths, gitStatus, settings, colorScheme }: { paths: readonly str
 
 export const TreePane = memo(function TreePane() {
   const { shown } = useActiveGroup();
-  const groupsLoaded = useFileGroups((s) => s.loaded);
+  const { relations } = useRelated();
+  const fileGroupsLoaded = useFileGroups((s) => s.loaded);
+  const rulesLoaded = useRelatedRules((s) => s.loaded);
+  const groupsLoaded = fileGroupsLoaded && rulesLoaded;
   const settingsLoaded = useSettings((s) => s.loaded);
   const pr = usePr((s) => s.pr);
   const settings = useSettings((s) => s.settings.tree);
@@ -149,7 +196,7 @@ export const TreePane = memo(function TreePane() {
   if (!pr || !groupsLoaded || !settingsLoaded) return <aside className="pierre-tree-pane" />;
   return (
     <aside className="pierre-tree-pane" data-testid="tree">
-      <Tree key={`${pr.headOid}:${key}`} paths={shown} gitStatus={gitStatus} settings={settings} colorScheme={colorScheme} />
+      <Tree key={`${pr.headOid}:${key}`} paths={shown} relations={relations} gitStatus={gitStatus} settings={settings} colorScheme={colorScheme} />
     </aside>
   );
 });

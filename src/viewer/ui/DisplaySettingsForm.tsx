@@ -12,10 +12,12 @@ import {
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
   isFontText,
+  RELATED_STYLES,
   SETTING_CHOICES,
   type DeepPartial,
   type DisplaySettings,
   type FontSettings,
+  type RelatedStyle,
 } from '../../shared/settings';
 
 /** Pause after the last keystroke before a numeric edit is saved (sync storage allows ~120 writes per minute). */
@@ -150,7 +152,11 @@ function FontSizeField({ value, onChange }: { value: FontSettings['codeFontSize'
   );
 }
 
-export function DisplaySettingsForm({ settings, update }: { settings: DisplaySettings; update: Update }) {
+/** The related-files styles, as the Display menu and the options page name them. */
+export const RELATED_STYLE_LABELS: Record<RelatedStyle, string> = { nested: 'Nested', box: 'One box', rail: 'Group rail', off: 'Off' };
+
+/** `relatedFiles`: the Related files choice (the options page shows it in its own section, with previews). */
+export function DisplaySettingsForm({ settings, update, relatedFiles = true }: { settings: DisplaySettings; update: Update; relatedFiles?: boolean }) {
   const d = settings.diff;
   const t = settings.tree;
   const diff = (p: Partial<DisplaySettings['diff']>) => update({ diff: p });
@@ -222,6 +228,18 @@ export function DisplaySettingsForm({ settings, update }: { settings: DisplaySet
       <fieldset>
         <legend>Review</legend>
         <Check label="Hide whitespace changes" value={settings.review.hideWhitespace} onChange={(v) => update({ review: { hideWhitespace: v } })} />
+        {relatedFiles && (
+          <label className="field">
+            <span>Related files</span>
+            <select value={settings.relatedFiles.style} onChange={(e) => update({ relatedFiles: { style: e.target.value as RelatedStyle } })}>
+              {RELATED_STYLES.map((style) => (
+                <option key={style} value={style}>
+                  {RELATED_STYLE_LABELS[style]}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </fieldset>
       <details className="advanced">
         <summary>Advanced</summary>
