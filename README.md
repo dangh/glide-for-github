@@ -12,7 +12,10 @@ review features: comments, suggestions, resolving threads, viewed files and revi
 
 ## What it does
 
-- Renders every changed file in one fast, virtualized diff view (split or unified), with a file tree beside it.
+- Renders every changed file in one fast, virtualized diff view (split or unified), with a file tree beside it. The
+  Glide tab shows the changed-file count, like Files changed.
+- A file tree button in the toolbar, like GitHub's, hides or shows the tree. It sits on the tree's side: first in the
+  toolbar, or last when the tree is on the right.
 - Comment on a line, a range of lines (drag over the gutter) or a whole file. The composer has a Write / Preview toggle
   and an "Insert suggestion" button.
 - Threads show inline: reply, edit, delete your own comments, resolve and unresolve, react.
@@ -21,15 +24,19 @@ review features: comments, suggestions, resolving threads, viewed files and revi
 - Apply a suggestion, or a batch of suggestions, as a commit (see the caveat below).
 - Viewed checkboxes stay in sync with GitHub's own viewed state, in both directions.
 - Commit range picker (all commits, one commit, a range) and hide-whitespace.
-- File groups: tabs above the tree and the diffs show one kind of file at a time (see [File groups](#file-groups)).
+- File groups: tabs in the toolbar show one kind of file at a time in the tree and the diffs (see
+  [File groups](#file-groups)).
+- When someone pushes to the pull request, a "This pull request was updated" banner offers Reload. Glide checks every
+  60 s while its tab is visible and never reloads by itself; Reload keeps your drafts and open comment boxes.
 - Reading needs no token. Posting comments, replies, reviews, edits and reactions needs one (next section). Applying
   suggestions, resolving threads and marking files viewed use your signed-in GitHub session, so they work without a
   token.
 - Display options (layout, themes, line wrapping, hunk rows, tree icons and position, fonts, and more) are on the
   options page and in the viewer's Display menu, with a live preview on the options page. Every option starts at
   "Default (GitHub)", which looks like GitHub's own Files changed page (unified, GitHub's colors, fonts and file boxes,
-  slim expandable "N unmodified lines" rows instead of `@@` headers, file status icons but no status letters in the tree); Pierre's other styles are one choice away. Changes apply to open pull
-  requests without a reload.
+  slim expandable "N unmodified lines" rows instead of `@@` headers, file status icons but no status letters in the
+  tree); Pierre's other styles are one choice away. Changes apply to open pull requests without a reload.
+- The options page shows Glide's icon and the installed version, which links to that version's release notes.
 - Replace Files changed with Glide, off by default, on the options page: GitHub's Files changed tab is hidden, Glide
   takes its place, and links to that page open Glide; the Display menu still links to GitHub's page.
 - Experimental, off by default, on the options page only: scroll the diffs with GitHub's page (its header scrolls
