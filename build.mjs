@@ -75,3 +75,7 @@ await Promise.all([
   // Licenses of the bundled production dependencies (Pierre's packages are Apache-2.0 and must travel with the zip).
   writeFile(resolve(dist, 'THIRD_PARTY_NOTICES.txt'), renderNotices(root)),
 ]);
+
+// This throwaway branch always builds the in-page experiment.
+const { buildInPageSpike } = await import('./scripts/inpage-spike/extension.mjs');
+await buildInPageSpike();

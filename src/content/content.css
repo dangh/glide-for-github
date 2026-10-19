@@ -6,7 +6,7 @@ iframe[data-pierre-viewer] {
 }
 
 /* GitHub's Files changed page spans the window (32 px side padding); other PR tabs cap .container-xl at 1280 px. */
-.container-xl:has(iframe[data-pierre-viewer]) {
+.container-xl:has(iframe[data-pierre-viewer], #glide-inpage-spike) {
   max-width: none;
 }
 

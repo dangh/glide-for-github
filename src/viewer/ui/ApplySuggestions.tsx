@@ -10,6 +10,7 @@ import { errorMessage } from '../state/review';
 import { commitSuggestions, DEFAULT_COMMIT_MESSAGE, suggestionRefs } from '../state/suggestions';
 import { sameSuggestion, usePr, type SuggestionRef } from '../state/store';
 import { reloadPullRequest } from './Notice';
+import { viewerRoot } from '../rootEl';
 
 const useCommitDialog = create<{ refs: SuggestionRef[] | null }>(() => ({ refs: null }));
 
@@ -74,11 +75,13 @@ export const BatchBar = memo(function BatchBar() {
 /** The commit dialog (one at a time). */
 export function CommitDialogHost() {
   const refs = useCommitDialog((s) => s.refs);
+  useEffect(() => () => useCommitDialog.setState({ refs: null }), []);
   if (!refs) return null;
   return <CommitDialog key={refs.map((r) => `${r.commentId}:${r.suggestionIndex ?? ''}`).join(',')} refs={refs} />;
 }
 
 function CommitDialog({ refs }: { refs: SuggestionRef[] }) {
+  const dialog = useRef<HTMLFormElement>(null);
   const title = useRef<HTMLInputElement>(null);
   const description = useRef<HTMLTextAreaElement>(null);
   const [busy, setBusy] = useState(false);
@@ -93,20 +96,45 @@ function CommitDialog({ refs }: { refs: SuggestionRef[] }) {
       if (!usePr.getState().headMoved) setError(null);
     });
   };
-  const close = () => useCommitDialog.setState({ refs: null });
+  const isCurrent = () => useCommitDialog.getState().refs === refs;
+  const close = () => {
+    if (isCurrent()) useCommitDialog.setState({ refs: null });
+  };
   const busyRef = useRef(false);
   busyRef.current = busy;
 
   useEffect(() => {
+    const scope = viewerRoot.scope;
+    const opener = scope.activeElement;
     title.current?.focus();
     title.current?.select();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      e.stopPropagation();
-      if (!busyRef.current) close();
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!busyRef.current) close();
+        return;
+      }
+      if (e.key !== 'Tab' || !dialog.current) return;
+      const items = dialog.current.querySelectorAll<HTMLElement>('input:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href]');
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) return;
+      const active = scope.activeElement;
+      const outside = !Array.from(items).some(item => item === active);
+      if (e.shiftKey && (active === first || outside)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || outside)) {
+        e.preventDefault();
+        first.focus();
+      }
     };
-    document.addEventListener('keydown', onKey, true);
-    return () => document.removeEventListener('keydown', onKey, true);
+    scope.addEventListener('keydown', onKey as EventListener, true);
+    return () => {
+      scope.removeEventListener('keydown', onKey as EventListener, true);
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+    };
   }, []);
 
   const commit = async (event?: React.FormEvent) => {
@@ -114,10 +142,13 @@ function CommitDialog({ refs }: { refs: SuggestionRef[] }) {
     const subject = title.current?.value.trim() ?? '';
     if (!subject || busy) return;
     const body = description.current?.value.trim() ?? '';
+    // The clicked submit becomes disabled; keep focus on a control that remains in the tab order.
+    title.current?.focus();
     setBusy(true);
     setError(null);
     try {
       await commitSuggestions(refs, body ? `${subject}\n\n${body}` : subject);
+      if (!isCurrent()) return;
       close();
       usePr.getState().setNotice({ kind: 'info', message: `Committed ${plural(refs.length)}.` });
     } catch (err) {
@@ -130,7 +161,7 @@ function CommitDialog({ refs }: { refs: SuggestionRef[] }) {
 
   return (
     <div className="modal-backdrop">
-      <form className="modal commit-dialog" role="dialog" aria-modal="true" aria-labelledby="commit-dialog-title" onSubmit={commit}>
+      <form ref={dialog} className="modal commit-dialog" role="dialog" aria-modal="true" aria-labelledby="commit-dialog-title" onSubmit={commit}>
         <h2 id="commit-dialog-title">{refs.length === 1 ? 'Commit suggestion' : `Commit ${plural(refs.length)}`}</h2>
         <label className="modal-field">
           Commit message

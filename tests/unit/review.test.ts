@@ -244,7 +244,7 @@ describe('review submission, viewed, apply suggestion (global store)', () => {
   }
   const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
   /** GraphQL answers by operation name (`mutation StartReview(…`, `query PendingReview(…`). */
-  function graphql(answers: Record<string, () => Response>) {
+  function graphql(answers: Record<string, () => Response | Promise<Response>>) {
     const ops: { op: string; variables: Record<string, unknown> }[] = [];
     fetchMock.mockImplementation(async (_url: string, init: RequestInit) => {
       const body = JSON.parse(String(init.body));
@@ -297,6 +297,24 @@ describe('review submission, viewed, apply suggestion (global store)', () => {
       const key = openComposer(targetFromRange('a.ts', { start: line, side: 'additions', end: line }));
       await submitNewComment(key, `review comment ${line}`, 'review');
     };
+
+    it.each(['PendingReview', 'StartReview', 'SubmitReview'] as const)('does not continue a review or clear the next PR draft after navigating during %s', async (paused) => {
+      let release!: (response: Response) => void;
+      const response = new Promise<Response>((resolve) => { release = resolve; });
+      const ops = graphql({ ...answers, [paused]: () => response });
+      const action = submitReview('APPROVE', 'Review for PR 1');
+      const result = expect(action).rejects.toThrow(/pull request.*changed/i);
+      await vi.waitFor(() => expect(ops.at(-1)?.op).toBe(paused));
+      usePr.setState(usePr.getInitialState());
+      resetReviewCaches();
+      usePr.getState().setPr({ ...livePr, ref: { ...livePr.ref, number: 2 }, nodeId: 'PR_2', headOid: 'head2' });
+      usePr.getState().setDraft(draftKey.reviewSummary, { body: 'Draft for PR 2', updatedAt: 1 });
+      release(answers[paused]());
+      await result;
+      expect(ops.at(-1)?.op).toBe(paused);
+      expect(usePr.getState().pendingReview).toBeNull();
+      expect(usePr.getState().drafts.get(draftKey.reviewSummary)?.body).toBe('Draft for PR 2');
+    });
 
     it('add → 1 pending; submit as Comment → no pending review, its comments submitted, summary draft cleared', async () => {
       const ops = graphql(answers);
@@ -466,6 +484,24 @@ describe('review submission, viewed, apply suggestion (global store)', () => {
       url: `https://github.com/o/r/pull/1#discussion_r${commentId}`,
     });
     const applyCalls = (calls: unknown[][]) => calls.filter((c) => c[0] === 'applySuggestions');
+
+    it.each(['success', 'head moved'] as const)('ignores an old suggestion %s response after navigating to another PR', async (outcome) => {
+      let finish!: () => void;
+      const calls = fakeRpc(() => new Promise((resolve, reject) => {
+        finish = () => outcome === 'success' ? resolve({}) : reject(new BridgeError({ status: 409, code: 'HEAD_OID_MISMATCH', message: 'Head moved' }));
+      }));
+      const action = commitSuggestions([ref(7)], 'PR 1 suggestion');
+      const result = expect(action).rejects.toThrow(/pull request.*changed/i);
+      usePr.setState(usePr.getInitialState());
+      usePr.getState().setPr({ ...livePr, ref: { ...livePr.ref, number: 2 } });
+      usePr.getState().addToBatch(ref(8));
+      finish();
+      await result;
+      expect(usePr.getState().headMoved).toBe(false);
+      expect(usePr.getState().suggestionBatch).toEqual([ref(8)]);
+      expect(usePr.getState().notice).toBeNull();
+      expect(calls).toHaveLength(1);
+    });
 
     it('sends sorted comments, the message and the PR head with a per-PR key; success clears key and batch and reloads the PR', async () => {
       const calls = fakeRpc(async (method) => {

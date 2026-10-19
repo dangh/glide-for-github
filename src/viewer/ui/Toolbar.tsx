@@ -136,7 +136,7 @@ const PrHeader = memo(function PrHeader() {
             title={title}
             onClick={(e) => {
               e.preventDefault();
-              session.pageScroll?.scrollPageToTop();
+              session.scrollPageToTop?.();
             }}
           >
             {title}

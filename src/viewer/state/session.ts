@@ -6,6 +6,8 @@ import type { Rpc } from '../github/private';
 import type { PageScrollView } from '../pageScroll';
 import type { AnnotationMeta } from './items';
 import type { Loader } from './loader';
+import { WriteError } from '../github/errors';
+import { usePr } from './store';
 
 export interface Session {
   rpc?: Rpc;
@@ -16,6 +18,8 @@ export interface Session {
   viewport?: string[];
   /** Scrolls the diff list to a file (tree selection). */
   scrollToFile?(path: string): void;
+  /** The merged PR title returns to the top of GitHub's document. */
+  scrollPageToTop?(): void;
   /** Marks a file as the current one in the tree (diff scroll position). */
   revealInTree?(path: string): void;
   /**
@@ -23,8 +27,30 @@ export interface Session {
    * on a file group tab blurs the search, which closes it).
    */
   keepTreeSearch?(): () => void;
-  /** Page scrolling's list side, when the viewer was mounted with it (src/viewer/pageScroll.ts). */
-  pageScroll?: PageScrollView;
+  /** Attaches the list's anchors; frame scrolling also coordinates explicit scroll requests with its parent. */
+  pageScroll?: Pick<PageScrollView, 'attach'> & { expectListScroll?(): void };
 }
 
 export const session: Session = {};
+
+/** In-page navigation keeps this module alive. Async work belongs to the PR and connection that started it. */
+export function capturePrOperation() {
+  const pr = usePr.getState().pr;
+  if (!pr) throw new WriteError('unknown', 'The pull request is not loaded yet.', { owner: '' });
+  const rpc = session.rpc;
+  const isCurrent = () => usePr.getState().pr === pr && session.rpc === rpc;
+  const check = () => {
+    if (!isCurrent()) throw new WriteError('conflict', 'The pull request changed. Retry the action on the current pull request.', { owner: pr.ref.owner });
+  };
+  return {
+    pr, rpc, isCurrent, check,
+    async run<T>(action: () => Promise<T>): Promise<T> {
+      check();
+      const result = await action();
+      check();
+      return result;
+    },
+  };
+}
+
+export type PrOperation = ReturnType<typeof capturePrOperation>;

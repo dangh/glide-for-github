@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { toStyleVars } from '../../shared/github-defaults';
 import { DEFAULT_CHOICE } from '../../shared/settings';
 import { useSettings } from '../state/settings';
+import { viewerRoot } from '../rootEl';
 
 const appliedKeys = new WeakMap<HTMLElement, string[]>();
 
@@ -20,9 +21,9 @@ export function applyStyleVars(el: HTMLElement, vars: Readonly<Record<string, st
 export function DisplayStyle() {
   const vars = useSettings((s) => toStyleVars(s.settings));
   const header = useSettings((s) => (s.settings.diff.fileHeaderStyle === DEFAULT_CHOICE ? 'github' : 'pierre'));
-  useEffect(() => applyStyleVars(document.documentElement, vars), [vars]);
+  useEffect(() => applyStyleVars(viewerRoot.el, vars), [vars]);
   useEffect(() => {
-    document.documentElement.dataset.fileHeader = header;
+    viewerRoot.el.dataset.fileHeader = header;
   }, [header]);
   return null;
 }

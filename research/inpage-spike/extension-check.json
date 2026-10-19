@@ -1,0 +1,65 @@
+{
+  "date": "2026-10-19",
+  "environment": "Chrome for Testing 155, Linux, actual unpacked extension, temporary signed-in profile copy",
+  "test": [
+    "tests/e2e/inpage-spike.spec.ts",
+    "tests/e2e/inpage-layout.spec.ts"
+  ],
+  "nativeWorkersAtSample": {
+    "spawned": 4,
+    "initialized": 4,
+    "completedHighlightRenders": 1,
+    "errors": 0
+  },
+  "tabRestoredAfterRemoval": true,
+  "viewerInTopDocument": true,
+  "viewerIframeCount": 0,
+  "workerHostHidden": true,
+  "highlightingRecoveredAfterWorkerHostRemoval": true,
+  "forcedWorkerFailureShowsAlertWithoutFileRenderer": true,
+  "browserTestsPassed": 7,
+  "unitTestsPassed": 878,
+  "typecheckPassed": true,
+  "devicePixelRatios": [
+    1,
+    2
+  ],
+  "viewportWidths": [
+    767,
+    768,
+    900,
+    1011,
+    1012,
+    1280,
+    1440
+  ],
+  "pullRequests": [
+    "https://github.com/dangh/glide-for-github/pull/1/files",
+    "https://github.com/react/react/pull/37778/files"
+  ],
+  "fullWidthLayout": true,
+  "displayMenusWithinViewport": true,
+  "outsideClickDismissesMenu": true,
+  "treeNavigation": true,
+  "splitUnifiedSwitch": true,
+  "commentTypingAndCancellation": true,
+  "tabSwitchAndReload": true,
+  "physicalMacTrackpadTested": false,
+  "reviewWritesTested": false,
+  "layoutModes": [
+    "page",
+    "merged"
+  ],
+  "entryRoutes": [
+    "Files changed",
+    "Conversation"
+  ],
+  "stickyGeometryAndFileEdges": true,
+  "nativeHeaderAndFooterRestored": true,
+  "customTopPadding": [
+    16,
+    40
+  ],
+  "mergedTitleReturnsToTop": true,
+  "retainedViewerAfterShiftedHeaderReplacement": true
+}

@@ -1,0 +1,193 @@
+{
+  "purpose": "Separate profiling pass, excluded from timing comparison. Scroll and composer typing only; profiles included other focused browser tests running on the host.",
+  "results": [
+    {
+      "build": "iframe",
+      "pr": "react",
+      "sampledMs": 6143.35,
+      "topSamples": [
+        {
+          "function": "(idle)",
+          "file": "",
+          "percent": 63.23
+        },
+        {
+          "function": "(program)",
+          "file": "",
+          "percent": 18.83
+        },
+        {
+          "function": "getBoundingClientRect",
+          "file": "",
+          "percent": 6.77
+        },
+        {
+          "function": "applyCodeColumnsInPlace",
+          "file": "chunk-66TI23YH.js",
+          "percent": 0.92
+        },
+        {
+          "function": "(garbage collector)",
+          "file": "",
+          "percent": 0.68
+        },
+        {
+          "function": "(anonymous)",
+          "file": "chunk-66TI23YH.js",
+          "percent": 0.56
+        },
+        {
+          "function": "postMessage",
+          "file": "",
+          "percent": 0.5
+        },
+        {
+          "function": "reconcileHeights",
+          "file": "chunk-66TI23YH.js",
+          "percent": 0.48
+        }
+      ]
+    },
+    {
+      "build": "iframe",
+      "pr": "vscode",
+      "sampledMs": 6265.74,
+      "topSamples": [
+        {
+          "function": "(idle)",
+          "file": "",
+          "percent": 57.77
+        },
+        {
+          "function": "(program)",
+          "file": "",
+          "percent": 22.75
+        },
+        {
+          "function": "getBoundingClientRect",
+          "file": "",
+          "percent": 7.41
+        },
+        {
+          "function": "(garbage collector)",
+          "file": "",
+          "percent": 0.91
+        },
+        {
+          "function": "applyCodeColumnsInPlace",
+          "file": "chunk-66TI23YH.js",
+          "percent": 0.81
+        },
+        {
+          "function": "insertAdjacentHTML",
+          "file": "",
+          "percent": 0.75
+        },
+        {
+          "function": "onPageMessage",
+          "file": "viewer.js",
+          "percent": 0.68
+        },
+        {
+          "function": "(anonymous)",
+          "file": "chunk-66TI23YH.js",
+          "percent": 0.63
+        }
+      ]
+    },
+    {
+      "build": "inpage",
+      "pr": "react",
+      "sampledMs": 6297.48,
+      "topSamples": [
+        {
+          "function": "(idle)",
+          "file": "",
+          "percent": 54.8
+        },
+        {
+          "function": "(program)",
+          "file": "",
+          "percent": 24.0
+        },
+        {
+          "function": "getBoundingClientRect",
+          "file": "",
+          "percent": 8.59
+        },
+        {
+          "function": "set innerHTML",
+          "file": "",
+          "percent": 1.19
+        },
+        {
+          "function": "(garbage collector)",
+          "file": "",
+          "percent": 0.71
+        },
+        {
+          "function": "reconcileHeights",
+          "file": "inpage.js",
+          "percent": 0.38
+        },
+        {
+          "function": "remove",
+          "file": "",
+          "percent": 0.33
+        },
+        {
+          "function": "render",
+          "file": "inpage.js",
+          "percent": 0.29
+        }
+      ]
+    },
+    {
+      "build": "inpage",
+      "pr": "vscode",
+      "sampledMs": 6263.69,
+      "topSamples": [
+        {
+          "function": "(idle)",
+          "file": "",
+          "percent": 55.78
+        },
+        {
+          "function": "(program)",
+          "file": "",
+          "percent": 22.25
+        },
+        {
+          "function": "getBoundingClientRect",
+          "file": "",
+          "percent": 9.29
+        },
+        {
+          "function": "set innerHTML",
+          "file": "",
+          "percent": 1.18
+        },
+        {
+          "function": "reconcileHeights",
+          "file": "inpage.js",
+          "percent": 1.03
+        },
+        {
+          "function": "insertAdjacentHTML",
+          "file": "",
+          "percent": 0.74
+        },
+        {
+          "function": "remove",
+          "file": "",
+          "percent": 0.42
+        },
+        {
+          "function": "trimColumnRows",
+          "file": "inpage.js",
+          "percent": 0.39
+        }
+      ]
+    }
+  ]
+}

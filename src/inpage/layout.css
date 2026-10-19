@@ -1,0 +1,22 @@
+/* GitHub supplies the page gutters. The iframe's extra pixel and internal scrollport do not apply here. */
+:host { display: block; width: 100%; min-width: 0; height: auto; contain: style; }
+#root { height: auto; overflow: visible; }
+.pierre-app { height: auto; padding-inline: 0; }
+.pierre-body { align-items: flex-start; }
+:host([data-scroll-layout]) .pierre-main,
+:host([data-scroll-layout]) .pierre-diffs { height: auto; overflow: visible; overscroll-behavior: auto; }
+/* Keep CodeView's padding margins inside its coordinate system without creating a scroll container. */
+.pierre-diffs { display: flow-root; }
+:host([data-scroll-layout]) .pierre-body[data-tree-position] .pierre-diffs { margin-inline: 0; padding-inline: 0; }
+:host([data-file-header='github']) .pierre-body[data-tree-position='left']:not([data-tree-hidden]) .pierre-diffs { padding-left: 16px; }
+:host([data-file-header='github']) .pierre-body[data-tree-position='right']:not([data-tree-hidden]) .pierre-diffs { padding-right: 16px; }
+.pierre-toolbar { position: sticky; top: var(--glide-toolbar-top, 0px); z-index: 50; background: var(--pierre-bg); }
+.modal-backdrop { z-index: 100; }
+.pierre-toolbar[data-stuck] {
+  margin-left: calc(-1 * var(--glide-gutter-left));
+  margin-right: calc(-1 * var(--glide-gutter-right));
+  padding-left: var(--glide-gutter-left);
+  padding-right: var(--glide-gutter-right);
+}
+.pierre-toolbar .popover:not(.stack-menu) > .popover-panel { max-height: min(70vh, 560px, var(--glide-menu-space)); }
+.pierre-tree-pane { position: sticky; top: var(--glide-sticky-top, 60px); height: calc(100vh - var(--glide-sticky-top, 60px)); }
