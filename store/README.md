@@ -42,6 +42,11 @@ Review GitHub pull requests with fast diffs and a file tree, next to Files chang
 >
 > - Every changed file in one smooth diff view, split or unified, with a file tree beside it. Big pull requests stay
 >   responsive.
+> - Looks like GitHub by default: GitHub's colors, fonts, file boxes and "N unmodified lines" rows, so it feels
+>   familiar from the first click. Pierre's other styles are one setting away.
+> - File groups: tabs in the toolbar show one kind of file at a time (Source, Tests, Docs, Infra, Manifest,
+>   Artifacts), each with its file count. Edit the groups with gitignore-style patterns, or import them from Sift for
+>   GitHub.
 > - Comment on a line, a range of lines or a whole file. Write and Preview, and an Insert suggestion button.
 > - Threads inline: reply, edit, delete your own comments, resolve and unresolve, react.
 > - Pending review: submit as Comment, Approve or Request changes, or discard it.
@@ -89,28 +94,21 @@ outside the approved use cases, no use unrelated to the single purpose, no use f
 
 **Privacy policy URL:** https://github.com/dangh/glide-for-github/blob/main/store/PRIVACY.md
 
-## First submission checklist
+## First submission
 
-The first upload is manual (the store API can only update an item that exists). Version 0.2.0 is the first one submitted.
+The store page is https://chromewebstore.google.com/detail/dhbdoblfgppilljakljokgbpkjeiomka (item ID
+`dhbdoblfgppilljakljokgbpkjeiomka`). Version 0.2.0 was uploaded by hand from its GitHub release on 2026-10-19 SGT (the
+store API can only update an item that exists), with the listing and privacy answers above. The five `CWS_*` secrets
+were set in the `chrome-web-store` environment right after, and CI has submitted every tag since (v0.2.1, v0.3.0).
 
-1. Push the `v0.2.0` tag. CI builds, creates the GitHub release with `glide-for-github.zip`, and skips the store
-   upload (no secrets yet; the job says so in a notice).
-2. [Developer dashboard](https://chrome.google.com/webstore/devconsole) > **Add new item** > upload
-   `glide-for-github.zip` from the v0.2.0 GitHub release.
-3. **Store listing** tab: fill name, summary, description, category and language from the Listing section above; upload
-   the icon, the four screenshots and the small and marquee tiles from the Assets table.
-4. **Privacy** tab: single purpose, the three permission justifications, remote code "No", data usage, and the privacy
-   policy URL above.
-5. **Submit for review.**
-6. Copy the item's ID from the dashboard (the 32-letter ID in the item's URL) and set the five environment secrets
-   (next section; protect the environment first). From the next tag on, CI uploads and publishes by itself.
-7. Add the store link to the README's Install section. Also upload `promo/social-preview.png` in the GitHub repository's
-   Settings > Social preview.
+- [x] Link the store page from the README's Install section.
+- [ ] Upload `promo/social-preview.png` as the repository's social preview (Settings > Social preview).
 
 ## Automatic publishing
 
-CI uploads and publishes every `v*` tag when all five secrets exist. The publish job runs in the `chrome-web-store`
-GitHub environment, so the secrets belong there, not at repository level.
+CI uploads every `v*` tag and submits it for store review when all five secrets exist; the store publishes it once
+the review passes. The publish job runs in the `chrome-web-store` GitHub environment, so the secrets belong there, not
+at repository level, and it waits for a reviewer to approve the deployment.
 
 **Before adding any secret**, create the environment and protect it: Settings > Environments > New environment, name
 `chrome-web-store`, turn on **Required reviewers** and add yourself (and any co-maintainer), and under **Deployment
