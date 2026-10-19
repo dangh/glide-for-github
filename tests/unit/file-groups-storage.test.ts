@@ -131,6 +131,34 @@ describe('file groups storage', () => {
     expect(groupsFromItems({ [FILE_GROUPS_KEY]: 0 })).toEqual([]);
   });
 
+  it('ignores an older change read that resolves after a newer change read', async () => {
+    const { storage } = fakeSync();
+    let finishOld!: (items: Record<string, unknown>) => void;
+    let first = true;
+    const delayed: GroupsStorage = {
+      ...storage,
+      get: () => {
+        if (!first) return storage.get(null);
+        first = false;
+        return new Promise((resolve) => { finishOld = resolve; });
+      },
+    };
+    const seen: FileGroup[][] = [];
+    const off = onFileGroupsChange((groups) => seen.push(groups), delayed);
+    try {
+      await saveFileGroups(custom, storage);
+      const old = await storage.get(null);
+      const newer = [{ label: 'New', patterns: ['*.new'] }];
+      await saveFileGroups(newer, storage);
+      await new Promise((r) => setTimeout(r, 0));
+      finishOld(old);
+      await new Promise((r) => setTimeout(r, 0));
+      expect(seen).toEqual([newer]);
+    } finally {
+      off();
+    }
+  });
+
   it('reports changes to the groups, not to other items', async () => {
     const { storage } = fakeSync();
     const seen: FileGroup[][] = [];
