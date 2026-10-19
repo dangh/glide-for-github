@@ -11,6 +11,7 @@
 :host([data-file-header='github']) .pierre-body[data-tree-position='left']:not([data-tree-hidden]) .pierre-diffs { padding-left: 16px; }
 :host([data-file-header='github']) .pierre-body[data-tree-position='right']:not([data-tree-hidden]) .pierre-diffs { padding-right: 16px; }
 .pierre-toolbar { position: sticky; top: var(--glide-toolbar-top, 0px); z-index: 50; background: var(--pierre-bg); }
+.modal-backdrop { z-index: 100; }
 .pierre-toolbar[data-stuck] {
   margin-left: calc(-1 * var(--glide-gutter-left));
   margin-right: calc(-1 * var(--glide-gutter-right));

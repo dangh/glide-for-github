@@ -272,6 +272,19 @@ describe('ReviewMenu', () => {
 });
 
 describe('FileHeader Viewed', () => {
+  it('does not show the previous PR Viewed failure after navigation', async () => {
+    let fail!: (e: unknown) => void;
+    session.rpc = { call: (() => new Promise((_, reject) => { fail = reject; })) as never };
+    setTokenStorage(fakeArea());
+    await render(<><FileHeader path="src/a.ts" /><Notice /></>);
+    await click(container.querySelector<HTMLInputElement>('.fh-viewed input')!);
+    await act(async () => usePr.getState().setPr({ ...basePr, ref: { ...basePr.ref, number: 2 } }));
+    await act(async () => fail(new BridgeError({ status: 422, message: 'Old PR failure' })));
+    await settle();
+    expect(usePr.getState().notice).toBeNull();
+    expect(document.querySelector('.toast-error')).toBeNull();
+  });
+
   it('toggles at once and reverts with an error notice when GitHub and the session both fail', async () => {
     let fail!: (e: unknown) => void;
     session.rpc = { call: (() => new Promise((_, reject) => (fail = reject))) as never };
@@ -316,6 +329,35 @@ describe('apply suggestion', () => {
         <CommitDialogHost />
       </>,
     );
+
+  it('does not reopen the previous PR suggestion dialog after remount', async () => {
+    usePr.getState().setThreads([thread('1')]);
+    await ui();
+    await click(button('Commit suggestion')!);
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    await render(null);
+    usePr.getState().setPr({ ...basePr, ref: { ...basePr.ref, number: 2 } });
+    await ui();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('an old suggestion response cannot close a new dialog or show a success notice', async () => {
+    let release!: () => void;
+    fakeRpc(() => new Promise<void>(resolve => { release = resolve; }));
+    usePr.getState().setThreads([thread('1')]);
+    await ui();
+    await click(button('Commit suggestion')!);
+    await click(button('Commit changes')!);
+    await render(null);
+    usePr.getState().setPr({ ...basePr, ref: { ...basePr.ref, number: 2 } });
+    usePr.getState().setThreads([thread('1')]);
+    await ui();
+    await click(button('Commit suggestion')!);
+    await act(async () => release());
+    await settle();
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(usePr.getState().notice).toBeNull();
+  });
 
   it('shows "Commit suggestion" and "Add suggestion to batch" only when the viewer can apply suggestions', async () => {
     usePr.getState().setThreads([thread('1'), thread('2', { comments: [comment(20, { body: 'no suggestion here' })] })]);

@@ -19,7 +19,7 @@ import { sessionStore } from './batch';
 import { noteWrite } from './freshness';
 import { loadPr } from './load';
 import { sessionError } from './review';
-import { session } from './session';
+import { capturePrOperation, session } from './session';
 import { usePr, type SuggestionRef } from './store';
 
 export { canApply, commentUrl, suggestionCount, suggestionRefs } from './batch';
@@ -50,8 +50,8 @@ const definite = (err: unknown) => err instanceof BridgeError && err.status >= 4
  * `WriteError` (`conflict` + "head moved" for `HEAD_OID_MISMATCH`); the batch is kept on any failure.
  */
 export async function commitSuggestions(refs: readonly SuggestionRef[], message: string): Promise<void> {
-  const pr = usePr.getState().pr;
-  if (!pr) throw new WriteError('unknown', 'The pull request is not loaded yet.', { owner: '' });
+  const operation = capturePrOperation();
+  const pr = operation.pr;
   const owner = pr.ref.owner;
   const rpc = session.rpc;
   if (!rpc) throw new WriteError('network', 'Not connected to the GitHub page.', { owner });
@@ -70,6 +70,7 @@ export async function commitSuggestions(refs: readonly SuggestionRef[], message:
     );
   } catch (err) {
     if (definite(err)) clearKey(pr.ref);
+    operation.check();
     if (err instanceof BridgeError && err.status === 409 && err.code === 'HEAD_OID_MISMATCH') {
       usePr.getState().setHeadMoved(true);
       throw new WriteError(
@@ -85,11 +86,13 @@ export async function commitSuggestions(refs: readonly SuggestionRef[], message:
       : new WriteError(e.kind, `Could not commit the ${refs.length === 1 ? 'suggestion' : 'suggestions'}.${detail}`, { owner, ...(e.status ? { status: e.status } : {}) });
   }
   clearKey(pr.ref);
+  operation.check();
   usePr.getState().removeFromBatch(refs);
   try {
     await loadPr(rpc, pr.ref, () => usePr.getState().pr === pr);
   } catch {
-    usePr.getState().setNotice({ kind: 'info', message: 'Suggestions committed. Reload to see the new commit.' });
+    if (operation.isCurrent()) usePr.getState().setNotice({ kind: 'info', message: 'Suggestions committed. Reload to see the new commit.' });
   }
-  noteWrite(); // the only write that moves the head: confirm the shown head is current (coalesced)
+  // loadPr replaces the PR object on success, but only this connection may receive the follow-up check.
+  if (session.rpc === rpc) noteWrite();
 }

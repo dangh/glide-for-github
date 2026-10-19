@@ -109,7 +109,10 @@ function variantOf(role: Role | undefined): string | undefined {
 
 /** Marks `files` viewed or not (optimistic, reverted with an error toast for the files GitHub refuses). */
 function markViewed(files: readonly string[], next: boolean) {
+  const pr = usePr.getState().pr;
+  const rpc = session.rpc;
   setFilesViewed(files, next).catch((err: unknown) => {
+    if (usePr.getState().pr !== pr || session.rpc !== rpc) return;
     if (isNoTokenError(err)) return; // token prompt cancelled: reverted, nothing to report
     const which = err instanceof FilesViewedError ? err.paths.join(', ') : files.join(', ');
     usePr.getState().setNotice({ kind: 'error', message: `Could not ${next ? 'mark' : 'unmark'} ${which} as viewed. ${errorMessage(err)}` });

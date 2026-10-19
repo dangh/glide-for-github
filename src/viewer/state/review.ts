@@ -16,7 +16,7 @@ import { fetchThreads, type PrData } from '../github/private';
 import { toThreadModels, type CommentModel, type ThreadModel } from '../github/threads';
 import { targetOfDraft, type CommentTarget } from './compose';
 import { rangeOids } from './range';
-import { session } from './session';
+import { capturePrOperation, session, type PrOperation } from './session';
 import { BridgeError } from '../../shared/rpc';
 import { draftKey, threadByKey, threadKey, usePr, type DraftKey } from './store';
 
@@ -57,15 +57,16 @@ export function shownHeadOid(): string {
  * Runs `fn` with an API client; an auth failure re-opens the token prompt and retries with the new token.
  * `first`: options for the first `requireToken` (e.g. `force` when the stored token is known to be refused).
  */
-export async function withApi<T>(reason: string, fn: (api: GithubApi) => Promise<T>, first: RequireTokenOptions = {}): Promise<T> {
-  const owner = currentPr().ref.owner;
-  let api = await requireToken(owner, reason, first);
+export async function withApi<T>(reason: string, fn: (api: GithubApi, operation: PrOperation) => Promise<T>, first: RequireTokenOptions = {}, operation = capturePrOperation()): Promise<T> {
+  const owner = operation.pr.ref.owner;
+  let api = await operation.run(() => requireToken(owner, reason, first));
   for (let attempt = 1; ; attempt++) {
     try {
-      return await fn(api);
+      return await operation.run(() => fn(api, operation));
     } catch (err) {
+      operation.check();
       if (!isAuthError(err) || attempt >= MAX_AUTH_ATTEMPTS) throw err;
-      api = await requireToken(owner, reason, { force: true, problem: err.message });
+      api = await operation.run(() => requireToken(owner, reason, { force: true, problem: err.message }));
     }
   }
 }
@@ -82,18 +83,25 @@ export function resetReviewCaches(): void {
   clearTimeout(refreshTimer);
 }
 
-async function prNodeId(api: GithubApi): Promise<string> {
-  caches.prNodeId ??= currentPr().nodeId ?? (await api.prNodeId());
+async function prNodeId(api: GithubApi, operation: PrOperation): Promise<string> {
+  operation.check();
+  if (caches.prNodeId) return caches.prNodeId;
+  const id = operation.pr.nodeId ?? (await operation.run(() => api.prNodeId()));
+  operation.check();
+  caches.prNodeId ??= id;
   return caches.prNodeId;
 }
 
 /** GraphQL thread node id (resolve, review replies), via `threadNodeIds()` fetched lazily and cached (refetched on a miss). */
-async function threadNodeId(api: GithubApi, thread: ThreadModel): Promise<string> {
+async function threadNodeId(api: GithubApi, thread: ThreadModel, operation: PrOperation): Promise<string> {
+  operation.check();
   const first = thread.comments[0]?.databaseId;
   if (first === undefined) throw new WriteError('not-found', 'This thread has no comments.', { owner: currentPr().ref.owner });
   let id = caches.threadNodeIds?.get(first);
   if (!id) {
-    caches.threadNodeIds = await api.threadNodeIds();
+    const ids = await operation.run(() => api.threadNodeIds());
+    operation.check();
+    caches.threadNodeIds = ids;
     id = caches.threadNodeIds.get(first);
   }
   if (!id) throw new WriteError('not-found', 'GitHub did not find this thread. Reload the page to refresh it.', { owner: currentPr().ref.owner });
@@ -101,16 +109,20 @@ async function threadNodeId(api: GithubApi, thread: ThreadModel): Promise<string
 }
 
 /** The viewer's pending review node id: the known one, else GitHub's, else (when `create`) a new pending review. */
-async function reviewNodeId(api: GithubApi, create: boolean): Promise<string> {
+async function reviewNodeId(api: GithubApi, create: boolean, operation: PrOperation): Promise<string> {
+  operation.check();
   const known = usePr.getState().pendingReview;
   if (known?.nodeId) return known.nodeId;
-  const found = await api.pendingReview();
+  const found = await operation.run(() => api.pendingReview());
+  operation.check();
   if (found) {
     usePr.getState().setPendingReview(found);
     return found.nodeId;
   }
   if (!create) throw new WriteError('conflict', 'The pending review no longer exists on GitHub.', { owner: currentPr().ref.owner });
-  const id = await api.startReview(await prNodeId(api), shownHeadOid());
+  const prId = await prNodeId(api, operation);
+  const id = await operation.run(() => api.startReview(prId, shownHeadOid()));
+  operation.check();
   usePr.getState().setPendingReview({ nodeId: id, count: 0 });
   return id;
 }
@@ -244,6 +256,7 @@ export type NewCommentMode = 'single' | 'review';
 
 /** Posts a new-thread composer's comment (`key` = its draft) as a single comment or as part of the pending review. */
 export async function submitNewComment(key: DraftKey, body: string, mode: NewCommentMode): Promise<void> {
+  const operation = capturePrOperation();
   const target = targetOfDraft(usePr.getState().drafts.get(key));
   if (!target) throw new WriteError('unknown', 'This comment box is no longer open.', { owner: currentPr().ref.owner });
   const line = target.subject === 'line';
@@ -258,18 +271,20 @@ export async function submitNewComment(key: DraftKey, body: string, mode: NewCom
         commitId: shownHeadOid(),
       }),
     );
+    operation.check();
     addProvisionalThread(target, provisionalComment(res.id, res.nodeId, body, 'submitted'));
   } else {
-    const res = await withApi('start a review', async (api) => {
-      const review = await reviewNodeId(api, true);
-      return api.addReviewThread(review, {
+    const res = await withApi('start a review', async (api, operation) => {
+      const review = await reviewNodeId(api, true, operation);
+      return operation.run(() => api.addReviewThread(review, {
         path: target.path,
         side: target.side,
         subjectType: target.subject,
         ...(line ? { line: target.line, ...(target.startLine !== undefined ? { startLine: target.startLine, startSide: target.startSide ?? target.side } : {}) } : {}),
         body,
-      });
+      }));
     });
+    operation.check();
     (caches.threadNodeIds ??= new Map()).set(res.commentDatabaseId, res.threadNodeId);
     addProvisionalThread(target, provisionalComment(res.commentDatabaseId, res.commentNodeId, body, 'pending'));
     bumpPending(1);
@@ -280,16 +295,23 @@ export async function submitNewComment(key: DraftKey, body: string, mode: NewCom
 
 /** Replies to a thread (by `threadKey`): REST reply, or a pending review reply while the viewer has a pending review. */
 export async function submitReply(key: string, body: string): Promise<void> {
+  const operation = capturePrOperation();
   const thread = threadByKey(usePr.getState().threads, key);
   const first = thread?.comments[0];
   if (!thread || !first) throw new WriteError('not-found', 'This thread is no longer available.', { owner: currentPr().ref.owner });
   let comment: CommentModel;
   if (usePr.getState().pendingReview) {
-    const res = await withApi('reply', async (api) => api.addReviewReply(await reviewNodeId(api, true), await threadNodeId(api, thread), body));
+    const res = await withApi('reply', async (api, operation) => {
+      const review = await reviewNodeId(api, true, operation);
+      const threadId = await threadNodeId(api, thread, operation);
+      return operation.run(() => api.addReviewReply(review, threadId, body));
+    });
+    operation.check();
     comment = provisionalComment(res.databaseId, res.nodeId, body, 'pending');
     bumpPending(1);
   } else {
     const res = await withApi('reply', (api) => api.reply(first.databaseId, body));
+    operation.check();
     comment = provisionalComment(res.id, res.nodeId, body, 'submitted');
   }
   updateThread(key, (t) => ({ ...t, comments: [...t.comments, comment] }));
@@ -298,15 +320,19 @@ export async function submitReply(key: string, body: string): Promise<void> {
 }
 
 export async function submitEdit(databaseId: number, body: string): Promise<void> {
+  const operation = capturePrOperation();
   await withApi('edit a comment', (api) => api.editComment(databaseId, body));
+  operation.check();
   updateComment(databaseId, (c) => ({ ...c, body, bodyHTML: '', provisional: true }));
   usePr.getState().clearDraft(draftKey.edit(databaseId));
   scheduleRefresh();
 }
 
 export async function deleteComment(databaseId: number): Promise<void> {
+  const operation = capturePrOperation();
   const found = findComment(databaseId);
   await withApi('delete a comment', (api) => api.deleteComment(databaseId));
+  operation.check();
   deleted.add(databaseId);
   usePr.getState().removeComment(databaseId);
   usePr.getState().clearDraft(draftKey.edit(databaseId));
@@ -329,6 +355,7 @@ function setReaction(databaseId: number, content: ReactionContent, on: boolean) 
 
 /** Adds or removes the viewer's reaction (per `viewerHasReacted`), optimistically; reverted on failure. */
 export async function toggleReaction(databaseId: number, content: ReactionContent): Promise<void> {
+  const operation = capturePrOperation();
   const found = findComment(databaseId);
   if (!found) return;
   const had = found.comment.reactions.find((r) => r.content === content)?.viewerHasReacted === true;
@@ -336,7 +363,7 @@ export async function toggleReaction(databaseId: number, content: ReactionConten
   try {
     await withApi('react', (api) => (had ? api.removeReaction(found.comment.nodeId, content) : api.addReaction(found.comment.nodeId, content)));
   } catch (err) {
-    setReaction(databaseId, content, had);
+    if (operation.isCurrent()) setReaction(databaseId, content, had);
     throw err;
   }
 }
@@ -370,36 +397,41 @@ const sessionRefused = (err: unknown) => err instanceof BridgeError && (err.stat
  * Only when the session is refused too does it ask for a token (`withApi`, forced when the stored one was refused).
  * Other failures of either path propagate (as `WriteError`). Reusable for Viewed (Task 10).
  */
-export async function withSessionFallback<T>(reason: string, tokenAction: (api: GithubApi) => Promise<T>, sessionAction: () => Promise<T>): Promise<T> {
-  const pr = currentPr();
+export async function withSessionFallback<T>(reason: string, tokenAction: (api: GithubApi, operation: PrOperation) => Promise<T>, sessionAction: (operation: PrOperation) => Promise<T>): Promise<T> {
+  const operation = capturePrOperation();
+  const pr = operation.pr;
   const owner = pr.ref.owner;
   let refused: WriteError | undefined;
-  const token = await getToken(owner);
+  const token = await operation.run(() => getToken(owner));
   if (token) {
     try {
-      return await tokenAction(new GithubApi(token, pr.ref));
+      return await operation.run(() => tokenAction(new GithubApi(token, pr.ref), operation));
     } catch (err) {
+      operation.check();
       if (!isAuthError(err)) throw err;
       refused = err;
     }
   }
   try {
-    return await sessionAction();
+    return await operation.run(() => sessionAction(operation));
   } catch (err) {
+    operation.check();
     if (!sessionRefused(err)) throw sessionError(err, owner);
-    return withApi(reason, tokenAction, refused ? { force: true, problem: refused.message } : {});
+    return withApi(reason, tokenAction, refused ? { force: true, problem: refused.message } : {}, operation);
   }
 }
 
 /** The thread's numeric id (page_data endpoints); a just-posted provisional thread gets it from a refresh first. */
-async function numericThreadId(key: string): Promise<string> {
+async function numericThreadId(key: string, operation: PrOperation): Promise<string> {
+  operation.check();
   const numeric = () => {
     const id = threadByKey(usePr.getState().threads, key)?.id;
     return id && /^\d+$/.test(id) ? id : undefined;
   };
   let id = numeric();
   if (!id) {
-    await refreshThreads();
+    await operation.run(() => refreshThreads());
+    operation.check();
     id = numeric();
   }
   if (!id) throw new WriteError('conflict', 'This conversation is still being saved on GitHub. Try again in a moment.', { owner: currentPr().ref.owner });
@@ -411,6 +443,7 @@ async function numericThreadId(key: string): Promise<string> {
  * then GitHub's session (`page_data/resolve_thread`), see `withSessionFallback`.
  */
 export async function setResolved(key: string, resolved: boolean): Promise<void> {
+  const operation = capturePrOperation();
   const thread = threadByKey(usePr.getState().threads, key);
   if (!thread || thread.isResolved === resolved) return;
   const apply = (value: boolean) => updateThread(key, (t) => (t.isResolved === value ? t : { ...t, isResolved: value }));
@@ -419,20 +452,21 @@ export async function setResolved(key: string, resolved: boolean): Promise<void>
   try {
     await withSessionFallback(
       resolved ? 'resolve a conversation' : 'unresolve a conversation',
-      async (api) => {
-        const id = await threadNodeId(api, threadByKey(usePr.getState().threads, key) ?? thread);
-        await (resolved ? api.resolve(id) : api.unresolve(id));
+      async (api, operation) => {
+        const id = await threadNodeId(api, threadByKey(usePr.getState().threads, key) ?? thread, operation);
+        await operation.run(() => resolved ? api.resolve(id) : api.unresolve(id));
       },
-      async () => {
-        const rpc = session.rpc;
+      async (operation) => {
+        const rpc = operation.rpc;
         if (!rpc) throw new WriteError('network', 'Not connected to the GitHub page.', { owner });
-        const id = await numericThreadId(key);
-        await rpc.call(resolved ? 'resolveThread' : 'unresolveThread', owner, repo, number, id);
+        const id = await numericThreadId(key, operation);
+        await operation.run(() => rpc.call(resolved ? 'resolveThread' : 'unresolveThread', owner, repo, number, id));
       },
     );
+    operation.check();
     apply(resolved); // a refresh in between may have brought the old state back
   } catch (err) {
-    apply(!resolved);
+    if (operation.isCurrent()) apply(!resolved);
     throw err;
   }
 }
@@ -471,7 +505,12 @@ function dropPendingComments() {
  * submitted and the summary draft is cleared; on failure everything is kept.
  */
 export async function submitReview(event: ReviewEvent, body: string): Promise<void> {
-  await withApi('submit a review', async (api) => api.submitReview(await reviewNodeId(api, true), event, body));
+  const operation = capturePrOperation();
+  await withApi('submit a review', async (api, operation) => {
+    const review = await reviewNodeId(api, true, operation);
+    return operation.run(() => api.submitReview(review, event, body));
+  });
+  operation.check();
   const s = usePr.getState();
   s.setPendingReview(null);
   s.clearDraft(draftKey.reviewSummary);
@@ -481,10 +520,12 @@ export async function submitReview(event: ReviewEvent, body: string): Promise<vo
 
 /** Discards the viewer's pending review and its comments (GraphQL `deletePullRequestReview`). */
 export async function discardReview(): Promise<void> {
-  await withApi('discard a review', async (api) => {
-    const known = usePr.getState().pendingReview?.nodeId || (await api.pendingReview())?.nodeId;
-    if (known) await api.deleteReview(known); // none on GitHub: already gone, just clear it here
+  const operation = capturePrOperation();
+  await withApi('discard a review', async (api, operation) => {
+    const known = usePr.getState().pendingReview?.nodeId || (await operation.run(() => api.pendingReview()))?.nodeId;
+    if (known) await operation.run(() => api.deleteReview(known)); // none on GitHub: already gone, just clear it here
   });
+  operation.check();
   usePr.getState().setPendingReview(null);
   dropPendingComments();
   scheduleRefresh();
@@ -524,12 +565,12 @@ export async function setFileViewed(path: string, viewed: boolean): Promise<void
     if (usePr.getState().pr !== pr) return;
     await withSessionFallback(
       viewed ? 'mark files as viewed' : 'unmark files as viewed',
-      async (api) => {
-        const id = await prNodeId(api);
-        await (viewed ? api.markViewed(id, path) : api.unmarkViewed(id, path));
+      async (api, operation) => {
+        const id = await prNodeId(api, operation);
+        await operation.run(() => viewed ? api.markViewed(id, path) : api.unmarkViewed(id, path));
       },
-      async () => {
-        const rpc = session.rpc;
+      async (operation) => {
+        const rpc = operation.rpc;
         if (!rpc) throw new WriteError('network', 'Not connected to the GitHub page.', { owner });
         await rpc.call(viewed ? 'markViewed' : 'unmarkViewed', owner, repo, number, path);
       },

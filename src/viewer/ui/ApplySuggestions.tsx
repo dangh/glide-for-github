@@ -75,6 +75,7 @@ export const BatchBar = memo(function BatchBar() {
 /** The commit dialog (one at a time). */
 export function CommitDialogHost() {
   const refs = useCommitDialog((s) => s.refs);
+  useEffect(() => () => useCommitDialog.setState({ refs: null }), []);
   if (!refs) return null;
   return <CommitDialog key={refs.map((r) => `${r.commentId}:${r.suggestionIndex ?? ''}`).join(',')} refs={refs} />;
 }
@@ -94,7 +95,10 @@ function CommitDialog({ refs }: { refs: SuggestionRef[] }) {
       if (!usePr.getState().headMoved) setError(null);
     });
   };
-  const close = () => useCommitDialog.setState({ refs: null });
+  const isCurrent = () => useCommitDialog.getState().refs === refs;
+  const close = () => {
+    if (isCurrent()) useCommitDialog.setState({ refs: null });
+  };
   const busyRef = useRef(false);
   busyRef.current = busy;
 
@@ -119,6 +123,7 @@ function CommitDialog({ refs }: { refs: SuggestionRef[] }) {
     setError(null);
     try {
       await commitSuggestions(refs, body ? `${subject}\n\n${body}` : subject);
+      if (!isCurrent()) return;
       close();
       usePr.getState().setNotice({ kind: 'info', message: `Committed ${plural(refs.length)}.` });
     } catch (err) {

@@ -1,6 +1,6 @@
 # In-page scroll spike, 2026-10-19
 
-The packaged extension now renders Glide in GitHub's top document and performs highlighting in native workers. It uses the existing content lifecycle to keep the tab present when GitHub replaces its layout. Keep this on `spike/in-page` until macOS trackpad behavior, review writes, and production performance have been verified.
+The packaged extension now renders Glide in GitHub's top document and performs highlighting in native workers. It uses the existing content lifecycle to keep the tab present when GitHub replaces its layout. The user confirmed that native bounce feels good on macOS. Keep this on `spike/in-page` until authenticated review writes, persisted-state migration, and production performance have been verified.
 
 ## Current architecture
 
@@ -40,9 +40,23 @@ The subsequent sticky-bar audit found that the in-page entry never activated the
 
 An additional case replaces GitHub's header while scrolled and adds 200 px of spacing. It verifies that the same viewer remains mounted, a tracked code row moves exactly 200 px without another scroll, and the toolbar stays pinned. The layout observer follows the replacement header and invalidates CodeView's cached viewport when its document offset changes. Pierre's input handlers now follow the window too: toolbar clicks and keys outside the list cancel pending scroll targets, including keys stopped at the shadow boundary.
 
-All seven focused browser scenarios pass. TypeScript, the build integrity checks, and all 878 unit tests pass. This is a focused browser check, not a passing result for the full production e2e suite. The earlier main-branch suite has separate failures recorded in the conversation.
+All eight focused browser scenarios pass. TypeScript, the build integrity checks, and all 891 unit tests pass. This is a focused browser check, not a passing result for the full production e2e suite. The earlier main-branch suite has separate failures recorded in the conversation.
 
 The lifecycle is reused rather than replaced with a one-time tab insertion. It handles DOM/route notifications, active-tab styling, settings, and tab presses. A GitHub layout replacement preserves the mounted React root if its worker host survives, or remounts the viewer and its workers if that host was removed.
+
+## Regression review
+
+The review reproduced an unsafe lifetime change: removing the iframe leaves viewer modules and pending promises alive. An approval started on PR A could wait for its pending-review lookup, then read PR B from the global store, start a review there, and clear B's summary draft. Review operations now capture their PR and connection, check each asynchronous continuation before another request, and reject stale local updates. Tests delay PendingReview, StartReview, and SubmitReview separately. Independent probes also covered delayed comment, discard, resolve, Viewed, and reaction responses. No real review was posted by these probes.
+
+The same lifetime change left suggestion dialogs open across remounts. Dialog teardown now drops their refs, late completions cannot close a newer dialog, and suggestion responses cannot change the next PR's batch or head-moved state. Stale Viewed and Reload errors also cannot show notices on the next PR.
+
+The sticky toolbar's z-index 50 was above the modal backdrop's 40. The backdrop is now 100. The browser check hit-tests the shipped backdrop CSS over a toolbar button; component tests exercise suggestion-dialog remount and delayed completion. This does not establish complete modal keyboard-focus coverage.
+
+The in-page entry also omitted per-file scroll persistence. Browser pixel restoration lost the previously visible code line. The new attachment saves the file and offset, waits for that file's diff to load, and restores the same line. It explicitly requests a delayed collapsed file's full lines even if the initial viewport has replaced its loader priority. Failed loads restore the file header instead. User input cancels restoration; browser Back/Forward policy is left untouched.
+
+`tests/e2e/inpage-regression.spec.ts` checks exact visible-line restoration, retained summary text, modal hit testing, and a 20-entry stack menu. The stack payload is supplied locally through the browser's network interception; the rest is the actual extension on a real GitHub PR. No comments, reviews, viewed changes, or suggestions are submitted. The earlier stack overflow suspicion was withdrawn: the stack button only exists once the merged toolbar is stuck, and its menu fits there.
+
+The final independent review found no remaining important issue in these fixes. This is a regression review of the spike, not production adoption approval.
 
 ## Earlier scroll and isolation probes
 
@@ -62,9 +76,10 @@ The loop advanced 120 pixels per frame through the first five files; separate ju
 
 ## Remaining adoption gates
 
-- Test a physical macOS trackpad at the top, bottom, and former page/list seam. Linux programmatic scrolling cannot verify macOS rubber-band feel.
+- The user confirmed macOS bounce. Automated Linux checks still do not reproduce physical trackpad gestures.
 - Verify authenticated review comments, replies, edits, deletion, viewed toggles, and suggestion actions. The focused tests above do not perform review writes.
-- Exercise full Turbo body replacement, stack menus, and modal focus on the real site. The focused checks now cover menu dismissal, switching tabs, reload, and a second PR, but not every navigation path.
+- Exercise full Turbo body replacement and modal keyboard focus on the real site. The focused checks cover menu dismissal, a long stack menu, switching tabs, reload, a second PR, and modal click blocking, but not every navigation or focus path.
+- Migrate existing iframe-origin session storage before production adoption. The new viewer reads GitHub-origin session storage, so old drafts, suggestion batches/idempotency keys, and file-group selections are not automatically imported.
 - Measure the full extension against the current iframe build on large real PRs, including comment typing and port transport overhead.
 - Restore a production strategy for inputs exceeding the browser's document-height limit. The synthetic list tested here was about 1.63 million pixels tall.
 
@@ -76,6 +91,6 @@ Every build command on this branch, including `npm run build`, produces the **IN
 
 After pulling and building, reload the extension in `chrome://extensions`, then reload the GitHub page. Click Glide beside Files changed, or open a PR URL ending in `#glide`.
 
-To run the packaged-extension checks, set `PIERRE_SPIKE_PROFILE` to a signed-in Chrome profile directory and run `PIERRE_E2E_HEADLESS=1 npx playwright test tests/e2e/inpage-spike.spec.ts tests/e2e/inpage-layout.spec.ts`. The tests copy that profile into a temporary directory and delete the copy afterward; they do not post comments or change viewed state.
+To run the packaged-extension checks, set `PIERRE_SPIKE_PROFILE` to a signed-in Chrome profile directory and run `PIERRE_E2E_HEADLESS=1 npx playwright test tests/e2e/inpage-spike.spec.ts tests/e2e/inpage-layout.spec.ts tests/e2e/inpage-regression.spec.ts`. The tests copy that profile into a temporary directory and delete the copy afterward; they do not post comments or change viewed state.
 
 For the synthetic harness, serve the worktree with `python3 -m http.server 8134` and open `http://localhost:8134/research/inpage-spike/index.html`. Evaluate `scripts/inpage-spike/measure.js`, then call `await __spikeMeasure()` to repeat the earlier synthetic comparison.

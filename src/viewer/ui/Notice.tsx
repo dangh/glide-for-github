@@ -2,13 +2,19 @@
 import { memo, useEffect, useState } from 'react';
 import { BRAND } from '../../shared/brand';
 import { reloadPr } from '../state/load';
+import { session } from '../state/session';
 import { errorMessage } from '../state/review';
 import { usePr } from '../state/store';
 import { SyncIcon } from './icons';
 
 /** Soft reload (keeps the suggestion batch and drafts); a failure is shown as a notice. */
 export function reloadPullRequest(): Promise<void> {
-  return reloadPr().catch((err: unknown) => usePr.getState().setNotice({ kind: 'error', message: `Could not reload the pull request. ${errorMessage(err)}` }));
+  const pr = usePr.getState().pr;
+  const rpc = session.rpc;
+  return reloadPr().catch((err: unknown) => {
+    if (usePr.getState().pr === pr && session.rpc === rpc)
+      usePr.getState().setNotice({ kind: 'error', message: `Could not reload the pull request. ${errorMessage(err)}` });
+  });
 }
 
 const INFO_TIMEOUT_MS = 6000;

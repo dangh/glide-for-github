@@ -17,8 +17,12 @@ import { initRelatedFiles } from '../viewer/state/relatedFiles';
 import { startFreshness } from '../viewer/state/freshness';
 import { session } from '../viewer/state/session';
 import { usePr } from '../viewer/state/store';
+import { resetReviewCaches } from '../viewer/state/review';
 import { createInPageLayout } from './layout';
 import { createWorkerBridge } from './workerBridge';
+import { createScrollPosition } from './scrollPosition';
+import { restoreKey } from '../shared/page-scroll';
+import { prKey } from '../shared/pr-url';
 
 ignoreBenignErrors(window);
 const lifecycle = createLifecycle(window, storedSettings(), (doc, ref, layout) => {
@@ -54,6 +58,8 @@ const lifecycle = createLifecycle(window, storedSettings(), (doc, ref, layout) =
     return true;
   };
   refresh();
+  const scrollPosition = createScrollPosition(window, restoreKey(prKey(ref)));
+  session.pageScroll = scrollPosition;
   session.scrollPageToTop = () => window.scrollTo({ top: 0, behavior: 'instant' });
   shadow.addEventListener('keydown', (event) => event.stopPropagation());
   usePr.setState(usePr.getInitialState());
@@ -89,7 +95,9 @@ const lifecycle = createLifecycle(window, storedSettings(), (doc, ref, layout) =
     unmount() {
       if (!mounted) return;
       mounted = false;
+      scrollPosition.dispose();
       root.unmount();
+      resetReviewCaches();
       pageLayout.dispose();
       for (const cleanup of cleanups) cleanup();
       terminateWorkerPoolSingleton();
@@ -97,6 +105,8 @@ const lifecycle = createLifecycle(window, storedSettings(), (doc, ref, layout) =
       connection.dispose();
       session.rpc = undefined;
       session.scrollPageToTop = undefined;
+      session.pageScroll = undefined;
+      session.viewport = undefined;
       workerSpike.factory = undefined;
       window.removeEventListener('message', onBridgeReady);
       host.remove();
