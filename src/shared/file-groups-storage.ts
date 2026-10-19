@@ -77,17 +77,18 @@ export async function saveFileGroups(groups: readonly FileGroup[], storage: Grou
     if (bytes(itemKey(i)) + bytes(JSON.stringify(item)) > QUOTA_BYTES_PER_ITEM) throw new Error(`${item.label}: too many patterns to sync (8 KB per group).`);
     items[itemKey(i)] = item;
   }
+  // Items past the count are ignored. Removing them after awaiting a write could delete a newer save.
   await storage.set(items);
-  const leftovers = Object.keys(await storage.get(null)).filter((k) => isGroupsKey(k) && !(k in items));
-  if (leftovers.length > 0) await storage.remove(leftovers);
 }
 
 /** Calls `cb` with the groups whenever another context (or this one) changes them. */
 export function onFileGroupsChange(cb: (groups: FileGroup[]) => void, storage: GroupsStorage = chromeSync()): () => void {
   let active = true;
+  let revision = 0;
   const off = storage.subscribe((keys) => {
     if (!keys.some(isGroupsKey)) return;
-    void loadFileGroups(storage).then((groups) => active && cb(groups), () => undefined);
+    const read = ++revision;
+    void loadFileGroups(storage).then((groups) => active && read === revision && cb(groups), () => undefined);
   });
   return () => {
     active = false;

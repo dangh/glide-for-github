@@ -161,13 +161,15 @@ function followRenames(renames: ReadonlyMap<string, string>) {
  */
 export function initFileGroups(store = usePr, storage?: GroupsStorage): () => void {
   let active = true;
+  let changed = false;
   void loadFileGroups(storage).then(
-    (groups) => active && useFileGroups.setState({ groups, loaded: true }),
-    () => active && useFileGroups.setState({ loaded: true }),
+    (groups) => active && !changed && useFileGroups.setState({ groups, loaded: true }),
+    () => active && !changed && useFileGroups.setState({ loaded: true }),
   );
   const offStorage = onFileGroupsChange((groups) => {
+    changed = true;
     const renames = renamedGroups(useFileGroups.getState().groups, groups);
-    useFileGroups.setState({ groups });
+    useFileGroups.setState({ groups, loaded: true });
     followRenames(renames);
   }, storage);
 

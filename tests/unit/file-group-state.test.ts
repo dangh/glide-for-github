@@ -184,6 +184,27 @@ describe('per pull request memory', () => {
     expect(sessionStorage.getItem(groupMemoryKey(pr(3).ref))).toBe('Tests');
   });
 
+  it('a late initial read cannot replace a newer storage change', async () => {
+    const storage = memoryStorage(stored(groups));
+    let finishInitial!: (items: Record<string, unknown>) => void;
+    const get = storage.get;
+    let initial = true;
+    storage.get = () => {
+      if (!initial) return get(null);
+      initial = false;
+      return new Promise((resolve) => { finishInitial = resolve; });
+    };
+    off = initFileGroups(createPrStore(), storage);
+    const newer = [{ label: 'New', patterns: ['*.ts'] }];
+    storage.replace(stored(newer));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(useFileGroups.getState().groups).toEqual(newer);
+    expect(useFileGroups.getState().loaded).toBe(true);
+    finishInitial(stored(groups));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(useFileGroups.getState().groups).toEqual(newer);
+  });
+
   it('loads the stored groups, then follows the viewer stores', async () => {
     off = initFileGroups(createPrStore(), memoryStorage({ [FILE_GROUPS_KEY]: 1, [`${FILE_GROUPS_KEY}.0`]: { label: 'Md', patterns: '*.md' } }));
     await new Promise((r) => setTimeout(r, 0));

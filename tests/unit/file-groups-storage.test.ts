@@ -75,11 +75,30 @@ describe('file groups storage', () => {
     expect(data[FILE_GROUPS_KEY]).toBeUndefined();
   });
 
-  it('removes items a shorter list leaves behind', async () => {
+  it('an older short save cannot delete groups from a newer longer save', async () => {
+    const { storage } = fakeSync();
+    let release!: () => void;
+    const delayed: GroupsStorage = {
+      ...storage,
+      async set(items) {
+        await storage.set(items);
+        if (items[FILE_GROUPS_KEY] === 1) await new Promise<void>((resolve) => { release = resolve; });
+      },
+    };
+    const older = saveFileGroups(custom.slice(0, 1), delayed);
+    await Promise.resolve();
+    await saveFileGroups(custom, storage);
+    release();
+    await older;
+    expect(await loadFileGroups(storage)).toEqual(custom);
+  });
+
+  it('ignores items a shorter list leaves behind', async () => {
     const { data, storage } = fakeSync();
     await saveFileGroups([...custom, { label: 'Docs', patterns: ['*.md'] }], storage);
     await saveFileGroups(custom, storage);
-    expect(Object.keys(data).sort()).toEqual([FILE_GROUPS_KEY, `${FILE_GROUPS_KEY}.0`, `${FILE_GROUPS_KEY}.1`]);
+    expect(data[`${FILE_GROUPS_KEY}.2`]).toBeDefined();
+    expect(await loadFileGroups(storage)).toEqual(custom);
   });
 
   it('keeps rules bigger than one sync item could hold in total (Sift\'s defaults are about 5 KB)', async () => {
