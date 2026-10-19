@@ -56,6 +56,13 @@ describe('build output', () => {
     for (const file of ['content.js', 'viewer.html', 'viewer.js']) expect(existsSync(join(dist, file)), file).toBe(false);
   });
 
+  it('preserves the body flex rule when adapting document selectors to the shadow root', () => {
+    const css = readFileSync(join(dist, 'inpage.css'), 'utf8');
+    expect(css).toMatch(/\.pierre-body\s*\{[^}]*display:\s*flex;/);
+    expect(css).not.toContain('.pierre-#root');
+    expect(css).toMatch(/#root\s*\{[^}]*font: 14px/);
+  });
+
   it('emits every stylesheet and script that the HTML pages reference', () => {
     for (const page of ['options.html', 'worker-host.html']) {
       const html = readFileSync(join(dist, page), 'utf8');

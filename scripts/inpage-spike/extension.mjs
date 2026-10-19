@@ -11,7 +11,7 @@ await build({ stdin: { contents: "import './node_modules/@pierre/diffs/dist/comp
 await build({ entryPoints: ['src/inpage/workerHost.ts'], bundle: true, outfile: 'dist/worker-host.js', format: 'iife', target: 'chrome120' });
 await writeFile('dist/worker-host.html', await readFile('src/inpage/worker-host.html'));
 const source = await readFile('src/viewer/viewer.css', 'utf8');
-const css = source.replaceAll(':root', ':host').replace(/\bhtml(?=[\s,\[.:{])/g, ':host').replace(/\bbody(?=[\s,{])/g, '#root')
+const css = source.replaceAll(':root', ':host').replace(/^html(?=[\s,\[.:{])/gm, ':host').replace(/^body(?=[\s,{])/gm, '#root')
   .replace(/:host((?:\[[^\]]+\]|:not\([^)]*\))+)/g, ':host($1)')
   .replace(/^(\[data-file-header=[^\]]+\])/gm, ':host($1)');
 await writeFile('dist/inpage.css', css + `
