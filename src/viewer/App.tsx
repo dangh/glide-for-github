@@ -2,6 +2,7 @@
  * Viewer root: reads the PR, then renders toolbar + tree + virtualized diffs immediately from the
  * summaries while the loader fills in the diffs.
  */
+import type { CodeViewWindowViewport } from '@pierre/diffs';
 import { WorkerPoolContext } from '@pierre/diffs/react';
 import { getOrCreateWorkerPoolSingleton, type WorkerPoolManager } from '@pierre/diffs/worker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -63,7 +64,7 @@ function createWorkerPool(settings: DisplaySettings, reportFailure?: (message: s
   }
 }
 
-export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
+export function App({ prRef, rpc, windowViewport }: { prRef: PrRef; rpc: Rpc; windowViewport?: CodeViewWindowViewport }) {
   const pr = usePr((s) => s.pr);
   const fatal = usePr((s) => s.fatal);
   const range = usePr((s) => s.range);
@@ -148,7 +149,7 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
           {treePosition === 'left' && <TreePane />}
           {/* The list waits for the file groups too, so it never shows other groups' files first (Sift's no-flash fix). */}
           <main className="pierre-main">
-            {pr && settingsLoaded && groupsLoaded ? <DiffPane rpc={rpc} /> : <div className="pierre-loading">Loading pull request…</div>}
+            {pr && settingsLoaded && groupsLoaded ? <DiffPane rpc={rpc} windowViewport={windowViewport} /> : <div className="pierre-loading">Loading pull request…</div>}
           </main>
           {treePosition === 'right' && <TreePane />}
         </div>
