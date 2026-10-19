@@ -11,6 +11,7 @@ import { DisplayStyle } from '../viewer/ui/DisplayStyle';
 import { ExperimentSettingsForm } from './ExperimentSettings';
 import { FileGroupSettingsForm } from './FileGroupSettings';
 import { GithubSettingsForm } from './GithubSettings';
+import { RelatedFilesSettingsForm } from './RelatedFilesSettings';
 import { SampleDiff } from './SampleDiff';
 import { TokenSettings } from './TokenSettings';
 
@@ -54,7 +55,7 @@ export function OptionsPage() {
         <p className="muted">Changes apply at once, also in pull requests that are already open.</p>
         {loaded && (
           <div className="options-display">
-            <DisplaySettingsForm settings={settings} update={update} />
+            <DisplaySettingsForm settings={settings} update={update} relatedFiles={false} />
             <div className="options-sample">
               <h3>Preview</h3>
               <SampleDiff diff={settings.diff} lineHeight={resolveFonts(settings.fonts).codeLineHeight} />
@@ -77,6 +78,14 @@ export function OptionsPage() {
           .
         </p>
         {loaded && <FileGroupSettingsForm settings={settings.fileGroups} update={update} />}
+      </section>
+      <section className="options-section" aria-labelledby="related-files-heading">
+        <h2 id="related-files-heading">Related files</h2>
+        <p className="muted">
+          Show a file with its companions, like a lock file with its manifest, so they read as one change. Changes apply at
+          once, also in pull requests that are already open.
+        </p>
+        {loaded && <RelatedFilesSettingsForm style={settings.relatedFiles.style} update={update} />}
       </section>
       <section className="options-section" aria-labelledby="experiments-heading">
         <h2 id="experiments-heading">Experimental</h2>

@@ -275,3 +275,274 @@ body {
 .group-import .group-patterns {
   margin-bottom: 8px;
 }
+
+/* Related files (RelatedFilesSettings.tsx) */
+.related-settings {
+  max-width: 1080px;
+}
+
+.related-styles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.related-style {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.related-style[data-checked] {
+  border-color: var(--pierre-accent);
+  box-shadow: 0 0 0 1px var(--pierre-accent);
+}
+
+.related-style-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.related-style-title input {
+  margin: 0;
+}
+
+.related-style-default {
+  margin: 0;
+  font-weight: 400;
+}
+
+.related-style-description {
+  color: var(--pierre-muted);
+  font-size: 12px;
+  min-height: 3em;
+}
+
+.related-preview {
+  display: block;
+  pointer-events: none;
+}
+
+/* The previews: the viewer's GitHub file boxes, small. */
+.rp-box {
+  border: 1px solid var(--pierre-border);
+  letter-spacing: -0.2px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 6px;
+  background: var(--pierre-bg);
+  font: 10px/1.5 var(--pierre-mono);
+}
+
+.rp-head,
+.rp-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.rp-head {
+  background: var(--pierre-bg-subtle);
+  border-bottom: 1px solid var(--pierre-border);
+}
+
+.rp-box > .rp-head:last-child {
+  border-bottom: 0;
+}
+
+.rp-row,
+.rp-sub {
+  background: var(--pierre-bg);
+  border-top: 1px solid var(--pierre-border);
+}
+
+.rp-row {
+  color: var(--pierre-muted);
+}
+
+.rp-group {
+  font: 600 10px/1.5 var(--pierre-mono);
+  padding-left: 0;
+}
+
+.rp-rail {
+  margin-left: 4px;
+  padding-left: 8px;
+  border-left: 2px solid var(--pierre-accent-border);
+}
+
+.rp-chevron {
+  color: var(--pierre-muted);
+  width: 8px;
+}
+
+.rp-name {
+  flex: none;
+}
+
+.rp-muted,
+.rp-row .rp-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rp-grow {
+  flex: 1;
+}
+
+.rp-muted {
+  color: var(--pierre-muted);
+  font-family: var(--pierre-font);
+  font-weight: 400;
+}
+
+.rp-add,
+.rp-del {
+  font-family: var(--pierre-font);
+  font-weight: 600;
+}
+
+.rp-add {
+  color: var(--pierre-success);
+}
+
+.rp-del {
+  color: var(--pierre-danger);
+}
+
+.rp-viewed {
+  margin-left: 2px;
+  padding: 0 4px;
+  border: 1px solid var(--pierre-border);
+  border-radius: 4px;
+  background: var(--pierre-bg);
+  font-family: var(--pierre-font);
+  font-weight: 400;
+}
+
+.rp-tag {
+  padding: 0 4px;
+  border: 1px solid var(--pierre-border);
+  border-radius: 8px;
+  color: var(--pierre-muted);
+  font: 9px/1.4 var(--pierre-font);
+}
+
+.rp-line {
+  padding: 0 6px;
+  white-space: pre;
+  overflow: hidden;
+}
+
+.rp-a {
+  background: light-dark(#dafbe1, #2ea04326);
+}
+
+.rp-d {
+  background: light-dark(#ffebe9, #f8514926);
+}
+
+.related-rules {
+  display: grid;
+  gap: 8px;
+  max-width: 820px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.related-rule {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) auto 1fr auto;
+  grid-template-areas: 'main arrow files actions';
+  align-items: start;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+}
+
+.related-rule .group-label {
+  height: 28px;
+}
+
+.related-rule-arrow {
+  grid-area: arrow;
+  color: var(--pierre-muted);
+  line-height: 28px;
+}
+
+.related-patterns.group-patterns {
+  height: auto;
+  min-height: 28px;
+  padding: 4px 8px;
+}
+
+.related-rule .group-label {
+  grid-area: main;
+}
+
+.related-rule .related-patterns {
+  grid-area: files;
+}
+
+.related-rule-actions {
+  grid-area: actions;
+  display: flex;
+  gap: 4px;
+}
+
+@media (max-width: 720px) {
+  .related-rule {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: 'main actions' 'files files';
+  }
+
+  .related-rule-arrow {
+    display: none;
+  }
+
+  .related-probe {
+    grid-template-columns: 1fr;
+  }
+}
+
+.related-rule .btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.related-probe {
+  display: grid;
+  grid-template-columns: minmax(240px, 420px) 1fr;
+  gap: 16px;
+  align-items: start;
+  margin: 16px 0;
+  max-width: 820px;
+}
+
+.related-probe-input {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+}
+
+.related-probe-input .group-patterns {
+  height: 110px;
+}
+
+.related-probe-result ul {
+  margin: 22px 0 0;
+  padding-left: 18px;
+}
