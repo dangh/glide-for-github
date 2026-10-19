@@ -313,11 +313,14 @@ test.describe('file groups', () => {
     }
   });
 
-  test('Tests filters the tree and the diffs, instantly, and loaded diffs stay loaded; viewed stays global', async ({ page }) => {
+  test('Tests filters the tree and the diffs, instantly, and loaded diffs stay loaded; viewed counts the open group', async ({ page }) => {
     const errors: string[] = [];
     page.on('console', (msg) => msg.type() === 'error' && errors.push(msg.text()));
     const viewer = await openPierre(page, REACT, 'hash');
-    const before = await viewer.viewedCounter();
+    const viewedOf = (paths: readonly string[]) =>
+      viewer.frame().evaluate((ps) => ps.filter((p) => window.__pierre!.store.getState().viewed.has(p)).length, paths);
+    const allViewed = await viewedOf(await viewer.order());
+    expect((await viewer.viewedCounter()).replace(/\s+/g, ' ')).toMatch(new RegExp(`^${allViewed} / 167`));
 
     // Switched while diffs are still loading: files outside the group load too, without touching the list.
     const started = Date.now();
@@ -338,7 +341,9 @@ test.describe('file groups', () => {
     const headers = await viewer.frame().evaluate(() => [...document.querySelectorAll<HTMLElement>('.fh')].map((h) => h.dataset.path!));
     expect(headers.length).toBeGreaterThan(0);
     expect(headers.every((h) => state.inList.includes(h))).toBe(true);
-    expect(await viewer.viewedCounter()).toBe(before);
+    // Like GitHub's counter with Sift: the open group's files, the whole PR in its tooltip.
+    expect((await viewer.viewedCounter()).replace(/\s+/g, ' ')).toMatch(new RegExp(`^${await viewedOf(state.inList)} / 80`));
+    await expect(viewer.locator.getByTestId('viewed-counter')).toHaveAttribute('title', `${allViewed} / 167 files viewed in the pull request`);
 
     // Loaded diffs stay loaded: the store's diffs are the very same map after switching back and forth.
     for (const name of ['Docs', 'Manifest', 'Source', 'All', 'Tests']) await tab(viewer, name).click();

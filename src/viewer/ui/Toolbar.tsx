@@ -11,10 +11,12 @@
  * What a narrow toolbar drops follows GitHub's container queries (viewer.css).
  * Each control subscribes to its own slice, so diff loading never re-renders the toolbar.
  */
-import { memo, useEffect, useState, type ReactNode } from 'react';
+import { memo, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ALL_GROUP } from '../../shared/file-groups';
 import { resolveDiffChoice } from '../../shared/github-defaults';
 import type { PrState } from '../github/private';
 import { usePageScroll } from '../pageScroll';
+import { useActiveGroup } from '../state/fileGroups';
 import { useSettings } from '../state/settings';
 import { session } from '../state/session';
 import { usePr } from '../state/store';
@@ -214,11 +216,19 @@ const WhitespaceToggle = memo(function WhitespaceToggle() {
   );
 });
 
+/**
+ * "N / M viewed" for the open file group, as GitHub's counter reads with Sift's tabs (GitHub only has the open tab's
+ * files then); the whole pull request's in its tooltip. On All it is the pull request's.
+ */
 const ViewedCounter = memo(function ViewedCounter() {
-  const viewed = usePr((s) => s.viewed.size);
-  const total = usePr((s) => s.order.length);
+  const viewedPaths = usePr((s) => s.viewed);
+  const order = usePr((s) => s.order);
+  const { active, shown } = useActiveGroup();
+  const viewed = useMemo(() => (active === ALL_GROUP ? viewedPaths.size : shown.filter((p) => viewedPaths.has(p)).length), [active, shown, viewedPaths]);
+  const total = shown.length;
+  const title = active === ALL_GROUP ? undefined : `${viewedPaths.size} / ${order.length} files viewed in the pull request`;
   return (
-    <span className="viewed-counter" data-testid="viewed-counter">
+    <span className="viewed-counter" data-testid="viewed-counter" title={title}>
       <ProgressRing done={total > 0 ? viewed / total : 0} />
       <span>
         <span className="viewed-count">{viewed}</span> / <span className="viewed-count">{total}</span>
