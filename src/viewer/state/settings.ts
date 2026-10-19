@@ -72,16 +72,25 @@ export const useSettings = create<SettingsState>()((set, get) => ({
 
 /** Loads stored settings and follows changes from other contexts. Returns the unsubscribe function. */
 export function initSettings(): () => void {
+  let active = true;
+  let changed = false;
   loadSettings()
-    .then((settings) => useSettings.setState((s) => ({ settings: reconcileSettings(s.settings, settings), loaded: true })))
-    .catch(() => useSettings.setState({ loaded: true }));
+    .then((settings) => {
+      if (active) useSettings.setState((s) => ({ settings: changed ? s.settings : reconcileSettings(s.settings, settings), loaded: true }));
+    })
+    .catch(() => { if (active) useSettings.setState({ loaded: true }); });
   // Also fires for our own writes (the echo): reconcile so unchanged sections keep their identity.
-  return onSettingsChange((settings) =>
+  const off = onSettingsChange((settings) => {
+    changed = true;
     useSettings.setState((s) => {
       const next = reconcileSettings(s.settings, settings);
       return next === s.settings ? s : { settings: next };
-    }),
-  );
+    });
+  });
+  return () => {
+    active = false;
+    off();
+  };
 }
 
 /**

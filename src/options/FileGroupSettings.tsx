@@ -155,6 +155,8 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
   commitRef.current = commit;
 
   useEffect(() => {
+    let active = true;
+    let changed = false;
     const adopt = (groups: FileGroup[]) => {
       // Another context's change (or the echo of ours): take it unless this page has unsaved edits.
       setDraft((current) => {
@@ -166,8 +168,12 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
         return next;
       });
     };
-    void loadFileGroups().then(adopt, () => adopt(defaultGroups()));
-    const off = onFileGroupsChange(adopt);
+    const initial = (groups: FileGroup[]) => { if (active && !changed) adopt(groups); };
+    void loadFileGroups().then(initial, () => initial(defaultGroups()));
+    const off = onFileGroupsChange((groups) => {
+      changed = true;
+      adopt(groups);
+    });
     const flush = () => {
       if (pending.current) commitRef.current(pending.current);
     };
@@ -175,6 +181,7 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
     window.addEventListener('pagehide', flush);
     document.addEventListener('visibilitychange', onHidden);
     return () => {
+      active = false;
       off();
       window.removeEventListener('pagehide', flush);
       document.removeEventListener('visibilitychange', onHidden);
