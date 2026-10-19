@@ -135,10 +135,14 @@ const COLOR_VARS: Record<string, keyof typeof GITHUB_COLORS> = {
  * Diff `unsafeCSS` for GitHub's colors. Pierre uses the line/number overrides as a mix target (88-91% background,
  * the rest override), which would turn #dafbe1 nearly white; on change rows (code and gutter) the mix is set to
  * 0% so the override is the color. Hover and selection still mix on top as usual. GitHub's gutter also meets the
- * code with no seam, where Pierre draws a 2 px background-colored border.
+ * code with no seam, where Pierre draws a 2 px background-colored border; in Split view the old side's code meets
+ * the new side's line numbers the same way, where Pierre draws a 1 px background-colored border on each side
+ * (scrolling: on each side's code; wrapped: on the old code and the new gutter).
  */
 export const GITHUB_CHANGE_CSS = `[data-background] [data-line-type^='change-'] { --mix-light: 0%; --mix-dark: 0%; }
-[data-diff] { --diffs-gap-style: none; }`;
+[data-diff] { --diffs-gap-style: none; }
+[data-diff-type='split'] :is([data-deletions], [data-deletions] [data-content]) { border-right: 0; }
+[data-diff-type='split'] :is([data-additions], [data-additions] [data-gutter]) { border-left: 0; }`;
 
 /**
  * Diff `unsafeCSS` for every look. Line numbers get a 4-digit column in every file (Pierre sizes it per file, so

@@ -2,6 +2,13 @@
 
 Newest first. Each release's GitHub notes are its section here (`scripts/release-notes.sh`).
 
+## Unreleased
+
+### Fixes
+
+- Split view no longer draws a white strip between the old and new sides: like GitHub's, the old side's code meets
+  the new side's line numbers directly, through changed lines, empty sides and expander rows.
+
 ## 0.3.1 (2026-10-19)
 
 ### Fixes
