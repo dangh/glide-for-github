@@ -137,6 +137,7 @@ function Tree({ paths, gitStatus, settings, colorScheme }: { paths: readonly str
 export const TreePane = memo(function TreePane() {
   const { shown } = useActiveGroup();
   const groupsLoaded = useFileGroups((s) => s.loaded);
+  const settingsLoaded = useSettings((s) => s.loaded);
   const pr = usePr((s) => s.pr);
   const settings = useSettings((s) => s.settings.tree);
   const themeType = useSettings((s) => effectiveThemeType(s.settings.diff.themeType, s.colorMode));
@@ -145,7 +146,7 @@ export const TreePane = memo(function TreePane() {
   const colorScheme = themeType === 'system' ? 'light dark' : themeType;
 
   // Like the diff list, the tree waits for the file groups so it never shows another group's files first.
-  if (!pr || !groupsLoaded) return <aside className="pierre-tree-pane" />;
+  if (!pr || !groupsLoaded || !settingsLoaded) return <aside className="pierre-tree-pane" />;
   return (
     <aside className="pierre-tree-pane" data-testid="tree">
       <Tree key={`${pr.headOid}:${key}`} paths={shown} gitStatus={gitStatus} settings={settings} colorScheme={colorScheme} />

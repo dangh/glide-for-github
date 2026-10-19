@@ -93,9 +93,9 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
   }, [rpc, prRef, attempt]);
 
   useEffect(() => {
-    if (!pr || !settingsLoaded) return;
+    if (!pr || !settingsLoaded || !groupsLoaded) return;
     startLoader(rpc, hideWhitespace);
-  }, [rpc, pr, range, hideWhitespace, settingsLoaded]);
+  }, [rpc, pr, range, hideWhitespace, settingsLoaded, groupsLoaded]);
   useEffect(() => () => session.loader?.cancel(), []);
 
   useEffect(() => {
