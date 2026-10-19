@@ -4,8 +4,7 @@
  *
  * Relations are computed once per (rules, open group's files) pair, over the open group's files only, so a companion
  * nests only when its main file is in the same group. The layout (list order, roles, folded files) is computed once
- * per (relations, style) pair. Every file stays its own CodeView item; 'box' and 'rail' add one group item per main
- * file, before it, whose header sums up the group (`groupItemId`).
+ * per (relations, style) pair. Every file stays its own CodeView item.
  */
 import { create } from 'zustand';
 import { defaultRules, loadRelatedRules, onRelatedRulesChange } from '../../shared/related-files-storage';
@@ -18,38 +17,20 @@ import { usePr } from './store';
 
 export const useRelatedRules = create<{ rules: RelatedRule[]; loaded: boolean }>()(() => ({ rules: defaultRules(), loaded: false }));
 
-/** Group items' ids: a leading "/" no repository path has. */
-const GROUP_PREFIX = '/related/';
-export const groupItemId = (main: string): string => GROUP_PREFIX + main;
-/** The main file of a group item id, or undefined for a file path. */
-export const groupItemMain = (id: string): string | undefined => (id.startsWith(GROUP_PREFIX) ? id.slice(GROUP_PREFIX.length) : undefined);
-/** The file an item stands for: a group item's main file, else the item's own path. */
-export const itemFile = (id: string): string => groupItemMain(id) ?? id;
-
-/**
- * What a file (or a group item) is in its group:
- * - 'group': a group item ('box', 'rail'), the summary line of `files` (the main file first).
- * - 'main': a main file with its companions folded under it ('nested').
- * - 'companion': a companion folded under `main` ('nested').
- * - 'member': a file of a 'box' or 'rail' group.
- * `above` is the item right above the file in the list (its box's previous part); `last` marks the group's last file,
- * where the box or the rail ends.
- */
+/** A main file or a companion; `above` and `last` locate the companion within their shared box. */
 export type Role =
-  | { kind: 'group'; style: 'box' | 'rail'; main: string; files: readonly string[] }
   | { kind: 'main'; files: readonly string[] }
-  | { kind: 'companion'; main: string; above: string; last: boolean }
-  | { kind: 'member'; style: 'box' | 'rail'; main: string; above: string; last: boolean };
+  | { kind: 'companion'; main: string; above: string; last: boolean };
 
 export interface RelatedLayout {
   style: RelatedStyle;
   relations: Relations;
-  /** The diff list's items, in order: file paths, and group items for 'box' and 'rail'. */
+  /** The diff list's file paths, in order. */
   items: readonly string[];
   roles: ReadonlyMap<string, Role>;
   /** Companions that start collapsed ('nested'). */
   folded: ReadonlySet<string>;
-  /** CodeView's `layout.gapBefore`: none inside a 'nested' or 'box' group's box; unset when no box has parts. */
+  /** CodeView's `layout.gapBefore`: none inside a nested group's box; unset when no box has parts. */
   gapBefore?: GapBefore;
 }
 
@@ -57,13 +38,13 @@ export interface RelatedLayout {
 export type GapBefore = (id: string, previousId: string) => number | undefined;
 
 /**
- * 'nested' and 'box' draw a group as one box: a part right below the box's previous part touches it. Asked about any
+ * Nested files share one box: a part right below the box's previous part touches it. Asked about any
  * other neighbor (CodeView can lay out the old list with the new layout for a frame), it keeps the list's gap.
  */
 function touching(roles: ReadonlyMap<string, Role>): GapBefore {
   return (id, previousId) => {
     const role = roles.get(id);
-    return (role?.kind === 'companion' || role?.kind === 'member') && role.above === previousId ? 0 : undefined;
+    return role?.kind === 'companion' && role.above === previousId ? 0 : undefined;
   };
 }
 
@@ -98,23 +79,14 @@ function buildLayout(relations: Relations, style: RelatedStyle, shown: readonly 
     }
     const list = relations.companions.get(group)!;
     const last = path === list.at(-1);
-    if (style === 'nested') {
-      if (main === undefined) roles.set(path, { kind: 'main', files: [path, ...list] });
-      else {
-        roles.set(path, { kind: 'companion', main, above: items.at(-1)!, last });
-        folded.add(path);
-      }
-    } else {
-      if (main === undefined) {
-        const id = groupItemId(path);
-        items.push(id);
-        roles.set(id, { kind: 'group', style, main: path, files: [path, ...list] });
-      }
-      roles.set(path, { kind: 'member', style, main: group, above: items.at(-1)!, last });
+    if (main === undefined) roles.set(path, { kind: 'main', files: [path, ...list] });
+    else {
+      roles.set(path, { kind: 'companion', main, above: items.at(-1)!, last });
+      folded.add(path);
     }
     items.push(path);
   }
-  return { style, relations, items, roles, folded, ...(style === 'rail' ? {} : { gapBefore: touching(roles) }) };
+  return { style, relations, items, roles, folded, gapBefore: touching(roles) };
 }
 
 let layoutMemo: { relations: Relations; style: RelatedStyle; shown: readonly string[]; layout: RelatedLayout } | undefined;
@@ -140,7 +112,7 @@ export function useRelated(): RelatedLayout {
   return relatedLayout(rules, shown, style);
 }
 
-/** A file's (or group item's) role, re-rendering only when it changes. */
+/** A file's role, re-rendering only when it changes. */
 export function useRole(id: string): Role | undefined {
   return useRelated().roles.get(id);
 }

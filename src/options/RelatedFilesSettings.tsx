@@ -1,9 +1,9 @@
 /**
- * The options page's Related files section: how related files show (`DisplaySettings.relatedFiles.style`, four
+ * The options page's Related files section: how related files show (`DisplaySettings.relatedFiles.style`, two
  * choices, each with a small preview drawn like the viewer's GitHub file boxes) and the rules that relate them, saved
  * at once (debounced) to their storage item (src/shared/related-files-storage.ts), as the file groups editor does.
  */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BASENAME, relateFiles, rulesProblem, type RelatedRule } from '../shared/related-files';
 import { defaultRules, loadRelatedRules, onRelatedRulesChange, saveRelatedRules, sameRules } from '../shared/related-files-storage';
 import { RELATED_STYLES, type RelatedStyle } from '../shared/settings';
@@ -28,16 +28,13 @@ type Status = { kind: 'idle' } | { kind: 'saved' } | { kind: 'error'; message: s
 
 const DESCRIPTIONS: Record<RelatedStyle, string> = {
   nested: 'A related file folds into one line at the bottom of its main file. Click it to open its diff.',
-  box: 'Related files share one box under a summary header, each file with its own small header.',
-  rail: 'Files keep their own boxes under a group line, tied by a rail.',
   off: 'Every file on its own, in GitHub’s order.',
 };
 
-const Head = ({ chevron = '▾', name, extra, counts, viewed }: { chevron?: string; name: string; extra?: ReactNode; counts: [number, number]; viewed?: string }) => (
+const Head = ({ name, counts, viewed }: { name: string; counts: [number, number]; viewed?: string }) => (
   <div className="rp-head">
-    <span className="rp-chevron">{chevron}</span>
+    <span className="rp-chevron">▾</span>
     <span className="rp-name">{name}</span>
-    {extra}
     <span className="rp-grow" />
     <span className="rp-add">+{counts[0]}</span>
     <span className="rp-del">−{counts[1]}</span>
@@ -77,48 +74,6 @@ function Preview({ style }: { style: RelatedStyle }) {
             <span className="rp-grow" />
             <span className="rp-add">+312</span>
             <span className="rp-del">−45</span>
-          </div>
-        </div>
-      );
-    case 'box':
-      return (
-        <div className="rp-box">
-          <Head name="package.json" extra={<span className="rp-muted">+ 1 related</span>} counts={[314, 46]} viewed="Viewed" />
-          <div className="rp-head rp-sub">
-            <span className="rp-name">package.json</span>
-            <span className="rp-grow" />
-            <span className="rp-add">+2</span>
-            <span className="rp-del">−1</span>
-          </div>
-          <Code lines={MAIN_LINES} />
-          <div className="rp-head rp-sub">
-            <span className="rp-name">package-lock.json</span>
-            <Tag />
-            <span className="rp-grow" />
-            <span className="rp-add">+312</span>
-            <span className="rp-del">−45</span>
-          </div>
-          <Code lines={LOCK_LINES} />
-        </div>
-      );
-    case 'rail':
-      return (
-        <div>
-          <div className="rp-group">
-            <span className="rp-chevron">▾</span>
-            <span className="rp-name">package.json</span>
-            <span className="rp-muted">· 2 files</span>
-            <span className="rp-grow" />
-            <span className="rp-viewed">☐ Viewed all</span>
-          </div>
-          <div className="rp-rail">
-            <div className="rp-box">
-              <Head name="package.json" counts={[2, 1]} viewed="Viewed" />
-              <Code lines={MAIN_LINES} />
-            </div>
-            <div className="rp-box">
-              <Head chevron="▸" name="package-lock.json" counts={[312, 45]} viewed="Viewed" />
-            </div>
           </div>
         </div>
       );

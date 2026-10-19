@@ -4,7 +4,7 @@ import { extensionId } from './fixtures';
 
 const folders = ['admin/services/add-ons', 'admin/web'];
 
-for (const style of ['nested', 'box'] as const) {
+for (const style of ['nested'] as const) {
   test(`${style} related files touch when collapsed and expanded in-page`, async ({ glideContext }, info) => {
     const options = await glideContext.newPage();
     await options.goto(`chrome-extension://${extensionId()}/options.html`);
@@ -46,7 +46,7 @@ for (const style of ['nested', 'box'] as const) {
     for (const folder of folders) {
       const main = `${folder}/package.json`;
       const lock = `${folder}/package-lock.json`;
-      const paths = style === 'box' ? [`/related/${main}`, main, lock] : [main, lock];
+      const paths = [main, lock];
       const gaps = async () => {
         const parts = await measure(paths);
         return parts.slice(1).map((part, i) => part.top - parts[i]!.bottom);

@@ -74,7 +74,7 @@
  *   github.replaceFilesTab    boolean, false: GitHub's Files changed tab is hidden and its page opens Glide instead
  *   fileGroups.*              enabled (true), defaultGroup ('' = All; else a group label), hideEmpty (true): the file
  *                             group tabs (./file-groups.ts). The groups themselves are stored apart (./file-groups-storage.ts).
- *   relatedFiles.style        'nested' (default) | 'box' | 'rail' | 'off': how companion files (lock files, …) show with
+ *   relatedFiles.style        'nested' (default) | 'off': how companion files (lock files, …) show with
  *                             their main file (./related-files.ts). The rules are stored apart (./related-files-storage.ts).
  *
  * EXCLUDED, with reasons:
@@ -202,8 +202,8 @@ export interface FileGroupSettings {
   hideEmpty: boolean;
 }
 
-/** How companion files show with their main file: folded under it, in one box, or under a group line with a rail. */
-export const RELATED_STYLES = ['nested', 'box', 'rail', 'off'] as const;
+/** How companion files show with their main file: folded under it, or shown independently. */
+export const RELATED_STYLES = ['nested', 'off'] as const;
 export type RelatedStyle = (typeof RELATED_STYLES)[number];
 
 export interface RelatedFilesSettings {

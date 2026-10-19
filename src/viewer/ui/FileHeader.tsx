@@ -6,9 +6,7 @@
  * `itemMetrics.diffHeaderHeight` for it and does not measure headers.
  *
  * Related files (state/relatedFiles.ts) change a header by the file's role, set on it as `data-related` for
- * viewer.css: a main file's Viewed covers its folded companions ('nested'); a companion is a one-line row ('nested'); a
- * 'box' file has a sub-header without Viewed under its group's summary header (`GroupHeader`); a 'rail' file keeps its
- * own header.
+ * viewer.css: a main file's Viewed covers its folded companions ('nested'); a companion is a one-line row ('nested').
  */
 import { memo, useCallback } from 'react';
 import { CHEVRON_DOWN, CHEVRON_RIGHT } from '../../shared/github-tree-icons';
@@ -17,7 +15,7 @@ import { isLockFile } from '../../shared/related-files';
 import { isNoTokenError } from '../auth/requireToken';
 import type { FileSummary } from '../github/private';
 import { fileTarget } from '../state/compose';
-import { useRole, type Role } from '../state/relatedFiles';
+import { useRole } from '../state/relatedFiles';
 import { errorMessage, FilesViewedError, setFilesViewed } from '../state/review';
 import { session } from '../state/session';
 import { commentCount, isCollapsed, threadsByPath, usePr, type FileLoadState } from '../state/store';
@@ -101,12 +99,6 @@ function LoadNotice({ path, load, summary }: { path: string; load: FileLoadState
   }
 }
 
-/** A file's look in its group of related files (`data-related` on the header). */
-function variantOf(role: Role | undefined): string | undefined {
-  if (!role || role.kind === 'group') return undefined;
-  return role.kind === 'member' ? `${role.style}-member` : role.kind;
-}
-
 /** Marks `files` viewed or not (optimistic, reverted with an error toast for the files GitHub refuses). */
 function markViewed(files: readonly string[], next: boolean) {
   const pr = usePr.getState().pr;
@@ -176,15 +168,15 @@ export const FileHeader = memo(function FileHeader({ path }: { path: string }) {
   const onViewed = useCallback((next: boolean) => markViewed(group ?? [path], next), [group, path]);
 
   if (!summary) return null;
-  const variant = variantOf(role);
+  const variant = role?.kind;
   /** A file shown as part of its main file's box: named by its file name, no Viewed of its own. */
-  const part = variant === 'companion' || variant === 'box-member';
+  const part = variant === 'companion';
   const badge = STATUS_BADGE[summary.status];
   const additions = load?.additions ?? summary.additions;
   const deletions = load?.deletions ?? summary.deletions;
   const copyPath = () => void navigator.clipboard?.writeText(path).catch(() => undefined);
-  const companion = role?.kind === 'companion' || (role?.kind === 'member' && role.main !== path);
-  const last = (role?.kind === 'companion' || role?.kind === 'member') && role.last;
+  const companion = role?.kind === 'companion';
+  const last = companion && role.last;
 
   return (
     <div
@@ -225,64 +217,6 @@ export const FileHeader = memo(function FileHeader({ path }: { path: string }) {
         <CommentIcon />+
       </button>
       {!part && <Viewed checked={viewed} label="Viewed" onChange={onViewed} />}
-    </div>
-  );
-});
-
-const NO_FILES: readonly string[] = Object.freeze([]);
-
-/**
- * A group item's header ('box', 'rail'): the main file's path and how many files the group holds, their summed
- * counts and comments, one chevron for every file and one Viewed for every file (checked when all are viewed).
- */
-export const GroupHeader = memo(function GroupHeader({ id }: { id: string }) {
-  const role = useRole(id);
-  const files = role?.kind === 'group' ? role.files : NO_FILES;
-  const viewed = usePr((s) => files.length > 0 && files.every((f) => s.viewed.has(f)));
-  const collapsed = usePr((s) => files.length > 0 && files.every((f) => isCollapsed(s, f)));
-  /** "additions:deletions", a string so the selector's result compares by value. */
-  const totals = usePr((s) => {
-    let additions = 0;
-    let deletions = 0;
-    for (const f of files) {
-      const summary = s.files.get(f);
-      const load = s.load.get(f);
-      additions += load?.additions ?? summary?.additions ?? 0;
-      deletions += load?.deletions ?? summary?.deletions ?? 0;
-    }
-    return `${additions}:${deletions}`;
-  });
-  const comments = usePr((s) => files.reduce((n, f) => n + commentCount(threadsByPath(s.threads).get(f)), 0));
-  const height = useSettings((s) => headerHeight(s.settings.diff.fileHeaderStyle));
-
-  const toggleCollapsed = useCallback(() => {
-    const s = usePr.getState();
-    const next = !files.every((f) => isCollapsed(s, f));
-    for (const f of files) s.setCollapsed(f, next);
-  }, [files]);
-  const onViewed = useCallback((next: boolean) => markViewed(files, next), [files]);
-
-  if (role?.kind !== 'group') return null;
-  const [additions, deletions] = totals.split(':').map(Number) as [number, number];
-  const box = role.style === 'box';
-  return (
-    <div
-      className="fh"
-      data-path={id}
-      data-related={`${role.style}-group`}
-      data-viewed={viewed || undefined}
-      data-collapsed={collapsed ? '' : undefined}
-      style={{ height }}
-    >
-      <Chevron collapsed={collapsed} label={`${files.length} related files`} onClick={toggleCollapsed} />
-      <span className="fh-path" title={files.join('\n')}>
-        <span className="fh-name">{role.main}</span>
-        <span className="fh-group-count">{box ? ` + ${files.length - 1} related` : ` · ${files.length} files`}</span>
-      </span>
-      <Counts additions={additions} deletions={deletions} />
-      <span className="fh-grow" />
-      <Comments count={comments} />
-      <Viewed checked={viewed} label={box ? 'Viewed' : 'Viewed all'} onChange={onViewed} />
     </div>
   );
 });

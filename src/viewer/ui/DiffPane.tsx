@@ -2,13 +2,13 @@
  * The open file group's files in one virtualized Pierre CodeView (uncontrolled: items are seeded once, then updated
  * one by one with `updateItem`, see state/items.ts). A group switch hands the CodeView the new group's items with
  * `setItems`: items it already has keep their layout, and loaded diffs stay loaded. Related files
- * (state/relatedFiles.ts) order the items, companions after their main file, and add 'box' and 'rail' group items;
+ * (state/relatedFiles.ts) order the items, companions after their main file;
  * a change of style or rules goes through `setItems` the same way. Their `gapBefore` takes the gap out of a box
  * (`layout.gapBefore`, added to @pierre/diffs by patches/), and a new one relays out the list.
  */
 import type { DiffLineAnnotation, FileDiffLoadedFiles, FileDiffMetadata, LineAnnotation, SelectedLineRange } from '@pierre/diffs';
 import { CodeView, type CodeViewHandle } from '@pierre/diffs/react';
-import { memo, useCallback, useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { resolveFonts } from '../../shared/github-defaults';
 import { fetchFullFile, type PrData, type Rpc } from '../github/private';
 import type { ListAnchors } from '../pageScroll';
@@ -16,13 +16,13 @@ import { createAnnotationSource } from '../state/annotations';
 import { targetFromRange } from '../state/compose';
 import { ItemSync, type AnnotationMeta, type AnnotationSource, type PierreItem } from '../state/items';
 import { rangeOids } from '../state/range';
-import { currentRelated, groupItemId, groupItemMain, itemFile, useRelated } from '../state/relatedFiles';
+import { currentRelated, useRelated } from '../state/relatedFiles';
 import { session } from '../state/session';
 import { useSettings } from '../state/settings';
 import { isCollapsed, usePr } from '../state/store';
 import { createDiffOptionsBuilder, createSettle, headerHeight, visibleFiles, type DiffViewOptions } from '../state/view';
 import { Composer, openComposerAt } from './Composer';
-import { FileHeader, GroupHeader } from './FileHeader';
+import { FileHeader } from './FileHeader';
 import { Thread } from './Thread';
 
 type Handle = CodeViewHandle<AnnotationMeta, undefined>;
@@ -120,9 +120,6 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
 
   const loadDiffFiles = useMemo(() => (pr ? createFileLoader(rpc, pr) : undefined), [rpc, pr]);
 
-  /** The gap between items, for viewer.css: a 'rail' runs across it. */
-  const gapStyle = useMemo(() => ({ '--pierre-gap': `${diffSettings.layoutGap}px` }) as CSSProperties, [diffSettings.layoutGap]);
-
   const related = useRelated();
   const buildOptions = useMemo(createDiffOptionsBuilder, []);
   const options = buildOptions(diffSettings, colorMode, loadDiffFiles, INTERACTIONS, lineHeight, related.gapBefore);
@@ -167,11 +164,11 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
         // The next few files below the viewport too, so scrolling down finds them loaded.
         const order = sync.mountedPaths;
         const next = order.indexOf(current!) + ids.length;
-        session.viewport = [...ids, ...order.slice(next, next + PRIORITY_AHEAD)].map(itemFile);
+        session.viewport = [...ids, ...order.slice(next, next + PRIORITY_AHEAD)];
         session.loader?.prioritize(session.viewport);
       }
       // Every scroll frame restarts the quiet period, so the tree only updates once scrolling pauses.
-      if (current && performance.now() >= quietUntil.current) treeSync.push(itemFile(current));
+      if (current && performance.now() >= quietUntil.current) treeSync.push(current);
     });
   }, [treeSync, sync]);
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
@@ -208,18 +205,17 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
           quietUntil.current = performance.now() + SCROLL_QUIET_MS;
           treeSync.cancel();
           session.pageScroll?.expectListScroll?.();
-          // A folded companion unfolds; a 'box' or 'rail' main file shows with its group's header.
+          // A folded companion unfolds when selected in the tree.
           const s = usePr.getState();
           if (s.folded.has(path) && isCollapsed(s, path)) s.setCollapsed(path, false);
-          const group = groupItemId(path);
-          handle.scrollTo({ type: 'item', id: currentRelated().roles.has(group) ? group : path, align: 'start' });
+          handle.scrollTo({ type: 'item', id: path, align: 'start' });
         }
       : undefined;
     session.pageScroll?.attach(handle?.getInstance()?.getContainerElement() ?? null, handle ? listAnchors(handle, sync) : null);
   }, [treeSync, sync]);
 
   const renderCustomHeader = useCallback(
-    (item: PierreItem) => (groupItemMain(item.id) === undefined ? <FileHeader path={item.id} /> : <GroupHeader id={item.id} />),
+    (item: PierreItem) => <FileHeader path={item.id} />,
     [],
   );
 
@@ -231,7 +227,6 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
         key={pr.headOid}
         ref={setHandle}
         className="pierre-diffs"
-        style={gapStyle}
         initialItems={initialItems}
         options={options}
         onScroll={onViewport}

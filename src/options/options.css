@@ -387,8 +387,7 @@ body {
   font: 10px/1.5 var(--pierre-mono);
 }
 
-.rp-head,
-.rp-group {
+.rp-head {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -406,25 +405,13 @@ body {
   border-bottom: 0;
 }
 
-.rp-row,
-.rp-sub {
+.rp-row {
   background: var(--pierre-bg);
   border-top: 1px solid var(--pierre-border);
 }
 
 .rp-row {
   color: var(--pierre-muted);
-}
-
-.rp-group {
-  font: 600 10px/1.5 var(--pierre-mono);
-  padding-left: 0;
-}
-
-.rp-rail {
-  margin-left: 4px;
-  padding-left: 8px;
-  border-left: 2px solid var(--pierre-accent-border);
 }
 
 .rp-chevron {
@@ -436,7 +423,6 @@ body {
   flex: none;
 }
 
-.rp-muted,
 .rp-row .rp-name {
   flex: 0 1 auto;
   min-width: 0;
@@ -446,12 +432,6 @@ body {
 
 .rp-grow {
   flex: 1;
-}
-
-.rp-muted {
-  color: var(--pierre-muted);
-  font-family: var(--pierre-font);
-  font-weight: 400;
 }
 
 .rp-add,

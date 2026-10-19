@@ -74,7 +74,7 @@ describe('DisplaySettingsForm', () => {
         continue;
       }
       if (label === 'Related files') {
-        expect([...select.options].map((o) => o.textContent)).toEqual(['Nested', 'One box', 'Group rail', 'Off']);
+        expect([...select.options].map((o) => o.textContent)).toEqual(['Nested', 'Off']);
         expect(select.value).toBe('nested');
         continue;
       }

@@ -153,7 +153,7 @@ function FontSizeField({ value, onChange }: { value: FontSettings['codeFontSize'
 }
 
 /** The related-files styles, as the Display menu and the options page name them. */
-export const RELATED_STYLE_LABELS: Record<RelatedStyle, string> = { nested: 'Nested', box: 'One box', rail: 'Group rail', off: 'Off' };
+export const RELATED_STYLE_LABELS: Record<RelatedStyle, string> = { nested: 'Nested', off: 'Off' };
 
 /** `relatedFiles`: the Related files choice (the options page shows it in its own section, with previews). */
 export function DisplaySettingsForm({ settings, update, relatedFiles = true }: { settings: DisplaySettings; update: Update; relatedFiles?: boolean }) {

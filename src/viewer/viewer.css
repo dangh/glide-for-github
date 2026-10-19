@@ -1124,7 +1124,7 @@ html[data-scroll-layout] .pierre-body[data-tree-position='left'] .pierre-diffs {
 
 /*
  * Related files (state/relatedFiles.ts; `data-related` on each header). Every file stays its own CodeView item. In a
- * 'nested' or 'box' group's box the items touch (the layout's `gapBefore` takes the list gap out), so each part draws
+ * nested group's box the items touch (the layout's `gapBefore` takes the list gap out), so each part draws
  * its share of the box: the first part its top, the last its bottom, and every part but the last a line under itself.
  */
 .fh-tag {
@@ -1136,14 +1136,7 @@ html[data-scroll-layout] .pierre-body[data-tree-position='left'] .pierre-diffs {
   color: var(--pierre-muted);
 }
 
-.fh-group-count {
-  color: var(--pierre-muted);
-  font-family: var(--pierre-font);
-  font-weight: 400;
-}
-
-.fh[data-related='companion'],
-.fh[data-related='box-member'] {
+.fh[data-related='companion'] {
   background: var(--pierre-bg);
 }
 
@@ -1156,74 +1149,33 @@ html[data-scroll-layout] .pierre-body[data-tree-position='left'] .pierre-diffs {
   font-weight: 400;
 }
 
-.fh[data-related='rail-group'] {
-  background: none;
-  border-bottom: 0;
-}
-
-.fh[data-related='rail-group'] .fh-name {
-  font-weight: 600;
-}
-
 /* GitHub's file boxes: one box drawn by its parts, square where they meet, each closing above the next with a line. */
-[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='main'], [data-related='box-group'])),
-[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='main'], [data-related='box-group']))::after {
+[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh[data-related='main']),
+[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh[data-related='main'])::after {
   border-radius: 6px 6px 0 0;
 }
 
-[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='companion'], [data-related='box-member'])),
-[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='companion'], [data-related='box-member']))::after {
+[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh[data-related='companion']),
+[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh[data-related='companion'])::after {
   border-radius: 0;
 }
 
 /* The part above already drew the line between them. */
-[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='companion'], [data-related='box-member']))::after {
+[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh[data-related='companion'])::after {
   border-top: 0;
 }
 
-[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='companion'], [data-related='box-member'])[data-last]),
-[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='companion'], [data-related='box-member'])[data-last])::after {
+[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh[data-related='companion'][data-last]),
+[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh[data-related='companion'][data-last])::after {
   border-radius: 0 0 6px 6px;
 }
 
-[data-file-header='github'] .fh:is([data-related='companion'], [data-related='box-member']) {
+[data-file-header='github'] .fh[data-related='companion'] {
   border-radius: 0;
 }
 
-/*
- * 'rail': the group line has no box, and its files' boxes sit to the right of a rail that runs from the group line
- * across the gaps to the last file. Their boxes are not clipped (the rail is outside them), so a collapsed header rounds
- * its own corners.
- */
-.pierre-diffs diffs-container:has(> [slot='header-custom'] .fh[data-related='rail-group'])::after {
-  display: none;
-}
-
-.pierre-diffs diffs-container:has(> [slot='header-custom'] .fh[data-related='rail-member']) {
-  position: relative;
-  margin-left: 20px;
-  overflow: visible;
-}
-
-.pierre-diffs diffs-container:has(> [slot='header-custom'] .fh[data-related='rail-member'])::before {
-  content: '';
-  position: absolute;
-  top: calc(-1 * var(--pierre-gap, 16px));
-  bottom: 0;
-  left: -13px;
-  width: 2px;
-  border-radius: 1px;
-  background: var(--pierre-accent-border);
-  pointer-events: none;
-}
-
-[data-file-header='github'] .fh[data-related='rail-member'][data-collapsed] {
-  border-radius: 6px;
-  border-bottom-color: transparent;
-}
-
 /* Glide's flat headers ('pierre'): no boxes, so attached files are indented under the header above. */
-[data-file-header='pierre'] .fh:is([data-related='companion'], [data-related='box-member']) {
+[data-file-header='pierre'] .fh[data-related='companion'] {
   padding-left: 24px;
 }
 

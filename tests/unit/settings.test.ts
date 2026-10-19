@@ -237,14 +237,19 @@ describe('fileGroups', () => {
 });
 
 describe('relatedFiles', () => {
-  it('nests companion files by default; any of the four styles can be stored; anything else falls back', async () => {
+  it('nests companion files by default; Nested and Off can be stored', async () => {
     expect((await loadSettings()).relatedFiles).toEqual({ style: 'nested' });
-    for (const style of ['nested', 'box', 'rail', 'off'] as const) {
+    for (const style of ['nested', 'off'] as const) {
       fake.data[SETTINGS_STORAGE_KEY] = { relatedFiles: { style } };
       expect((await loadSettings()).relatedFiles.style).toBe(style);
     }
-    fake.data[SETTINGS_STORAGE_KEY] = { relatedFiles: { style: 'tabs' } };
-    expect((await loadSettings()).relatedFiles.style).toBe('nested');
+  });
+
+  it.each(['box', 'rail', 'tabs'])('falls back to Nested for the retired or invalid style %s', async (style) => {
+    fake.data[SETTINGS_STORAGE_KEY] = { relatedFiles: { style }, layout: { treePosition: 'right' } };
+    const settings = await loadSettings();
+    expect(settings.relatedFiles.style).toBe('nested');
+    expect(settings.layout.treePosition).toBe('right');
   });
 });
 

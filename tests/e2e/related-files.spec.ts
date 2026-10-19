@@ -16,11 +16,11 @@ const SNAPSHOT = 'src/vs/platform/agentHost/test/node/__snapshots__/Copilot_SDK_
 const SHOTS = process.env.PIERRE_SHOTS ?? join(ROOT, '.superpowers/related-files');
 mkdirSync(SHOTS, { recursive: true });
 
-/** The diff list's items (files, and the group items of 'box' and 'rail'), in the order the CodeView lays them out. */
+/** The diff list's files, in the order the CodeView lays them out. */
 const listItems = (viewer: Viewer) =>
   viewer.frame().evaluate(() => {
     const view = window.__pierre!.session.codeView!;
-    const ids = window.__pierre!.store.getState().order.flatMap((p) => [p, `/related/${p}`]).filter((id) => view.getItem(id));
+    const ids = window.__pierre!.store.getState().order.filter((id) => view.getItem(id));
     const top = (id: string) => view.getInstance()!.getTopForItem(id)!;
     return ids.sort((a, b) => top(a) - top(b));
   });
@@ -33,9 +33,6 @@ const header = (viewer: Viewer, path: string) => viewer.locator.locator(`.fh[dat
 
 const setCollapsed = (viewer: Viewer, path: string, collapsed: boolean) =>
   viewer.frame().evaluate(([p, c]) => window.__pierre!.store.getState().setCollapsed(p, c), [path, collapsed] as const);
-
-/** A main file's item in 'box' and 'rail': its group's summary line (where the tree scrolls to). */
-const listItemFor = (path: string) => (path.endsWith('package.json') ? `/related/${path}` : path);
 
 /**
  * Each item's box (its `diffs-container`) and header, in the viewer's px, and `drift`: how far the box is drawn from
@@ -227,18 +224,17 @@ test.describe('related files', () => {
     };
     await viewer.scrollToFile('remote/package.json');
     await expect.poll(gap).toEqual({ gap: 0, drift: [0, 0] });
-    await select.selectOption('rail');
-    await expect.poll(() => listItems(viewer)).toContain('/related/package.json');
-    await expect.poll(gap).toEqual({ gap: 16, drift: [0, 0] });
-    await select.selectOption('box');
-    await expect.poll(gap).toEqual({ gap: 0, drift: [0, 0] });
+    await expect(select.locator('option')).toHaveText(['Nested', 'Off']);
+    await select.selectOption('off');
+    await expect.poll(() => listItems(viewer)).toEqual(await viewer.order());
+    await expect(viewer.locator.locator('.fh[data-related]')).toHaveCount(0);
     await select.selectOption('nested');
-    await expect.poll(() => listItems(viewer)).not.toContain('/related/package.json');
+    await viewer.scrollToFile('remote/package.json');
     await expect.poll(gap).toEqual({ gap: 0, drift: [0, 0] });
     await page.keyboard.press('Escape');
   });
 
-  for (const style of ['nested', 'box', 'rail'] as const) {
+  for (const style of ['nested', 'off'] as const) {
     test(`${style}: dark, narrow, and the tree on the right`, async ({ page, extContext }) => {
       await setSettings(extContext, 'relatedFiles', { style });
       try {
@@ -337,17 +333,17 @@ test.describe('related files', () => {
     }
   });
 
-  test('options page: four styles with previews, and the rules editor with add, reorder, delete, reset and try paths', async ({ page, extContext }) => {
+  test('options page: two styles with previews, and the rules editor with add, reorder, delete, reset and try paths', async ({ page, extContext }) => {
     const options = await extensionPage(extContext);
     try {
       const section = options.getByRole('region', { name: 'Related files' });
-      await expect(section.getByRole('radio')).toHaveCount(4);
+      await expect(section.getByRole('radio')).toHaveCount(2);
       await expect(section.getByRole('radio', { name: /Nested/ })).toBeChecked();
       await section.scrollIntoViewIfNeeded();
       await section.getByRole('radiogroup').screenshot({ path: `${SHOTS}/options-light.png` });
 
-      await section.getByTestId('related-style-box').click();
-      await expect.poll(() => options.evaluate(async () => ((await chrome.storage.sync.get('pierre.settings'))['pierre.settings'] as { relatedFiles?: unknown })?.relatedFiles)).toEqual({ style: 'box' });
+      await section.getByTestId('related-style-off').click();
+      await expect.poll(() => options.evaluate(async () => ((await chrome.storage.sync.get('pierre.settings'))['pierre.settings'] as { relatedFiles?: unknown })?.relatedFiles)).toEqual({ style: 'off' });
 
       const rules = section.getByTestId('related-rule');
       const count = await rules.count();
@@ -393,7 +389,7 @@ test.describe('related files', () => {
     }
   });
 
-  for (const style of ['nested', 'box'] as const) {
+  for (const style of ['nested'] as const) {
     for (const scheme of ['light', 'dark'] as const) {
       test(`${style}, ${scheme}: one box, its parts touching, and a 42 px main header, collapsed and expanded`, async ({ page, extContext }) => {
         await setSettings(extContext, 'relatedFiles', { style });
@@ -403,7 +399,7 @@ test.describe('related files', () => {
           await viewer.allFetched();
           const main = 'remote/package.json';
           const lock = 'remote/package-lock.json';
-          const parts = style === 'box' ? [`/related/${main}`, main, lock] : [main, lock];
+          const parts = [main, lock];
           await viewer.scrollToFile(main);
           await expect.poll(async () => (await boxes(viewer, parts)).every((b) => b !== null)).toBe(true);
 
@@ -443,7 +439,7 @@ test.describe('related files', () => {
     }
   }
 
-  for (const style of ['nested', 'box', 'rail'] as const) {
+  for (const style of ['nested', 'off'] as const) {
     test(`${style}: the tree scrolls every file's header to the top, also below a group`, async ({ page, extContext }) => {
       await setSettings(extContext, 'relatedFiles', { style });
       try {
@@ -452,8 +448,7 @@ test.describe('related files', () => {
         await viewer.allFetched();
         for (const path of [SNAPSHOT, 'package.json', 'remote/package-lock.json', 'package-lock.json', 'remote/package.json']) {
           await viewer.scrollToFile(path);
-          const target = style === 'nested' ? path : listItemFor(path);
-          await expect.poll(() => scrolledTo(viewer, target), { message: `${path} at the top` }).toEqual({ found: true, offset: 0, drift: 0 });
+          await expect.poll(() => scrolledTo(viewer, path), { message: `${path} at the top` }).toEqual({ found: true, offset: 0, drift: 0 });
         }
       } finally {
         await page.setViewportSize({ width: 1400, height: 900 });
@@ -462,7 +457,7 @@ test.describe('related files', () => {
     });
   }
 
-  for (const style of ['box', 'rail', 'off'] as const) {
+  for (const style of ['off'] as const) {
     test(`${style}: the diff list and its headers`, async ({ page, extContext }) => {
       await setSettings(extContext, 'relatedFiles', { style });
       try {
@@ -470,22 +465,8 @@ test.describe('related files', () => {
         await viewer.allFetched();
         await shoot(page, `${style}-light-wide-top`);
         await viewer.scrollToFile('package.json');
-        if (style === 'off') {
-          await expect.poll(() => listItems(viewer)).toEqual(await viewer.order());
-          await expect(viewer.locator.locator('.fh[data-related]')).toHaveCount(0);
-        } else {
-          await expect
-            .poll(() => listItems(viewer))
-            .toEqual(['/related/remote/package.json', 'remote/package.json', 'remote/package-lock.json', SNAPSHOT, '/related/package.json', 'package.json', 'package-lock.json']);
-          const group = header(viewer, '/related/package.json');
-          await expect(group).toHaveAttribute('data-related', `${style}-group`);
-          await expect(group.locator('.fh-path')).toHaveText(style === 'box' ? 'package.json + 1 related' : 'package.json · 2 files');
-          await expect(group.locator('.fh-counts')).toHaveText('+38−38');
-          await expect(group.locator('.fh-viewed')).toHaveText(style === 'box' ? 'Viewed' : 'Viewed all');
-          await expect(header(viewer, 'package.json')).toHaveAttribute('data-related', `${style}-member`);
-          await expect(header(viewer, 'package-lock.json').locator('.fh-viewed')).toHaveCount(style === 'box' ? 0 : 1);
-          expect(await viewer.item('package-lock.json')).toMatchObject({ collapsed: false });
-        }
+        await expect.poll(() => listItems(viewer)).toEqual(await viewer.order());
+        await expect(viewer.locator.locator('.fh[data-related]')).toHaveCount(0);
         await shoot(page, `${style}-light-wide`);
       } finally {
         await writeGlideSync(extContext, {});

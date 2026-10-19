@@ -5,7 +5,7 @@ import { RELATED_RULES_KEY, saveRelatedRules } from '../../src/shared/related-fi
 import { DEFAULT_SETTINGS } from '../../src/shared/settings';
 import type { FileSummary, PrData } from '../../src/viewer/github/private';
 import { useFileGroups } from '../../src/viewer/state/fileGroups';
-import { groupItemId, groupItemMain, initRelatedFiles, relatedLayout, relationsOf, useRelatedRules } from '../../src/viewer/state/relatedFiles';
+import { initRelatedFiles, relatedLayout, relationsOf, useRelatedRules } from '../../src/viewer/state/relatedFiles';
 import { useSettings } from '../../src/viewer/state/settings';
 import { isCollapsed, usePr } from '../../src/viewer/state/store';
 import { fakeSync } from './fake-sync';
@@ -24,18 +24,6 @@ describe('the layout of each style', () => {
     expect(layout.roles.get('web/package.json')).toBeUndefined();
   });
 
-  it.each(['box', 'rail'] as const)('%s: a group item before the main file, nothing folded', (style) => {
-    const layout = relatedLayout(rules, shown, style);
-    const group = groupItemId('package.json');
-    expect(layout.items).toEqual(['src/a.ts', group, 'package.json', 'package-lock.json', 'yarn.lock', 'web/package.json']);
-    expect(layout.folded.size).toBe(0);
-    expect(layout.roles.get(group)).toEqual({ kind: 'group', style, main: 'package.json', files: ['package.json', 'package-lock.json', 'yarn.lock'] });
-    expect(layout.roles.get('package.json')).toEqual({ kind: 'member', style, main: 'package.json', above: group, last: false });
-    expect(layout.roles.get('yarn.lock')).toEqual({ kind: 'member', style, main: 'package.json', above: 'package-lock.json', last: true });
-    expect(groupItemMain(group)).toBe('package.json');
-    expect(groupItemMain('package.json')).toBeUndefined();
-  });
-
   it('off: the open group\'s list itself, no roles', () => {
     const layout = relatedLayout(rules, shown, 'off');
     expect(layout.items).toBe(shown);
@@ -45,32 +33,23 @@ describe('the layout of each style', () => {
 
   it('a list with no related files is shown as it is', () => {
     const plain = ['a.ts', 'b.ts'];
-    expect(relatedLayout(rules, plain, 'box').items).toBe(plain);
+    expect(relatedLayout(rules, plain, 'nested').items).toBe(plain);
   });
 
   /** The gap CodeView puts above each item of `items` (`undefined`: the list's own gap). */
   const gaps = (layout: ReturnType<typeof relatedLayout>, items = layout.items) =>
     items.slice(1).map((id, i) => [id, layout.gapBefore?.(id, items[i]!)]);
 
-  it('nested and box: no gap inside a box, so its parts touch; the list gap around it', () => {
+  it('nested: no gap inside a box, so its parts touch; the list gap around it', () => {
     expect(gaps(relatedLayout(rules, shown, 'nested'))).toEqual([
       ['package.json', undefined],
       ['package-lock.json', 0],
       ['yarn.lock', 0],
       ['web/package.json', undefined],
     ]);
-    const group = groupItemId('package.json');
-    expect(gaps(relatedLayout(rules, shown, 'box'))).toEqual([
-      [group, undefined],
-      ['package.json', 0],
-      ['package-lock.json', 0],
-      ['yarn.lock', 0],
-      ['web/package.json', undefined],
-    ]);
   });
 
-  it('rail and off keep the list gap everywhere', () => {
-    expect(relatedLayout(rules, shown, 'rail').gapBefore).toBeUndefined();
+  it('off and unrelated files keep the list gap everywhere', () => {
     expect(relatedLayout(rules, shown, 'off').gapBefore).toBeUndefined();
     expect(relatedLayout(rules, ['a.ts', 'b.ts'], 'nested').gapBefore).toBeUndefined();
   });
@@ -93,7 +72,7 @@ describe('the layout of each style', () => {
     expect(relatedLayout(rules, shown, 'nested')).toBe(layout);
     // CodeView relays out every item when `gapBefore` changes: it changes with the layout only.
     expect(relatedLayout(rules, shown, 'nested').gapBefore).toBe(layout.gapBefore);
-    expect(relatedLayout(rules, shown, 'box').gapBefore).not.toBe(layout.gapBefore);
+    expect(relatedLayout(rules, [...shown], 'nested').gapBefore).not.toBe(layout.gapBefore);
   });
 });
 
@@ -122,7 +101,7 @@ describe('folded companions in the store', () => {
     expect(isCollapsed(usePr.getState(), 'package-lock.json')).toBe(false);
     usePr.getState().setCollapsed('package-lock.json', undefined);
 
-    useSettings.setState((s) => ({ settings: { ...s.settings, relatedFiles: { style: 'box' } } }));
+    useSettings.setState((s) => ({ settings: { ...s.settings, relatedFiles: { style: 'off' } } }));
     expect(usePr.getState().folded.size).toBe(0);
     useSettings.setState((s) => ({ settings: { ...s.settings, relatedFiles: { style: 'nested' } } }));
     expect([...usePr.getState().folded]).toEqual(['package-lock.json']);
