@@ -2,30 +2,12 @@
  * The page-scrolling experiments (src/shared/page-scroll.ts), read-only, on react/react#37778 (167 files). Each test
  * sets the experiments in chrome.storage.sync from an extension page; afterAll removes them again.
  */
-import type { BrowserContext, Page } from '@playwright/test';
-import { expect, extensionId, openPierre, prUrl, REACT, test, Viewer } from './fixtures';
+import type { Page } from '@playwright/test';
+import { expect, extensionId, ON_SCREEN, openPierre, placement, prUrl, REACT, setExperiments, test, Viewer } from './fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
 const SHOTS = '.superpowers/scroll-flags';
-type Experiments = { pageScroll: boolean; mergedBar: boolean } | null;
-
-/**
- * Writes (or with null removes) the stored experiments, keeping every other stored setting, then brings `back` to
- * the front again (a background tab renders no frames, so it would not scroll).
- */
-async function setExperiments(context: BrowserContext, experiments: Experiments, back?: Page) {
-  const ext = await context.newPage();
-  await ext.goto(`chrome-extension://${extensionId()}/options.html`);
-  await ext.evaluate(async (value) => {
-    const stored = ((await chrome.storage.sync.get('pierre.settings'))['pierre.settings'] ?? {}) as Record<string, unknown>;
-    if (value) stored.experiments = value;
-    else delete stored.experiments;
-    await chrome.storage.sync.set({ 'pierre.settings': stored });
-  }, experiments);
-  await ext.close();
-  await back?.bringToFront();
-}
 
 /** Page and list positions: everything the sync must keep consistent. */
 async function positions(page: Page, viewer: Viewer) {
@@ -359,6 +341,23 @@ test('page scrolling: a reload comes back to the same file', async ({ page, extC
   await expect.poll(async () => Math.abs((await viewer.item(path))?.top ?? Infinity), { timeout: 15_000 }).toBeLessThan(60);
   const restored = await positions(page, viewer);
   expect(Math.abs(restored.listTop - ((restored.sticky?.height ?? 0) - restored.wrapperTop!))).toBeLessThanOrEqual(1);
+});
+
+test('page scrolling, with and without the merged bar: a toast is on screen before the iframe sticks, and after', async ({ page, extContext }) => {
+  for (const experiments of [
+    { pageScroll: true, mergedBar: false },
+    { pageScroll: true, mergedBar: true },
+  ]) {
+    await setExperiments(extContext, experiments, page);
+    const viewer = await openPierre(page, REACT);
+    await viewer.frame().evaluate(() => window.__pierre!.store.getState().setNotice({ kind: 'error', message: 'Could not reload the pull request.' }));
+    const toast = () => placement(page, viewer, '.toast');
+    await expect.poll(toast, { message: `${JSON.stringify(experiments)}: page at the top` }).toEqual(ON_SCREEN);
+    await wheel(page, 50, 2);
+    await expect.poll(toast, { message: `${JSON.stringify(experiments)}: GitHub's header half away` }).toEqual(ON_SCREEN);
+    await wheel(page, 200, 12);
+    await expect.poll(toast, { message: `${JSON.stringify(experiments)}: stuck` }).toEqual(ON_SCREEN);
+  }
 });
 
 test("merged bar: GitHub's sticky header is hidden, Glide's toolbar shows the title, leaving the tab restores it", async ({ page, extContext }) => {

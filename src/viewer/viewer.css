@@ -1114,7 +1114,7 @@ html[data-scroll-layout] .pierre-body[data-tree-position='left'] .pierre-diffs {
 /* Notices */
 .toast {
   position: fixed;
-  bottom: 16px;
+  bottom: calc(16px + var(--hidden-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   display: flex;

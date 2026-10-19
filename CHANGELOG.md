@@ -2,6 +2,13 @@
 
 Newest first. Each release's GitHub notes are its section here (`scripts/release-notes.sh`).
 
+## Unreleased
+
+### Fixes
+
+- With "Scroll with the page" on, messages at the bottom of the viewer (errors, for one) are on screen before you
+  scroll, too.
+
 ## 0.3.1 (2026-10-19)
 
 ### Fixes
