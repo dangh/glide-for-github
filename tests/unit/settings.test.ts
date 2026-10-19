@@ -113,7 +113,7 @@ describe('DEFAULT_SETTINGS', () => {
         showGitStatus: false,
       },
       fonts: { codeFontFamily: '', uiFontFamily: '', codeFontSize: 'default', codeFontFeatures: '' },
-      layout: { treePosition: 'left', showTree: true },
+      layout: { treePosition: 'left', showTree: true, treeWidth: 'default' },
       review: { hideWhitespace: false },
       experiments: { pageScroll: false, mergedBar: false },
       github: { replaceFilesTab: false },
@@ -377,14 +377,14 @@ describe('loadSettings', () => {
     fake.data[SETTINGS_STORAGE_KEY] = {
       diff: { changeColors: 'pink', fileHeaderStyle: 'github' },
       tree: { showGitStatus: 'yes' },
-      layout: { treePosition: 'top', showTree: 'no' },
+      layout: { treePosition: 'top', showTree: 'no', treeWidth: 255 },
       fonts: { codeFontSize: 7, codeFontFamily: 12, uiFontFamily: null, codeFontFeatures: [] },
     };
     const s = await loadSettings();
     expect(s.diff.changeColors).toBe('default');
     expect(s.diff.fileHeaderStyle).toBe('default');
     expect(s.tree.showGitStatus).toBe(false);
-    expect(s.layout).toEqual({ treePosition: 'left', showTree: true });
+    expect(s.layout).toEqual({ treePosition: 'left', showTree: true, treeWidth: 'default' });
     expect(s.fonts).toEqual(DEFAULT_SETTINGS.fonts);
   });
 
@@ -392,14 +392,25 @@ describe('loadSettings', () => {
     fake.data[SETTINGS_STORAGE_KEY] = {
       diff: { changeColors: 'theme', fileHeaderStyle: 'pierre' },
       tree: { showGitStatus: true },
-      layout: { treePosition: 'right', showTree: false },
+      layout: { treePosition: 'right', showTree: false, treeWidth: 412 },
       fonts: { codeFontSize: 14, codeFontFamily: '"JetBrains Mono", monospace', uiFontFamily: 'Inter, sans-serif', codeFontFeatures: '"calt" 0, "liga" 1' },
     };
     const s = await loadSettings();
     expect(s.diff).toMatchObject({ changeColors: 'theme', fileHeaderStyle: 'pierre' });
     expect(s.tree.showGitStatus).toBe(true);
-    expect(s.layout).toEqual({ treePosition: 'right', showTree: false });
+    expect(s.layout).toEqual({ treePosition: 'right', showTree: false, treeWidth: 412 });
     expect(s.fonts).toEqual({ codeFontSize: 14, codeFontFamily: '"JetBrains Mono", monospace', uiFontFamily: 'Inter, sans-serif', codeFontFeatures: '"calt" 0, "liga" 1' });
+  });
+
+  it("takes the tree width as 'default' or a whole number of px from 256 to 700", async () => {
+    const stored = (treeWidth: unknown) => {
+      fake.data[SETTINGS_STORAGE_KEY] = { layout: { treeWidth } };
+      return loadSettings().then((s) => s.layout.treeWidth);
+    };
+    for (const ok of ['default', 256, 296, 700]) expect(await stored(ok), String(ok)).toBe(ok);
+    for (const bad of [255, 701, 300.5, '400', null, 'wide']) expect(await stored(bad), String(bad)).toBe('default');
+    await saveSettings({ layout: { treeWidth: 9000 } });
+    expect(fake.data[SETTINGS_STORAGE_KEY]).toEqual({});
   });
 
   it('validates font text (at most 300 chars, none of ; { } < >) and size (integer 8-32 px, or default)', async () => {

@@ -46,6 +46,8 @@
  * tree.showGitStatus         false        no A/M/D letters                    user request
  * fonts.*                    '' / 'default' GITHUB_FONTS                      GitHub's Primer font stacks, 12 px code
  * layout.treePosition        'left'                                           GitHub's tree is on the left
+ * layout.treeWidth           'default'    the account's GitHub tree width,    GitHub's tree is 296 px until dragged, and
+ *                                         else 296 px (./tree-width.ts)       remembers the width per account
  * review.hideWhitespace      false                                            GitHub shows whitespace changes
  */
 import type { DiffSettings, DisplaySettings, FontSettings, TreeSettings } from './settings';

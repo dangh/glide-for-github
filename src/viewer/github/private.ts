@@ -5,6 +5,7 @@
  */
 import type { PrRef } from '../../shared/pr-url';
 import { BridgeError, diffEntriesRaw, sortSuggestionComments, type BridgeMethods, type BridgeQuery, type Json, type RpcClient } from '../../shared/rpc';
+import { isTreeWidth } from '../../shared/tree-width';
 
 /** The part of the RPC client this module needs (a fake in tests). */
 export type Rpc = Pick<RpcClient<BridgeMethods>, 'call'>;
@@ -98,7 +99,8 @@ export interface PrData {
   headOid: string;
   commits: CommitInfo[];
   files: FileSummary[];
-  viewer: { login: string; canApplySuggestion: boolean; canReview: boolean };
+  /** `treeWidth`: the file tree width saved on the account (GitHub's own drag), when one is. */
+  viewer: { login: string; canApplySuggestion: boolean; canReview: boolean; treeWidth?: number };
   /** Thread data embedded in the route; pass to `fetchThreads(rpc, ref, {markers})` to skip a route refetch. */
   threadMarkers: ThreadMarkers;
 }
@@ -287,7 +289,7 @@ interface ChangesRoute {
   viewerPendingReview?: { id?: number | string | null; comments?: unknown[] } | null;
   comparison?: { fullDiff?: { baseOid: string; headOid: string } };
   commits?: { oid: string; shortOid: string; messageHeadline: string }[];
-  user: { currentUserLogin: string; canApplySuggestion?: boolean; canComment?: boolean };
+  user: { currentUserLogin: string; canApplySuggestion?: boolean; canComment?: boolean; fileTreeWidth?: number | null };
   diffSummaries: GithubDiffSummary[];
   diffContents?: GithubDiffEntry[];
   markers?: { threads?: Record<string, GithubThread> };
@@ -502,7 +504,8 @@ export async function fetchStack(rpc: Rpc, ref: PrRef): Promise<PrStack | null> 
  * - `commits` ← `commits[]`: `oid`, `shortOid`, `message` ← `messageHeadline` (only the headline is sent)
  * - `viewer.login` ← `user.currentUserLogin`; `viewer.canApplySuggestion` ← `user.canApplySuggestion`;
  *   `viewer.canReview` ← `user.canComment` (may comment / submit a COMMENT review; approve and request
- *   changes are further limited by `pullRequest.viewerAllowedNonCommentReviewTypes`)
+ *   changes are further limited by `pullRequest.viewerAllowedNonCommentReviewTypes`); `viewer.treeWidth` ←
+ *   `user.fileTreeWidth` when it is a width GitHub's tree can have (null until the user drags GitHub's divider)
  * - `files[]` ← `diffSummaries[]` in GitHub's order: `path`, `digest` ← `pathDigest` (sha256 of the path),
  *   `status` ← `changeType` (ADDED/COPIED → added, REMOVED/DELETED → deleted, RENAMED → renamed, else
  *   modified), `additions` ← `linesAdded`, `deletions` ← `linesDeleted`, `viewed` ← `markedAsViewed`.
@@ -558,6 +561,7 @@ export async function fetchPrData(rpc: Rpc, ref: PrRef, opts: { prefetched?: boo
       login: route.user.currentUserLogin,
       canApplySuggestion: route.user.canApplySuggestion === true,
       canReview: route.user.canComment === true,
+      ...(isTreeWidth(route.user.fileTreeWidth) ? { treeWidth: route.user.fileTreeWidth } : {}),
     },
     threadMarkers: markersOf(route),
   };

@@ -69,6 +69,8 @@
  *                             so it is at most 300 chars and never contains ; { } < >.
  *   layout.treePosition       'left' | 'right', default 'left'
  *   layout.showTree           boolean, true: the file tree pane (the toolbar's file tree button, like GitHub's)
+ *   layout.treeWidth          'default' (GitHub's width for the account, else 296 px) or 256-700 px: dragged on the
+ *                             tree's divider (./tree-width.ts)
  *   experiments.pageScroll    boolean, false: GitHub's page scrolls the diffs (src/shared/page-scroll.ts), not the viewer
  *   experiments.mergedBar     boolean, false: GitHub's sticky PR header folds into Glide's toolbar (only with pageScroll)
  *   github.replaceFilesTab    boolean, false: GitHub's Files changed tab is hidden and its page opens Glide instead
@@ -112,6 +114,7 @@ import { GITHUB_TREE_CSS, GITHUB_TREE_ICONS, HIDE_GIT_STATUS_CSS } from './githu
 import { SETTINGS_STORAGE_KEY, type ExperimentSettings } from './experiments';
 import { ALL_GROUP, GROUP_LABEL_MAX } from './file-groups';
 import type { GithubSettings } from './github-settings';
+import { isTreeWidth } from './tree-width';
 
 export { SETTINGS_STORAGE_KEY, type ExperimentSettings, type GithubSettings };
 
@@ -187,6 +190,8 @@ export interface LayoutSettings {
   treePosition: 'left' | 'right';
   /** The file tree pane is shown (GitHub's "Collapse file tree" / "Expand file tree" button). */
   showTree: boolean;
+  /** The tree pane's width in px (TREE_WIDTH_MIN-TREE_WIDTH_MAX), or 'default' (GitHub's: ./tree-width.ts). */
+  treeWidth: OrDefault<number>;
 }
 
 export interface ReviewSettings {
@@ -375,7 +380,7 @@ export const DEFAULT_SETTINGS: DisplaySettings = deepFreeze({
     showGitStatus: false,
   },
   fonts: { codeFontFamily: '', uiFontFamily: '', codeFontSize: 'default', codeFontFeatures: '' },
-  layout: { treePosition: 'left', showTree: true },
+  layout: { treePosition: 'left', showTree: true, treeWidth: 'default' },
   review: { hideWhitespace: false },
   experiments: { pageScroll: false, mergedBar: false },
   github: { replaceFilesTab: false },
@@ -453,7 +458,11 @@ const FONT_SCHEMA: Schema<FontSettings> = {
   codeFontFeatures: isFontText,
 };
 
-const LAYOUT_SCHEMA: Schema<LayoutSettings> = { treePosition: oneOf(C.layout.treePosition), showTree: isBool };
+const LAYOUT_SCHEMA: Schema<LayoutSettings> = {
+  treePosition: oneOf(C.layout.treePosition),
+  showTree: isBool,
+  treeWidth: (v): v is LayoutSettings['treeWidth'] => v === DEFAULT_CHOICE || isTreeWidth(v),
+};
 
 const REVIEW_SCHEMA: Schema<ReviewSettings> = { hideWhitespace: isBool };
 

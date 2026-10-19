@@ -83,6 +83,21 @@ describe('fetchPrData', () => {
     expect((await fetchPrData(withPr({ headBranch: null }), ref)).branches).toBeUndefined();
   });
 
+  it("reads the account's GitHub tree width, when it is one GitHub's tree can have", async () => {
+    const withWidth = (fileTreeWidth: unknown) =>
+      fetchPrData(
+        fakeRpc((path) => {
+          if (path !== `${base}/changes`) return undefined;
+          const data = structuredClone(fixture('route.json'));
+          data.payload.pullRequestsChangesRoute.user.fileTreeWidth = fileTreeWidth;
+          return { data, link: null };
+        }),
+        ref,
+      ).then((pr) => pr.viewer.treeWidth);
+    expect(await withWidth(436)).toBe(436);
+    for (const none of [null, 9000, 120, '436']) expect(await withWidth(none), String(none)).toBeUndefined();
+  });
+
   it('builds file summaries in GitHub order with statuses, counts and digests', async () => {
     const pr = await fetchPrData(fakeRpc(), ref);
     expect(pr.files.map((f) => f.path)).toEqual(allPaths);
