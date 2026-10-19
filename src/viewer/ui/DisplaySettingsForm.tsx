@@ -15,10 +15,11 @@ import {
   RELATED_STYLES,
   SETTING_CHOICES,
   type DeepPartial,
+  type Default,
   type DisplaySettings,
-  type FontSettings,
   type RelatedStyle,
 } from '../../shared/settings';
+import { TREE_WIDTH_DEFAULT, TREE_WIDTH_MAX, TREE_WIDTH_MIN } from '../../shared/tree-width';
 
 /** Pause after the last keystroke before a numeric edit is saved (sync storage allows ~120 writes per minute). */
 export const INPUT_DEBOUNCE_MS = 400;
@@ -130,22 +131,35 @@ function FontTextField({ label, value, placeholder, onChange }: { label: string;
   );
 }
 
-const sizeValid = (v: string) => v === '' || (/^\d+$/.test(v) && Number(v) >= FONT_SIZE_MIN && Number(v) <= FONT_SIZE_MAX);
-
-/** Code font size in px; empty = 'default' (GitHub's 12 px, shown as placeholder). */
-function FontSizeField({ value, onChange }: { value: FontSettings['codeFontSize']; onChange(v: FontSettings['codeFontSize']): void }) {
-  const [draft, change] = useDebounced(value === DEFAULT_CHOICE ? '' : String(value), (v) => onChange(v === '' ? DEFAULT_CHOICE : Number(v)), sizeValid);
+/** A whole number of px from `min` to `max`, or empty for 'default' (GitHub's value, shown as placeholder). */
+function DefaultNumberField({
+  label,
+  value,
+  min,
+  max,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: number | Default;
+  min: number;
+  max: number;
+  placeholder: number;
+  onChange(v: number | Default): void;
+}) {
+  const valid = (v: string) => v === '' || (/^\d+$/.test(v) && Number(v) >= min && Number(v) <= max);
+  const [draft, change] = useDebounced(value === DEFAULT_CHOICE ? '' : String(value), (v) => onChange(v === '' ? DEFAULT_CHOICE : Number(v)), valid);
   return (
     <label className="field">
-      <span>Code font size (px)</span>
+      <span>{label}</span>
       <input
         type="number"
-        min={FONT_SIZE_MIN}
-        max={FONT_SIZE_MAX}
+        min={min}
+        max={max}
         step={1}
         value={draft}
-        placeholder={String(GITHUB_FONTS.codeSize)}
-        aria-invalid={!sizeValid(draft) || undefined}
+        placeholder={String(placeholder)}
+        aria-invalid={!valid(draft) || undefined}
         onChange={(e) => change(e.target.value)}
       />
     </label>
@@ -217,11 +231,26 @@ export function DisplaySettingsForm({ settings, update, relatedFiles = true }: {
           choices={C.layout.treePosition}
           onChange={(v) => update({ layout: { treePosition: v } })}
         />
+        <DefaultNumberField
+          label="Tree width (px)"
+          value={settings.layout.treeWidth}
+          min={TREE_WIDTH_MIN}
+          max={TREE_WIDTH_MAX}
+          placeholder={TREE_WIDTH_DEFAULT}
+          onChange={(v) => update({ layout: { treeWidth: v } })}
+        />
       </fieldset>
       <fieldset>
         <legend>Fonts</legend>
         <FontTextField label="Code font" value={f.codeFontFamily} placeholder={GITHUB_FONTS.code} onChange={(v) => fonts({ codeFontFamily: v })} />
-        <FontSizeField value={f.codeFontSize} onChange={(v) => fonts({ codeFontSize: v })} />
+        <DefaultNumberField
+          label="Code font size (px)"
+          value={f.codeFontSize}
+          min={FONT_SIZE_MIN}
+          max={FONT_SIZE_MAX}
+          placeholder={GITHUB_FONTS.codeSize}
+          onChange={(v) => fonts({ codeFontSize: v })}
+        />
         <FontTextField label="Code font features" value={f.codeFontFeatures} placeholder={GITHUB_FONTS.features} onChange={(v) => fonts({ codeFontFeatures: v })} />
         <FontTextField label="UI font" value={f.uiFontFamily} placeholder={GITHUB_FONTS.ui} onChange={(v) => fonts({ uiFontFamily: v })} />
       </fieldset>

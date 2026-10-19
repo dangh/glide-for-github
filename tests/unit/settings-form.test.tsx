@@ -149,6 +149,23 @@ describe('DisplaySettingsForm', () => {
     expect(update).toHaveBeenLastCalledWith({ fonts: { codeFontSize: 'default' } });
   });
 
+  it("takes a tree width of 256-700 px, or empty for GitHub's", async () => {
+    await mount();
+    const width = field('Tree width (px)') as HTMLInputElement;
+    expect(width.closest('fieldset')?.querySelector('legend')?.textContent).toBe('Tree');
+    expect([width.value, width.placeholder]).toEqual(['', '296']);
+    await type(width, '800');
+    await act(async () => void vi.advanceTimersByTime(INPUT_DEBOUNCE_MS * 3));
+    expect(update).not.toHaveBeenCalled();
+    expect(width.getAttribute('aria-invalid')).toBe('true');
+    await type(width, '420');
+    await act(async () => void vi.advanceTimersByTime(INPUT_DEBOUNCE_MS + 1));
+    expect(update).toHaveBeenLastCalledWith({ layout: { treeWidth: 420 } });
+    await type(width, '');
+    await act(async () => void vi.advanceTimersByTime(INPUT_DEBOUNCE_MS + 1));
+    expect(update).toHaveBeenLastCalledWith({ layout: { treeWidth: 'default' } });
+  });
+
   it('applies a theme choice immediately', async () => {
     await mount();
     const select = field('Dark theme') as HTMLSelectElement;

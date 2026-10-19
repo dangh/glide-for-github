@@ -16,6 +16,8 @@ review features: comments, suggestions, resolving threads, viewed files and revi
   Glide tab shows the changed-file count, like Files changed.
 - A file tree button in the toolbar, like GitHub's, hides or shows the tree. It sits on the tree's side: first in the
   toolbar, or last when the tree is on the right.
+- Drag the line between the tree and the diffs to resize the tree, like on GitHub (or use the arrow keys on it). The
+  width is remembered; a double-click goes back to the width you use on GitHub.
 - Comment on a line, a range of lines (drag over the gutter) or a whole file. The composer has a Write / Preview toggle
   and an "Insert suggestion" button.
 - Threads show inline: reply, edit, delete your own comments, resolve and unresolve, react.

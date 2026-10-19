@@ -12,6 +12,12 @@ Newest first. Each release's GitHub notes are its section here (`scripts/release
   marks each of them viewed on GitHub. In the tree, a related file sits right under its main file, indented. Pick
   another look in the Display menu or on the options page (one box, a group rail, or off), and edit the rules there:
   a main file pattern and its related files, in the same folder, with `${basename}` for the main file's name.
+- **Resizable file tree.** Drag the line between the tree and the diffs to make the tree wider or narrower, as on
+  GitHub's Files changed page: from 256 to 700 px, and the diffs always keep at least 400 px. The width is remembered
+  and synced like your other settings, and open pull requests follow it. Double-click the line to go back to the
+  default width, which is the one you set on GitHub's page, or GitHub's 296 px. With the line focused, the arrow keys
+  move it 16 px, Home and End go to the narrowest and widest, and Enter resets. The options page and the Display menu
+  have a Tree width field too.
 
 ### Fixes
 
