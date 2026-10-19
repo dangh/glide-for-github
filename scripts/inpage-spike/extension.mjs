@@ -15,12 +15,13 @@ const css = source.replaceAll(':root', ':host').replace(/^html(?=[\s,\[.:{])/gm,
   .replace(/:host((?:\[[^\]]+\]|:not\([^)]*\))+)/g, ':host($1)')
   .replace(/^(\[data-file-header=[^\]]+\])/gm, ':host($1)');
 await writeFile('dist/inpage.css', css + `
-:host { display: block; contain: style; --gutter: 1px; }
+:host { display: block; width: 100%; min-width: 0; height: auto; contain: style; --gutter: 1px; }
 #root { height: auto; overflow: visible; }
 .pierre-app { height: auto; }
 .pierre-body { align-items: flex-start; }
 .pierre-main, .pierre-diffs { height: auto; overflow: visible; overscroll-behavior: auto; }
 .pierre-toolbar { position: sticky; top: 0; z-index: 50; background: var(--pierre-bg); }
+.pierre-toolbar .popover:not(.stack-menu) > .popover-panel { max-height: min(70vh, 560px, var(--glide-menu-space)); }
 .pierre-tree-pane { position: sticky; top: 60px; height: calc(100vh - 60px); }
 `);
 const manifest = JSON.parse(await readFile('dist/manifest.json', 'utf8'));

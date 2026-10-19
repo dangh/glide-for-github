@@ -14,7 +14,30 @@
   "workerHostHidden": true,
   "highlightingRecoveredAfterWorkerHostRemoval": true,
   "forcedWorkerFailureShowsAlertWithoutFileRenderer": true,
-  "browserTestsPassed": 2,
-  "unitTestsPassed": 877,
-  "typecheckPassed": true
+  "browserTestsPassed": 3,
+  "unitTestsPassed": 878,
+  "typecheckPassed": true,
+  "devicePixelRatios": [
+    1,
+    2
+  ],
+  "viewportWidths": [
+    768,
+    900,
+    1280,
+    1440
+  ],
+  "pullRequests": [
+    "https://github.com/dangh/glide-for-github/pull/1/files",
+    "https://github.com/react/react/pull/37778/files"
+  ],
+  "fullWidthLayout": true,
+  "displayMenusWithinViewport": true,
+  "outsideClickDismissesMenu": true,
+  "treeNavigation": true,
+  "splitUnifiedSwitch": true,
+  "commentTypingAndCancellation": true,
+  "tabSwitchAndReload": true,
+  "physicalMacTrackpadTested": false,
+  "reviewWritesTested": false
 }

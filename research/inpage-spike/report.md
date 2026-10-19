@@ -22,7 +22,19 @@ The repository e2e tests load the actual unpacked extension in Chrome for Testin
 - Removing the worker host causes a remount and a new pool that completes highlighting.
 - A forced native Worker constructor failure produces an alert and no file renderer, rather than silently switching to main-thread highlighting.
 
-Both browser scenarios pass. TypeScript, the build integrity checks, and all 877 unit tests pass. This is a focused browser check, not a passing result for the full production e2e suite. The earlier main-branch suite has separate failures recorded in the conversation.
+The earlier smoke checks missed a layout failure: GitHub's flex parent shrank the host to 334 px, leaving a 32 px diff pane. The host now explicitly occupies the content width. Actual browser assertions failed before this fix and pass after it. The same pass found a settings menu ending at 868 px in an 800 px window, and outside clicks on GitHub failing to close menus. Menu height now tracks the available viewport space; dismissal uses the document event's composed path across the shadow boundary.
+
+The expanded checks run against `dangh/glide-for-github#1` (17 files) and `react/react#37778` (167 files at the time of the run), at actual device pixel ratios 1 and 2. They verify:
+
+- Full content width, flex layout, usable diff width, and no document horizontal overflow at 768, 900, 1280, and 1440 px.
+- Wheel scrolling with visible code, sticky toolbar screenshots, tree search/navigation, tree hiding and left/right placement, and split/unified layout changes.
+- Display menu bounds, Escape and outside-click dismissal, and review menu opening/closing.
+- File comment focus, typing, retained text, and cancellation without submitting.
+- Switching to GitHub's Files changed and back, reload, a second PR, tab repair, and worker-host recovery.
+
+Each interaction checkpoint saves a screenshot and geometry attachment under `test-results/`. The screenshots were visually inspected, including the narrow menu, split view, comment editor, and scrolled second PR. These are packaged-extension checks, not an injected layout fixture.
+
+All three browser scenarios pass. TypeScript, the build integrity checks, and all 878 unit tests pass. This is a focused browser check, not a passing result for the full production e2e suite. The earlier main-branch suite has separate failures recorded in the conversation.
 
 The lifecycle is reused rather than replaced with a one-time tab insertion. It handles DOM/route notifications, active-tab styling, settings, and tab presses. A GitHub layout replacement preserves the mounted React root if its worker host survives, or remounts the viewer and its workers if that host was removed.
 
@@ -46,7 +58,7 @@ The loop advanced 120 pixels per frame through the first five files; separate ju
 
 - Test a physical macOS trackpad at the top, bottom, and former page/list seam. Linux programmatic scrolling cannot verify macOS rubber-band feel.
 - Verify authenticated review comments, replies, edits, deletion, viewed toggles, and suggestion actions. The focused tests above do not perform review writes.
-- Exercise full Turbo body replacement, repeated PR navigation, menu dismissal, and modal focus on the real site. Targeted tests cover tab repair and worker-host loss, not every navigation path.
+- Exercise full Turbo body replacement, stack menus, and modal focus on the real site. The focused checks now cover menu dismissal, switching tabs, reload, and a second PR, but not every navigation path.
 - Measure the full extension against the current iframe build on large real PRs, including comment typing and port transport overhead.
 - Restore a production strategy for inputs exceeding the browser's document-height limit. The synthetic list tested here was about 1.63 million pixels tall.
 

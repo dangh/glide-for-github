@@ -54,9 +54,18 @@ const lifecycle = createLifecycle(window, storedSettings(), (doc, ref, layout) =
     return true;
   };
   refresh();
-  const onResize = () => { host.dataset.viewport = reachedBreakpoints(innerWidth).join(' '); };
+  const fitMenus = () => {
+    const bottom = shadow.querySelector('.pierre-toolbar')?.getBoundingClientRect().bottom
+      ?? Math.max(0, host.getBoundingClientRect().top) + 60;
+    host.style.setProperty('--glide-menu-space', `${Math.max(0, innerHeight - bottom - 8)}px`);
+  };
+  const onResize = () => {
+    host.dataset.viewport = reachedBreakpoints(innerWidth).join(' ');
+    fitMenus();
+  };
   onResize();
   window.addEventListener('resize', onResize);
+  window.addEventListener('scroll', fitMenus, { passive: true });
   shadow.addEventListener('keydown', (event) => event.stopPropagation());
   usePr.setState(usePr.getInitialState());
   const cleanups = [initSettings(), initBatchPersistence(), initDraftPersistence(), initFileGroups(), initRelatedFiles()];
@@ -100,6 +109,7 @@ const lifecycle = createLifecycle(window, storedSettings(), (doc, ref, layout) =
       workerSpike.factory = undefined;
       window.removeEventListener('message', onBridgeReady);
       window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', fitMenus);
       host.remove();
       for (const [el, style] of hidden) {
         if (style === null) el.removeAttribute('style');
