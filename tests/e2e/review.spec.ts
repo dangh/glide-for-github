@@ -144,7 +144,10 @@ async function activateTokens(frame: Frame, key: string): Promise<void> {
   const ok = await frame.evaluate(async (k) => {
     const got = await chrome.storage.local.get(['pierre.tokens', k, 'pierre.e2e.activeBackup']);
     if (!got[k]) return false;
-    if (!got['pierre.e2e.activeBackup']) await chrome.storage.local.set({ 'pierre.e2e.activeBackup': got['pierre.tokens'] ?? {} });
+    if (!Object.hasOwn(got, 'pierre.e2e.activeBackup')) {
+      const items = Object.hasOwn(got, 'pierre.tokens') ? { 'pierre.tokens': got['pierre.tokens'] } : {};
+      await chrome.storage.local.set({ 'pierre.e2e.activeBackup': { items } });
+    }
     await chrome.storage.local.set({ 'pierre.tokens': got[k] });
     return true;
   }, key);
@@ -154,8 +157,12 @@ async function activateTokens(frame: Frame, key: string): Promise<void> {
 async function restoreTokens(frame: Frame): Promise<void> {
   await frame.evaluate(async () => {
     const got = await chrome.storage.local.get('pierre.e2e.activeBackup');
-    if (!got['pierre.e2e.activeBackup']) return;
-    await chrome.storage.local.set({ 'pierre.tokens': got['pierre.e2e.activeBackup'] });
+    const backup = got['pierre.e2e.activeBackup'];
+    if (typeof backup !== 'object' || backup === null || !('items' in backup)) return;
+    const items = backup.items;
+    if (typeof items !== 'object' || items === null) return;
+    if ('pierre.tokens' in items) await chrome.storage.local.set({ 'pierre.tokens': items['pierre.tokens'] });
+    else await chrome.storage.local.remove('pierre.tokens');
     await chrome.storage.local.remove('pierre.e2e.activeBackup');
   });
 }
@@ -196,7 +203,12 @@ async function resolveRoundTrip(page: Page, viewer: Viewer, thread: () => Locato
 }
 
 async function tokenStored(frame: Frame): Promise<boolean> {
-  return frame.evaluate(async () => (await chrome.storage.local.getKeys()).includes('pierre.tokens'));
+  return frame.evaluate(async () => {
+    const tokens = (await chrome.storage.local.get('pierre.tokens'))['pierre.tokens'];
+    return typeof tokens === 'object' && tokens !== null && Object.values(tokens).some((entry) =>
+      typeof entry === 'object' && entry !== null && 'token' in entry && typeof entry.token === 'string' && entry.token.length > 0,
+    );
+  });
 }
 
 const fileItem = (viewer: Viewer, path = FILE) => viewer.locator.locator(`diffs-container:has(.fh[data-path="${path}"])`);
@@ -681,7 +693,10 @@ async function githubViewed(page: Page): Promise<Record<string, boolean>> {
 async function withoutTokens<T>(frame: Frame, fn: () => Promise<T>): Promise<T> {
   await frame.evaluate(async () => {
     const got = await chrome.storage.local.get(['pierre.tokens', 'pierre.e2e.activeBackup']);
-    if (!got['pierre.e2e.activeBackup']) await chrome.storage.local.set({ 'pierre.e2e.activeBackup': got['pierre.tokens'] ?? {} });
+    if (!Object.hasOwn(got, 'pierre.e2e.activeBackup')) {
+      const items = Object.hasOwn(got, 'pierre.tokens') ? { 'pierre.tokens': got['pierre.tokens'] } : {};
+      await chrome.storage.local.set({ 'pierre.e2e.activeBackup': { items } });
+    }
     await chrome.storage.local.set({ 'pierre.tokens': {} });
   });
   try {
