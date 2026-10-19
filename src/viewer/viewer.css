@@ -835,6 +835,8 @@ html[data-scroll-layout] .pierre-body[data-tree-hidden] .pierre-diffs {
 .pierre-body[data-tree-position='right'] .pierre-tree {
   --glide-tree-start: 16px;
   --glide-tree-end: 1px;
+  /* Put the scrollbar in the page gutter so rows and search reach the toolbar's edge. */
+  margin-right: calc(-1 * var(--trees-scrollbar-gutter-measured, 6px));
 }
 
 .pierre-body[data-tree-position='right'] .pierre-diffs {
