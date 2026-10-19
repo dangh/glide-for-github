@@ -235,7 +235,7 @@ export async function placement(page: Page, viewer: Viewer, selector: string) {
 }
 export const ON_SCREEN = { inFrame: true, inViewport: true, onTopInViewer: true, onTopInPage: true };
 
-export type Experiments = { pageScroll: boolean; mergedBar: boolean } | null;
+export type Experiments = { pageScroll: boolean; mergedBar: boolean; rubberBand?: boolean } | null;
 
 /**
  * Writes (or with null removes) the stored experiments, and the tree side when given, keeping every other stored

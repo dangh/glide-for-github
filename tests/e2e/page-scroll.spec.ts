@@ -9,6 +9,19 @@ test.describe.configure({ mode: 'serial' });
 
 const SHOTS = '.superpowers/scroll-flags';
 
+/**
+ * A trackpad flick over the diff list: decaying deltas at half the display's frame rate (a 120 Hz MacBook Pro screen).
+ * DevTools sends each wheel event as a gesture of its own (phase began, then ended), so Chrome latches each anew, as it
+ * does for a new swipe; the viewer sees one gesture, as it does on a trackpad.
+ */
+async function flick(page: Page, sign: number, steps: number) {
+  const cdp = await page.context().newCDPSession(page);
+  for (let i = 0; i < steps; i++) {
+    void cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 900, y: 650, deltaX: 0, deltaY: sign * Math.max(1, Math.round(90 * 0.92 ** i)) });
+    await page.waitForTimeout(33);
+  }
+}
+
 /** Page and list positions: everything the sync must keep consistent. */
 async function positions(page: Page, viewer: Viewer) {
   const outer = await page.evaluate(() => {
@@ -39,6 +52,7 @@ async function positions(page: Page, viewer: Viewer) {
     return {
       listTop: root.scrollTop,
       overflowY: getComputedStyle(root).overflowY,
+      listOverscrollY: getComputedStyle(root).overscrollBehaviorY,
       scrollbar: getComputedStyle(root).scrollbarWidth,
       layout: document.documentElement.dataset.scrollLayout ?? null,
       treeTop: document.querySelector('.pierre-tree-pane')!.getBoundingClientRect().top,
@@ -185,17 +199,25 @@ test('options page: an Experimental group whose merged bar needs page scrolling'
   await expect(page.getByRole('heading', { name: 'Experimental' })).toBeVisible();
   const pageScroll = page.getByRole('checkbox', { name: /^Scroll with the page/ });
   const mergedBar = page.getByRole('checkbox', { name: /^Merge GitHub's sticky header/ });
+  const rubberBand = page.getByRole('checkbox', { name: /^Rubber band at the edges \(try-out\)/ });
   await expect(pageScroll).not.toBeChecked();
   await expect(mergedBar).toBeDisabled();
+  await expect(rubberBand).toBeChecked();
+  await expect(rubberBand).toBeDisabled();
 
   await pageScroll.check();
   await expect(mergedBar).toBeEnabled();
   await expect.poll(stored).toEqual({ pageScroll: true });
   await mergedBar.check();
   await expect.poll(stored).toEqual({ pageScroll: true, mergedBar: true });
+  await rubberBand.uncheck();
+  await expect.poll(stored).toEqual({ pageScroll: true, mergedBar: true, rubberBand: false });
+  await rubberBand.check();
+  await expect.poll(stored).toEqual({ pageScroll: true, mergedBar: true, rubberBand: true });
   await pageScroll.uncheck();
   await expect(mergedBar).toBeDisabled();
-  await expect.poll(stored).toEqual({ pageScroll: false, mergedBar: true });
+  await expect(rubberBand).toBeDisabled();
+  await expect.poll(stored).toEqual({ pageScroll: false, mergedBar: true, rubberBand: true });
   await page.close();
 });
 
@@ -271,8 +293,9 @@ test("page scrolling: GitHub's header scrolls away, the tree and file headers st
   await page.screenshot({ path: `${SHOTS}/page-end.png` });
 });
 
-test('page scrolling: flicking past the end and straight back up does not pull the list back down', async ({ page, extContext }) => {
-  await setExperiments(extContext, { pageScroll: true, mergedBar: false }, page);
+for (const rubberBand of [true, false]) {
+test(`page scrolling, rubber band try-out ${rubberBand ? 'on' : 'off'}: flicking past the end and straight back up does not pull the list back down`, async ({ page, extContext }) => {
+  await setExperiments(extContext, { pageScroll: true, mergedBar: false, rubberBand }, page);
   const viewer = await openPierre(page, REACT);
   await viewer.scrollToFile((await viewer.order()).at(-1)!);
   await page.waitForTimeout(1000);
@@ -284,49 +307,119 @@ test('page scrolling: flicking past the end and straight back up does not pull t
 
   await page.mouse.wheel(0, 600);
   await page.waitForTimeout(50);
-  const cdp = await page.context().newCDPSession(page);
   const moves = await downwardMoves(viewer, async () => {
     await bounceAtEnd(page);
-    // A trackpad flick: decaying deltas at half the display's frame rate (a 120 Hz MacBook Pro screen).
-    for (let i = 0; i < 30; i++) {
-      void cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 900, y: 650, deltaX: 0, deltaY: -Math.max(1, Math.round(90 * 0.92 ** i)) });
-      await page.waitForTimeout(33);
-    }
+    await flick(page, -1, 30);
     await page.waitForTimeout(500);
   });
   expect(moves.up).toBeGreaterThan(500);
   expect(moves.down).toEqual([]);
 });
 
-test('page scrolling: flicking past the top and straight back down is not pulled back up', async ({ page, extContext }) => {
-  await setExperiments(extContext, { pageScroll: true, mergedBar: false }, page);
+test(`page scrolling, rubber band try-out ${rubberBand ? 'on' : 'off'}: flicking past the top and straight back down is not pulled back up`, async ({ page, extContext }) => {
+  await setExperiments(extContext, { pageScroll: true, mergedBar: false, rubberBand }, page);
   const viewer = await openPierre(page, REACT);
   await wheel(page, 200, 3);
   const start = await positions(page, viewer);
   expect(start.listTop).toBeGreaterThan(300);
 
-  const cdp = await page.context().newCDPSession(page);
-  // Trackpad flicks as above: up past the list's top, then straight back down while the list would still bounce.
-  // DevTools sends each wheel event as a gesture of its own (phase began, then ended), so Chrome latches each anew, as
-  // it does for a new swipe; the viewer sees one gesture, as it does on a trackpad.
-  const flick = async (sign: number, steps: number) => {
-    for (let i = 0; i < steps; i++) {
-      void cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 900, y: 650, deltaX: 0, deltaY: sign * Math.max(1, Math.round(90 * 0.92 ** i)) });
-      await page.waitForTimeout(33);
-    }
-  };
+  // Up past the list's top, then straight back down while the list would still bounce.
   await bounceAtTop(viewer);
-  await flick(-1, 8);
+  await flick(page, -1, 8);
   const top = await positions(page, viewer);
   expect(top.listTop).toBe(0);
   expect(top.scrollY).toBeLessThan(start.scrollY - start.listTop);
 
   const moves = await upwardMoves(page, viewer, async () => {
-    await flick(1, 30);
+    await flick(page, 1, 30);
     await page.waitForTimeout(500);
   });
   expect(moves.pageDown).toBeGreaterThan(500);
   expect({ page: moves.page, list: moves.list }).toEqual({ page: [], list: [] });
+});
+}
+
+/**
+ * Each frame while `run` scrolls: GitHub's root and the list's `overscroll-behavior-y`, and whether the iframe has
+ * reached where it sticks (its wrapper's top at or above the iframe's sticky `top`).
+ */
+async function overscrolls(page: Page, viewer: Viewer, run: () => Promise<void>) {
+  const record = (inFrame: boolean) => {
+    const w = window as unknown as { glideOverscrolls: unknown[] | null };
+    w.glideOverscrolls = [];
+    const frame = () => {
+      if (!w.glideOverscrolls) return;
+      if (inFrame) {
+        w.glideOverscrolls.push(getComputedStyle(document.querySelector('.pierre-diffs')!).overscrollBehaviorY);
+      } else {
+        const wrapper = document.querySelector<HTMLElement>('[data-glide-scroll]')!;
+        const stickTop = parseFloat(document.querySelector<HTMLElement>('iframe[data-pierre-viewer]')!.style.top);
+        const reached = wrapper.getBoundingClientRect().top <= stickTop + 0.5;
+        w.glideOverscrolls.push({ reached, overscroll: getComputedStyle(document.documentElement).overscrollBehaviorY });
+      }
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  };
+  const collect = () => {
+    const w = window as unknown as { glideOverscrolls: unknown[] | null };
+    const all = w.glideOverscrolls!;
+    w.glideOverscrolls = null;
+    return all;
+  };
+  await page.evaluate(record, false);
+  await viewer.frame().evaluate(record, true);
+  await run();
+  return {
+    page: (await page.evaluate(collect)) as { reached: boolean; overscroll: string }[],
+    list: (await viewer.frame().evaluate(collect)) as string[],
+  };
+}
+
+for (const mergedBar of [false, true]) {
+  test(`rubber band try-out${mergedBar ? ', merged bar' : ''}: GitHub's page stops stretching from the hand-off on, the list at its top; both get it back after`, async ({ page, extContext }) => {
+    await setExperiments(extContext, { pageScroll: true, mergedBar }, page);
+    const viewer = await openPierre(page, REACT);
+    const top = await positions(page, viewer);
+    expect({ page: top.overscrollY, list: top.listOverscrollY }).toEqual({ page: 'auto', list: 'auto' });
+    await wheel(page, 200, 3);
+    const stuck = await positions(page, viewer);
+    expect(stuck.listTop).toBeGreaterThan(300);
+    expect({ page: stuck.overscrollY, list: stuck.listOverscrollY }).toEqual({ page: 'none', list: 'auto' });
+
+    // A flick that begins mid-list and runs past its top: the list hands the rest to the page, which brings GitHub's
+    // header back.
+    const seen = await overscrolls(page, viewer, async () => {
+      await flick(page, -1, 12);
+      await page.waitForTimeout(800);
+    });
+    const back = await positions(page, viewer);
+    expect(back.listTop).toBe(0);
+    expect(back.scrollY).toBeLessThan(stuck.scrollY - stuck.listTop);
+    expect(seen.page.filter((f) => f.overscroll !== (f.reached ? 'none' : 'auto'))).toEqual([]);
+    expect(seen.page.some((f) => f.reached)).toBe(true);
+    expect(seen.page.at(-1)).toEqual({ reached: false, overscroll: 'auto' });
+    expect(seen.list.slice(0, seen.list.indexOf('auto', 1))).not.toContain('contain');
+    expect(seen.list).toContain('none');
+    expect(seen.list.at(-1)).toBe('auto');
+  });
+}
+
+test('rubber band try-out: at the end GitHub\'s page does not stretch, the list does; turned off, neither does', async ({ page, extContext }) => {
+  for (const rubberBand of [true, false]) {
+    await setExperiments(extContext, { pageScroll: true, mergedBar: false, rubberBand }, page);
+    const viewer = await openPierre(page, REACT);
+    const top = await positions(page, viewer);
+    expect(top.overscrollY, `try-out ${rubberBand}: page at its top`).toBe(rubberBand ? 'auto' : 'none');
+    await viewer.scrollToFile((await viewer.order()).at(-1)!);
+    await page.waitForTimeout(1000);
+    await wheel(page, 300, 10);
+    const end = await positions(page, viewer);
+    expect(end.atBottom).toBe(true);
+    expect({ page: end.overscrollY, list: end.listOverscrollY }, `try-out ${rubberBand}: at the end`).toEqual({ page: 'none', list: rubberBand ? 'contain' : 'auto' });
+    await wheel(page, -300, 3);
+    expect((await positions(page, viewer)).listOverscrollY, `try-out ${rubberBand}: back up`).toBe('auto');
+  }
 });
 
 test('page scrolling: a reload comes back to the same file', async ({ page, extContext }) => {
