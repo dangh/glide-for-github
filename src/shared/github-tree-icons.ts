@@ -1,7 +1,7 @@
 /**
  * GitHub's file tree look for @pierre/trees (`tree.icons: 'default'`): the octicons `file-16`, `file-added-16`,
  * `file-diff-16`, `file-moved-16`, `file-removed-16`, `file-directory-fill-16`, `file-directory-open-fill-16`,
- * `chevron-right-16`, `chevron-down-16` and `search-16` (Primer Octicons 19.x, MIT; paths copied from
+ * 12 px tree chevrons, 16 px file-header chevrons, and `search-16` (Primer Octicons 19.x, MIT; paths copied from
  * https://unpkg.com/@primer/octicons@19.40.0/build/svg/), and the palette and spacing of GitHub's tree view.
  *
  * @pierre/trees has two icon slots: `file-tree-icon-file` for files and `file-tree-icon-chevron` for folders (it
@@ -30,6 +30,11 @@ export const CHEVRON_RIGHT =
   'M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z';
 export const CHEVRON_DOWN =
   'M12.78 5.22a.749.749 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.06 0L3.22 6.28a.749.749 0 1 1 1.06-1.06L8 8.939l3.72-3.719a.749.749 0 0 1 1.06 0Z';
+// GitHub's tree uses the 12 px Octicons; file headers keep the exported 16 px glyphs above.
+const TREE_CHEVRON_RIGHT =
+  'M4.7 10c-.2 0-.4-.1-.5-.2-.3-.3-.3-.8 0-1.1L6.9 6 4.2 3.3c-.3-.3-.3-.8 0-1.1.3-.3.8-.3 1.1 0l3.3 3.2c.3.3.3.8 0 1.1L5.3 9.7c-.2.2-.4.3-.6.3Z';
+const TREE_CHEVRON_DOWN =
+  'M6 8.825c-.2 0-.4-.1-.5-.2l-3.3-3.3c-.3-.3-.3-.8 0-1.1.3-.3.8-.3 1.1 0l2.7 2.7 2.7-2.7c.3-.3.8-.3 1.1 0 .3.3.3.8 0 1.1l-3.2 3.2c-.2.2-.4.3-.6.3Z';
 const FOLDER_OPEN =
   'M.513 1.513A1.75 1.75 0 0 1 1.75 1h3.5c.55 0 1.07.26 1.4.7l.9 1.2a.25.25 0 0 0 .2.1H13a1 1 0 0 1 1 1v.5H2.75a.75.75 0 0 0 0 1.5h11.978a1 1 0 0 1 .994 1.117L15 13.25A1.75 1.75 0 0 1 13.25 15H1.75A1.75 1.75 0 0 1 0 13.25V2.75c0-.464.184-.91.513-1.237Z';
 const SEARCH =
@@ -81,7 +86,7 @@ const SPRITE = `<svg data-glide-icons aria-hidden="true" width="0" height="0" st
 ${statusGlyphs}
 </symbol>
 <symbol id="${FOLDER_ICON}" viewBox="0 0 40 16">
-<g style="fill:var(--glide-chevron-color, currentColor)"><path style="display:var(--glide-folder-closed, inline)" d="${CHEVRON_RIGHT}"/><path style="display:var(--glide-folder-open, none)" d="${CHEVRON_DOWN}"/></g>
+<g transform="translate(2 2)" style="fill:var(--glide-chevron-color, currentColor)"><path style="display:var(--glide-folder-closed, inline)" d="${TREE_CHEVRON_RIGHT}"/><path style="display:var(--glide-folder-open, none)" d="${TREE_CHEVRON_DOWN}"/></g>
 <g transform="translate(24 0)"><path style="display:var(--glide-folder-closed, inline)" d="${FOLDER}"/><path style="display:var(--glide-folder-open, none)" d="${FOLDER_OPEN}"/></g>
 </symbol>
 </svg>`;
