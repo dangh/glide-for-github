@@ -614,6 +614,25 @@ test.describe('file groups', () => {
     }
   });
 
+  test('closing options immediately after renaming the default group preserves the default', async ({ extContext }) => {
+    await setSettings(extContext, 'fileGroups', { defaultGroup: 'Docs' });
+    const options = await extensionPage(extContext);
+    try {
+      await options.getByRole('textbox', { name: 'Name of group 3' }).fill('Documentation');
+      await options.close();
+      const again = await extensionPage(extContext);
+      try {
+        await expect(again.getByRole('textbox', { name: 'Name of group 3' })).toHaveValue('Documentation');
+        await expect(again.getByRole('combobox', { name: 'Open pull requests on' })).toHaveValue('Documentation');
+      } finally {
+        await again.close();
+      }
+    } finally {
+      if (!options.isClosed()) await options.close();
+      await writeGlideSync(extContext, {});
+    }
+  });
+
   test('turned off, there are no tabs and every file shows', async ({ page, extContext }) => {
     const viewer = await openPierre(page, REACT, 'hash');
     await tab(viewer, 'Tests').click();

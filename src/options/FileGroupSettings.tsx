@@ -120,6 +120,9 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   /** What storage holds, by draft id (renames and deletions of the default group follow from it). */
   const saved = useRef<DraftGroup[]>([]);
+  const submitted = useRef<DraftGroup[] | null>(null);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   /** A valid edit waiting out SAVE_DELAY_MS; written at once if the page is closed or hidden first. */
   const pending = useRef<DraftGroup[] | null>(null);
@@ -129,21 +132,28 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
   const commit = (next: DraftGroup[]) => {
     clearTimeout(timer.current);
     pending.current = null;
-    const previous = saved.current;
-    saveFileGroups(fromDraft(next)).then(
+    const previous = submitted.current ?? saved.current;
+    submitted.current = next;
+    const write = saveFileGroups(fromDraft(next));
+    const current = settingsRef.current.defaultGroup;
+    const named = (d: DraftGroup) => d.label.trim().toLowerCase() === current.toLowerCase();
+    const was = previous.find(named);
+    const now = was && next.find((d) => d.id === was.id);
+    const renamed = current !== ALL_GROUP && was && !next.some(named) ? (now?.label.trim() ?? ALL_GROUP) : undefined;
+    // Both writes must be issued before pagehide returns; this page may die before either promise settles.
+    if (renamed !== undefined) update({ fileGroups: { defaultGroup: renamed } });
+    write.then(
       () => {
+        if (submitted.current !== next) return;
         saved.current = next;
-        setStatus({ kind: 'saved' });
-        // The default group follows a rename, and All replaces it once it is deleted.
-        const current = settingsRef.current.defaultGroup;
-        const named = (d: DraftGroup) => d.label.trim().toLowerCase() === current.toLowerCase();
-        const was = previous.find(named);
-        if (current === ALL_GROUP || !was || next.some(named)) return;
-        const now = next.find((d) => d.id === was.id);
-        const label = now ? now.label.trim() : ALL_GROUP;
-        if (label !== current) update({ fileGroups: { defaultGroup: label } });
+        if (sameGroups(fromDraft(draftRef.current ?? []), fromDraft(next))) setStatus({ kind: 'saved' });
       },
-      (err: unknown) => setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) }),
+      (err: unknown) => {
+        if (submitted.current !== next) return;
+        submitted.current = saved.current;
+        if (renamed !== undefined && settingsRef.current.defaultGroup === renamed) update({ fileGroups: { defaultGroup: current } });
+        setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+      },
     );
   };
   const commitRef = useRef(commit);
@@ -157,6 +167,7 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
         if (current && sameGroups(fromDraft(current), groups)) return current;
         const next = toDraft(groups);
         saved.current = next;
+        submitted.current = next;
         return next;
       });
     };
