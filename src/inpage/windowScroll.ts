@@ -19,14 +19,24 @@ const NO_REBASE = { containerHeight: Infinity, triggerTop: -Infinity, targetTop:
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type CV = any;
 const proto = CodeView.prototype as CV;
+const views = new Set<CV>();
+const scrollInputs = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const;
+
+export function refreshWindowViewport(): void {
+  for (const view of views) {
+    view.heightDirty = true;
+    view.scrollDirty = true;
+    view.render();
+  }
+}
 
 (window as unknown as { __spikeOriginal: CV }).__spikeOriginal = Object.fromEntries(['setup', 'cleanUp', 'getScrollTop', 'getHeight', 'applyScrollFix', 'applyStickyPositioning'].map((name) => [name, proto[name]]));
 
 const setup = proto.setup;
 proto.setup = function (this: CV, root: HTMLElement) {
   this.scrollRebaseConfig = NO_REBASE;
-  root.style.setProperty('--glide-sticky-top', `${insetTop()}px`);
   setup.call(this, root);
+  views.add(this);
   root.removeEventListener('scroll', this.handleScroll);
   this.__onWindowResize = () => {
     this.heightDirty = true;
@@ -34,14 +44,19 @@ proto.setup = function (this: CV, root: HTMLElement) {
     this.render();
   };
   window.addEventListener('scroll', this.handleScroll, { passive: true });
-  window.addEventListener('wheel', this.clearPendingScroll, { passive: true });
+  for (const event of scrollInputs) {
+    root.removeEventListener(event, this.clearPendingScroll);
+    // Toolbar and page interactions must interrupt anchoring too, including keys stopped at the shadow boundary.
+    window.addEventListener(event, this.clearPendingScroll, { passive: true, capture: true });
+  }
   window.addEventListener('resize', this.__onWindowResize, { passive: true });
 };
 
 const cleanUp = proto.cleanUp;
 proto.cleanUp = function (this: CV) {
+  views.delete(this);
   window.removeEventListener('scroll', this.handleScroll);
-  window.removeEventListener('wheel', this.clearPendingScroll);
+  for (const event of scrollInputs) window.removeEventListener(event, this.clearPendingScroll, true);
   window.removeEventListener('resize', this.__onWindowResize);
   cleanUp.call(this);
 };

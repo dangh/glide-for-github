@@ -34,7 +34,13 @@ The expanded checks run against `dangh/glide-for-github#1` (17 files) and `react
 
 Each interaction checkpoint saves a screenshot and geometry attachment under `test-results/`. The screenshots were visually inspected, including the narrow menu, split view, comment editor, and scrolled second PR. These are packaged-extension checks, not an injected layout fixture.
 
-All three browser scenarios pass. TypeScript, the build integrity checks, and all 878 unit tests pass. This is a focused browser check, not a passing result for the full production e2e suite. The earlier main-branch suite has separate failures recorded in the conversation.
+The subsequent sticky-bar audit found that the in-page entry never activated the requested layout in the shared viewer. It also retained iframe gutters, omitted the native header/footer handling, and let CodeView's padding collapse through its root. The repair connects the requested layout and stuck state, measures the native header and toolbar together, and applies that inset to the tree and file headers. Only the merged toolbar extends to the viewport edges; content stays inside GitHub's existing gutters. File boxes now align with the outside content edge, with 16 px only toward a visible tree. Conversation entry also removes the inherited 1280 px content cap. The merged title returns to the document top.
+
+`tests/e2e/inpage-layout.spec.ts` checks both `merged` and `page`, on Files changed and Conversation, at device pixel ratios 1 and 2. At widths 767, 768, 1011, 1012, and 1440 px it asserts toolbar, tree, and file edges; native header visibility and offsets; visible document-scrolled code; left/right/hidden tree spacing; and menu bounds. It also checks file jumps with 16 px and 40 px top padding, the bottom content edge, title-click navigation, and restoration of GitHub's native header/footer on exit. Each checkpoint saves a screenshot and geometry JSON. These checks exposed the missing merged title before the repair.
+
+An additional case replaces GitHub's header while scrolled and adds 200 px of spacing. It verifies that the same viewer remains mounted, a tracked code row moves exactly 200 px without another scroll, and the toolbar stays pinned. The layout observer follows the replacement header and invalidates CodeView's cached viewport when its document offset changes. Pierre's input handlers now follow the window too: toolbar clicks and keys outside the list cancel pending scroll targets, including keys stopped at the shadow boundary.
+
+All seven focused browser scenarios pass. TypeScript, the build integrity checks, and all 878 unit tests pass. This is a focused browser check, not a passing result for the full production e2e suite. The earlier main-branch suite has separate failures recorded in the conversation.
 
 The lifecycle is reused rather than replaced with a one-time tab insertion. It handles DOM/route notifications, active-tab styling, settings, and tab presses. A GitHub layout replacement preserves the mounted React root if its worker host survives, or remounts the viewer and its workers if that host was removed.
 
@@ -70,6 +76,6 @@ Every build command on this branch, including `npm run build`, produces the **IN
 
 After pulling and building, reload the extension in `chrome://extensions`, then reload the GitHub page. Click Glide beside Files changed, or open a PR URL ending in `#glide`.
 
-To run the packaged-extension checks, set `PIERRE_SPIKE_PROFILE` to a signed-in Chrome profile directory and run `PIERRE_E2E_HEADLESS=1 npx playwright test tests/e2e/inpage-spike.spec.ts`. The tests copy that profile into a temporary directory and delete the copy afterward; they do not post comments or change viewed state.
+To run the packaged-extension checks, set `PIERRE_SPIKE_PROFILE` to a signed-in Chrome profile directory and run `PIERRE_E2E_HEADLESS=1 npx playwright test tests/e2e/inpage-spike.spec.ts tests/e2e/inpage-layout.spec.ts`. The tests copy that profile into a temporary directory and delete the copy afterward; they do not post comments or change viewed state.
 
 For the synthetic harness, serve the worktree with `python3 -m http.server 8134` and open `http://localhost:8134/research/inpage-spike/index.html`. Evaluate `scripts/inpage-spike/measure.js`, then call `await __spikeMeasure()` to repeat the earlier synthetic comparison.

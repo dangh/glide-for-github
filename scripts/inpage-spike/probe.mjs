@@ -12,7 +12,7 @@ window.__spikeStart = async ({ mode = 'page', count = 500, workers = false } = {
   const style = document.createElement('style');
   style.textContent = `:host { display:block; color:#1f2328; font:14px/1.5 system-ui; background:white; }
     * { box-sizing:border-box; } .bar {position:sticky;top:0;z-index:100;background:#f6f8fa;padding:12px;border:1px solid #aaa;height:56px;}
-    .list { overflow:visible; } .header {position:sticky;top:0;background:#eee;height:36px;padding:6px;border:1px solid #aaa;}
+    .list { overflow:visible; display:flow-root; --glide-sticky-top:56px; } .header {position:sticky;top:0;background:#eee;height:36px;padding:6px;border:1px solid #aaa;}
     textarea { font:14px monospace; }`;
   const bar = document.createElement('div');
   bar.className = 'bar';

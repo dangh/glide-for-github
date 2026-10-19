@@ -43,6 +43,7 @@ if (!prRef) {
   if (layout !== 'frame') {
     document.documentElement.dataset.scrollLayout = layout;
     pageScroll = session.pageScroll = createPageScrollView(window, layout, restoreKey(prKey(prRef)));
+    session.scrollPageToTop = pageScroll.scrollPageToTop;
     trackHiddenBottom(window);
   }
   // viewer.css follows GitHub's viewport; until the page reports it, the iframe's width is the best guess.

@@ -16,6 +16,8 @@ export interface Session {
   viewport?: string[];
   /** Scrolls the diff list to a file (tree selection). */
   scrollToFile?(path: string): void;
+  /** The merged PR title returns to the top of GitHub's document. */
+  scrollPageToTop?(): void;
   /** Marks a file as the current one in the tree (diff scroll position). */
   revealInTree?(path: string): void;
   /**
