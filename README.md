@@ -92,7 +92,8 @@ Or install it by hand:
 4. Open any pull request on github.com. The **Glide** tab appears after **Files changed**. (Links ending in `#glide`
    open it directly; `#pierre` links from before the rename still work.)
 
-Requires Node 20.19 or newer to build, and a Chromium-based browser that supports Manifest V3.
+Requires Node 22.13 or newer on the 22 line, Node 24, or Node 26 and newer (what vitest 5 and jsdom support), and a
+Chromium-based browser that supports Manifest V3.
 
 ## Token setup
 

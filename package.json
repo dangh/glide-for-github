@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20.19"
+    "node": "^22.13.0 || ^24.0.0 || >=26.0.0"
   },
   "description": "Chrome extension that adds a Glide tab to GitHub PR pages, powered by Pierre",
   "scripts": {
