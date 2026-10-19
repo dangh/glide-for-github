@@ -276,6 +276,8 @@ export function RelatedFilesSettingsForm({ style, update }: { style: RelatedStyl
   commitRef.current = commit;
 
   useEffect(() => {
+    let active = true;
+    let changed = false;
     const adopt = (rules: RelatedRule[]) => {
       // Another context's change (or the echo of ours): take it unless this page has unsaved edits.
       setDraft((current) => {
@@ -287,8 +289,12 @@ export function RelatedFilesSettingsForm({ style, update }: { style: RelatedStyl
         return next;
       });
     };
-    void loadRelatedRules().then(adopt, () => adopt(defaultRules()));
-    const off = onRelatedRulesChange(adopt);
+    const initial = (rules: RelatedRule[]) => { if (active && !changed) adopt(rules); };
+    void loadRelatedRules().then(initial, () => initial(defaultRules()));
+    const off = onRelatedRulesChange((rules) => {
+      changed = true;
+      adopt(rules);
+    });
     const flush = () => {
       if (pending.current) commitRef.current(pending.current);
     };
@@ -296,6 +302,7 @@ export function RelatedFilesSettingsForm({ style, update }: { style: RelatedStyl
     window.addEventListener('pagehide', flush);
     document.addEventListener('visibilitychange', onHidden);
     return () => {
+      active = false;
       off();
       window.removeEventListener('pagehide', flush);
       document.removeEventListener('visibilitychange', onHidden);
