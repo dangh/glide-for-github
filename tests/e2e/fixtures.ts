@@ -53,17 +53,21 @@ export function chromePath(): string {
   return join(dir, newest, 'chrome');
 }
 
-export const test = base.extend<{ page: Page }, { extContext: BrowserContext }>({
+export const test = base.extend<{ page: Page }, { extContext: BrowserContext; screenScale: number }>({
+  /** The browser's device pixel ratio (`test.use({ screenScale: 2 })` for a Retina screen). */
+  screenScale: [1, { scope: 'worker', option: true }],
   extContext: [
-    async ({}, use) => {
+    async ({ screenScale }, use) => {
       if (!existsSync(join(PROFILE, 'Default'))) throw new Error('No .e2e-profile: run scripts/e2e-profile.sh first');
       if (!existsSync(join(DIST, 'manifest.json'))) throw new Error('No dist/: run npm run build first');
       const context = await chromium.launchPersistentContext(PROFILE, {
         executablePath: chromePath(),
         headless: HEADLESS,
         env: { ...(process.env as Record<string, string>), ...browserEnv() },
-        args: [`--disable-extensions-except=${DIST}`, `--load-extension=${DIST}`],
+        // Emulating `deviceScaleFactor` alone leaves the extension's out-of-process iframe at 1x: force the screen's too.
+        args: [`--disable-extensions-except=${DIST}`, `--load-extension=${DIST}`, `--force-device-scale-factor=${screenScale}`],
         viewport: { width: 1400, height: 900 },
+        deviceScaleFactor: screenScale,
       });
       await use(context);
       await context.close();
