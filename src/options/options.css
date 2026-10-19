@@ -105,6 +105,11 @@ body {
   gap: 12px;
 }
 
+/* A status beside the buttons ("Saved") is centred on them, without the description's paragraph margins. */
+.options-actions > .muted {
+  margin: 0;
+}
+
 .btn-danger {
   background: var(--pierre-danger);
   color: #fff;
