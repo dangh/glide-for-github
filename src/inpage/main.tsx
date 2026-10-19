@@ -1,6 +1,6 @@
 /** The viewer shares GitHub's document scroll; only highlighting workers live in an extension-origin frame. */
 import '../viewer/inspection';
-import { scrollWindowToTop } from './windowScroll';
+import { scrollWindowToTop, windowViewport } from './windowScroll';
 import { terminateWorkerPoolSingleton } from '@pierre/diffs/worker';
 import { createRoot } from 'react-dom/client';
 import { createLifecycle } from '../content/lifecycle';
@@ -77,7 +77,7 @@ const lifecycle = createLifecycle(window, storedSettings(), (doc, ref, layout) =
     scrollPosition.start();
     cleanups.push(initBatchPersistence(), initDraftPersistence(), initFileGroups(), initRelatedFiles());
     workerSpike.factory = factory;
-    root.render(<App prRef={ref} rpc={connection.rpc} />);
+    root.render(<App prRef={ref} rpc={connection.rpc} windowViewport={windowViewport} />);
   }).catch((error: unknown) => {
     if (mounted) root.render(<div className="fatal" role="alert">{error instanceof Error ? error.message : String(error)}</div>);
   });

@@ -1,0 +1,13 @@
+diff --git a/node_modules/@pierre/trees/dist/components/web-components.js b/node_modules/@pierre/trees/dist/components/web-components.js
+index 4c858e7..727e662 100644
+--- a/node_modules/@pierre/trees/dist/components/web-components.js
++++ b/node_modules/@pierre/trees/dist/components/web-components.js
+@@ -39,7 +39,7 @@ function adoptDeclarativeShadowDom(host, shadowRoot) {
+ 	shadowRoot.appendChild(template.content.cloneNode(true));
+ 	if (template.hasAttribute("shadowrootmode")) template.remove();
+ }
+-if (typeof HTMLElement !== "undefined" && customElements.get("file-tree-container") == null) {
++if (typeof HTMLElement !== "undefined" && customElements != null && customElements.get("file-tree-container") == null) {
+ 	class FileTreeContainer extends HTMLElement {
+ 		constructor() {
+ 			super();
