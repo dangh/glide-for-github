@@ -21,9 +21,9 @@ function fakeRoot() {
   return root;
 }
 
-function setup(anchors: ListAnchors | null = null) {
+function setup(anchors: ListAnchors | null = null, rubberBand = false) {
   const root = fakeRoot();
-  const view = createPageScrollView(window, 'page', KEY);
+  const view = createPageScrollView(window, 'page', KEY, rubberBand);
   const channel = new MessageChannel();
   const sent: ViewerScrollMessage[] = [];
   channel.port2.onmessage = (e) => sent.push(e.data as ViewerScrollMessage);
@@ -192,6 +192,53 @@ describe('wheel hand-off', () => {
     await flush();
     s.wheel(-100); // begins at the list's top
     expect(s.root.style.overscrollBehaviorY).toBe('');
+  });
+});
+
+describe('rubber band (try-out)', () => {
+  const overscroll = (s: ReturnType<typeof setup>) => s.root.style.overscrollBehaviorY;
+
+  it('a gesture latched to the list keeps its rubber band on its way down, not on its way up, until it ends', async () => {
+    const s = setup(null, true);
+    s.page(1000, true);
+    await flush();
+    expect(overscroll(s)).toBe('');
+    s.wheel(100);
+    expect(overscroll(s)).toBe('contain');
+    s.wheel(-100); // the same gesture turns back up, towards GitHub's header
+    expect(overscroll(s)).toBe('none');
+    s.wheel(0);
+    expect(overscroll(s)).toBe('none');
+    vi.advanceTimersByTime(499);
+    expect(overscroll(s)).toBe('none');
+    vi.advanceTimersByTime(1);
+    expect(overscroll(s)).toBe('');
+  });
+
+  it('at its bottom the list stretches under a gesture that begins there, without handing it to the page', async () => {
+    const s = setup(null, true);
+    s.page(1000, true);
+    await flush();
+    s.scrollList(EXTENT);
+    expect(overscroll(s)).toBe('contain');
+    s.wheel(100);
+    expect(overscroll(s)).toBe('contain');
+    expect(s.handOffs()).toEqual([]);
+    vi.advanceTimersByTime(500);
+    expect(overscroll(s)).toBe('contain');
+
+    // The page brings the list back up (a scroll on GitHub's header), and then out of its sticky spot.
+    await flush();
+    const ack = s.scrollTos().at(-1)!.seq;
+    s.page(3000, true, ack);
+    await flush();
+    expect(overscroll(s)).toBe('');
+    s.page(EXTENT, true, ack);
+    await flush();
+    expect(overscroll(s)).toBe('contain');
+    s.page(EXTENT, false, ack);
+    await flush();
+    expect(overscroll(s)).toBe('');
   });
 });
 

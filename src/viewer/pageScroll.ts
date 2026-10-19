@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import {
   listCanScroll,
+  listOverscroll,
   parsePageMessage,
   parseScrollAnchor,
   ScrollRequests,
@@ -68,7 +69,7 @@ export function trackHiddenBottom(win: Window): void {
   ).observe(root);
 }
 
-export function createPageScrollView(win: Window, layout: Exclude<ScrollLayout, 'frame'>, storageKey: string): PageScrollView {
+export function createPageScrollView(win: Window, layout: Exclude<ScrollLayout, 'frame'>, storageKey: string, rubberBand = false): PageScrollView {
   usePageScroll.setState({ layout });
   const requests = new ScrollRequests();
   let port: MessagePort | null = null;
@@ -83,8 +84,8 @@ export function createPageScrollView(win: Window, layout: Exclude<ScrollLayout, 
   /** A list scroll the user asked for is on its way (see `expectListScroll`). */
   let expected = false;
   let expectTimer: ReturnType<typeof setTimeout> | undefined;
-  /** The wheel gesture in progress: where it began, and whether the browser latched it to the list. */
-  let gesture: { latched: boolean; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null = null;
+  /** The wheel gesture in progress: where it began, whether the browser latched it to the list, and where it heads. */
+  let gesture: { latched: boolean; up: boolean; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null = null;
 
   const post = (msg: ViewerScrollMessage) => port?.postMessage(msg);
   const extentOf = (el: HTMLElement) => Math.max(0, el.scrollHeight - el.clientHeight);
@@ -101,14 +102,16 @@ export function createPageScrollView(win: Window, layout: Exclude<ScrollLayout, 
   /**
    * The list scrolls natively only while the iframe is stuck, switched mid-gesture too: the hand-off carries on a
    * gesture latched to the list, and a list still scrollable below GitHub's header takes the next swipe only to be put
-   * back. A gesture latched to the list turns its rubber band off: on macOS, until a stretch at its edge springs back,
-   * Chrome pulls the list back to that edge every frame (ElasticOverscrollController::ReconcileStretchAndScroll), and
-   * the page that follows it. Meanwhile Chrome latches a new swipe to the list too, and the hand-off carries it.
+   * back. A gesture latched to the list turns its rubber band off (at least on its way up, see `listOverscroll`): on
+   * macOS, until a stretch at its edge springs back, Chrome pulls the list back to that edge every frame, and the page
+   * that follows it. Meanwhile Chrome latches a new swipe to the list too, and the hand-off carries it.
    */
   const applyStyle = () => {
     if (!root) return;
-    root.style.overflowY = stuck ? 'auto' : 'hidden';
-    root.style.overscrollBehaviorY = gesture?.latched ? 'none' : '';
+    const overflow = stuck ? 'auto' : 'hidden';
+    const overscroll = listOverscroll(rubberBand, gesture, stuck, root.scrollTop, extentOf(root));
+    if (root.style.overflowY !== overflow) root.style.overflowY = overflow;
+    if (root.style.overscrollBehaviorY !== overscroll) root.style.overscrollBehaviorY = overscroll;
   };
 
   /**
@@ -140,6 +143,7 @@ export function createPageScrollView(win: Window, layout: Exclude<ScrollLayout, 
     }
     expected = false;
     lastApplied = top;
+    applyStyle();
     // The page must know the new range before it is asked to scroll into it.
     sendExtent();
     post({ type: 'scrollTo', top, seq: requests.request() });
@@ -158,12 +162,11 @@ export function createPageScrollView(win: Window, layout: Exclude<ScrollLayout, 
       clearTimeout(gesture.timer);
       if (Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y) >= LATCH_SLOP_PX) gesture = null;
     }
-    if (gesture) gesture = { ...gesture, timer: setTimeout(endGesture, LATCH_MS) };
-    else {
-      // Latched once, when the gesture begins: to the list only if it could scroll then.
-      gesture = { latched: stuck && listCanScroll(dy, root.scrollTop, extent), x: e.clientX, y: e.clientY, timer: setTimeout(endGesture, LATCH_MS) };
-      applyStyle();
-    }
+    const up = dy === 0 ? (gesture?.up ?? false) : dy < 0;
+    // Latched once, when the gesture begins: to the list only if it could scroll then.
+    const latched = gesture ? gesture.latched : stuck && listCanScroll(dy, root.scrollTop, extent);
+    gesture = { latched, up, x: gesture?.x ?? e.clientX, y: gesture?.y ?? e.clientY, timer: setTimeout(endGesture, LATCH_MS) };
+    applyStyle();
     const handOff = wheelHandOff(gesture.latched, stuck, dy, root.scrollTop, extent);
     if (handOff === 0) return;
     // Where the list stopped goes first: its scroll event, still to come, would put the page back after the hand-off.
@@ -183,11 +186,11 @@ export function createPageScrollView(win: Window, layout: Exclude<ScrollLayout, 
     if (msg.stuck !== stuck) {
       stuck = msg.stuck;
       usePageScroll.setState({ stuck });
-      applyStyle();
     }
     if (!root) return;
     lastApplied = msg.top;
     if (Math.abs(root.scrollTop - msg.top) >= 1) root.scrollTop = msg.top;
+    applyStyle();
   };
 
   win.addEventListener('pagehide', () => {

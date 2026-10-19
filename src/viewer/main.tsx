@@ -1,6 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import { BRAND } from '../shared/brand';
-import { parseScrollLayout, restoreKey } from '../shared/page-scroll';
+import { parseRubberBand, parseScrollLayout, restoreKey } from '../shared/page-scroll';
 import { prKey } from '../shared/pr-url';
 import { reachedBreakpoints, type Breakpoint } from '../shared/viewport';
 import { App } from './App';
@@ -42,7 +42,7 @@ if (!prRef) {
   let pageScroll: PageScrollView | undefined;
   if (layout !== 'frame') {
     document.documentElement.dataset.scrollLayout = layout;
-    pageScroll = session.pageScroll = createPageScrollView(window, layout, restoreKey(prKey(prRef)));
+    pageScroll = session.pageScroll = createPageScrollView(window, layout, restoreKey(prKey(prRef)), parseRubberBand(location.search));
     trackHiddenBottom(window);
   }
   // viewer.css follows GitHub's viewport; until the page reports it, the iframe's width is the best guess.

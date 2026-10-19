@@ -1,10 +1,11 @@
 /**
  * The page's side of page scrolling (see src/shared/page-scroll.ts): the sticky iframe in its tall wrapper, GitHub's
  * sticky PR header (measured in `page`, hidden in `merged`), GitHub's footer (hidden: like GitHub's own Files changed
- * page, the page ends with the diffs), the page's rubber band (off), and the scroll channel to the viewer.
+ * page, the page ends with the diffs), the page's rubber band, and the scroll channel to the viewer.
  */
 import {
   listScroll,
+  pageRubberBand,
   pageScrollDelta,
   parseViewerMessage,
   stickySizes,
@@ -38,7 +39,13 @@ export const FRAME_OVERHANG = 'margin-left:-1px;margin-right:-1px;width:calc(100
 /** A wheel hand-off is dropped while the page has scrolled by itself this recently. */
 const OWN_SCROLL_MS = 200;
 
-export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTMLIFrameElement, layout: Exclude<ScrollLayout, 'frame'>): PageScroll {
+export function createPageScroll(
+  doc: Document,
+  anchor: HTMLElement,
+  iframe: HTMLIFrameElement,
+  layout: Exclude<ScrollLayout, 'frame'>,
+  rubberBand = false,
+): PageScroll {
   const win = doc.defaultView!;
   const wrapper = doc.createElement('div');
   wrapper.setAttribute('data-glide-scroll', layout);
@@ -100,6 +107,24 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
     }
   };
   const hide = (el: HTMLElement) => restyle(el, 'display', 'none');
+  /** Puts back GitHub's own value of a property `restyle` set. */
+  const unstyle = (el: HTMLElement, property: string) => {
+    const own = doc.createElement('div').style;
+    own.cssText = restyled.get(el) ?? '';
+    el.style.setProperty(property, own.getPropertyValue(property), own.getPropertyPriority(property));
+  };
+
+  const root = doc.documentElement;
+  /** Experiment `rubberBand` (src/shared/page-scroll.ts): whether GitHub's page keeps its rubber band now. */
+  let stretches = true;
+  const fitRubberBand = () => {
+    if (!rubberBand) return;
+    const next = pageRubberBand(wrapper.getBoundingClientRect().top, stickTop);
+    if (next === stretches) return;
+    stretches = next;
+    if (next) unstyle(root, 'overscroll-behavior-y');
+    else restyle(root, 'overscroll-behavior-y', 'none');
+  };
 
   /** Where the iframe sticks: below GitHub's header, at 0 when it is hidden, else below any bar pinned to the top. */
   const measureStickTop = (): number => {
@@ -118,10 +143,12 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
 
   const remeasure = () => {
     const next = measureStickTop();
-    if (next === stickTop) return;
-    stickTop = next;
-    layoutSizes();
-    sendScroll();
+    if (next !== stickTop) {
+      stickTop = next;
+      layoutSizes();
+      sendScroll();
+    }
+    fitRubberBand();
   };
 
   const onResize = () => {
@@ -135,6 +162,7 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
   const onScroll = () => {
     if (Math.abs(win.scrollY - lastY) >= 1) movedByItselfAt = performance.now();
     lastY = win.scrollY;
+    fitRubberBand();
     sendScroll();
   };
 
@@ -165,10 +193,7 @@ export function createPageScroll(doc: Document, anchor: HTMLElement, iframe: HTM
     sendScroll();
   };
 
-  // No rubber band on the page (macOS): while one animates, Chrome pulls the page back to its edge every frame
-  // (ElasticOverscrollController::ReconcileStretchAndScroll), so a list scroll the page follows meanwhile, like
-  // flicking back up right after flicking past the end, would be pulled back, and the list with it.
-  restyle(doc.documentElement, 'overscroll-behavior-y', 'none');
+  if (!rubberBand) restyle(root, 'overscroll-behavior-y', 'none');
   stickTop = measureStickTop();
   layoutSizes();
   win.addEventListener('scroll', onScroll, { passive: true });

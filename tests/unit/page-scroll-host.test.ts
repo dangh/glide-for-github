@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountViewer, setExtensionUrlResolver } from '../../src/content/host';
 import { createPageScroll } from '../../src/content/page-scroll';
 import { createLifecycle } from '../../src/content/lifecycle';
-import { DEFAULT_CONTENT_SETTINGS, type SettingsSource } from '../../src/content/settings-source';
+import { DEFAULT_CONTENT_SETTINGS, type ContentSettings, type SettingsSource } from '../../src/content/settings-source';
 import type { PageScrollMessage, ScrollLayout } from '../../src/shared/page-scroll';
 import type { PrRef } from '../../src/shared/pr-url';
 
@@ -244,9 +244,32 @@ describe('page layout', () => {
     const root = document.documentElement;
     root.setAttribute('style', 'color-scheme: dark;');
     const host = mountViewer(document, ref, 'page');
+    expect(host.iframe.getAttribute('src')).not.toContain('rubberBand');
     expect(getComputedStyle(root).overscrollBehaviorY).toBe('none');
     host.unmount();
     expect(root.getAttribute('style')).toBe('color-scheme: dark;');
+  });
+
+  it("with the rubber band try-out, GitHub's page keeps its own overscroll until the iframe sticks, and gets it back above", () => {
+    const root = document.documentElement;
+    const own = 'color-scheme: dark; overscroll-behavior-y: contain;';
+    root.setAttribute('style', own);
+    const host = mountViewer(document, ref, 'page', true);
+    expect(host.iframe.getAttribute('src')).toContain('&rubberBand=1');
+    const overscroll = () => getComputedStyle(root).overscrollBehaviorY;
+    const scrollTo = (top: number) => {
+      wrapperTop = top;
+      window.dispatchEvent(new Event('scroll'));
+      return overscroll();
+    };
+    expect(overscroll()).toBe('contain');
+    // No sticky header: the iframe sticks at the top.
+    expect(scrollTo(0.4)).toBe('none');
+    expect(scrollTo(-3000)).toBe('none');
+    expect(scrollTo(1)).toBe('contain');
+    expect(scrollTo(0)).toBe('none');
+    host.unmount();
+    expect(root.getAttribute('style')).toBe(own);
   });
 
   it("leaves GitHub's footer and page overscroll alone in the default layout", () => {
@@ -327,10 +350,10 @@ describe('merged layout', () => {
 
 describe('lifecycle with a layout source', () => {
   function source(initial: ScrollLayout | undefined) {
-    let layout = initial;
+    let settings: ContentSettings | undefined = initial && { ...DEFAULT_CONTENT_SETTINGS, layout: initial };
     const listeners = new Set<() => void>();
     const src: SettingsSource = {
-      get: () => layout && { ...DEFAULT_CONTENT_SETTINGS, layout },
+      get: () => settings,
       subscribe(fn) {
         listeners.add(fn);
         return () => void listeners.delete(fn);
@@ -338,8 +361,8 @@ describe('lifecycle with a layout source', () => {
     };
     return {
       src,
-      set(next: ScrollLayout) {
-        layout = next;
+      set(next: Partial<ContentSettings>) {
+        settings = { ...DEFAULT_CONTENT_SETTINGS, ...settings, ...next };
         for (const fn of listeners) fn();
       },
     };
@@ -352,13 +375,19 @@ describe('lifecycle with a layout source', () => {
     expect(document.querySelector('iframe[data-pierre-viewer]')).toBeNull();
     expect(document.querySelector('[data-pierre-tab]')).not.toBeNull();
 
-    s.set('page');
+    s.set({ layout: 'page' });
     const first = document.querySelector('iframe[data-pierre-viewer]')!;
     expect(first.parentElement!.getAttribute('data-glide-scroll')).toBe('page');
+    expect(first.getAttribute('src')).toContain('&rubberBand=1');
 
-    s.set('frame');
+    s.set({ rubberBand: false });
+    const flipped = document.querySelector('iframe[data-pierre-viewer]')!;
+    expect(flipped).not.toBe(first);
+    expect(flipped.getAttribute('src')).not.toContain('rubberBand');
+
+    s.set({ layout: 'frame' });
     const second = document.querySelector('iframe[data-pierre-viewer]')!;
-    expect(second).not.toBe(first);
+    expect(second).not.toBe(flipped);
     expect(document.querySelector('[data-glide-scroll]')).toBeNull();
     expect(second.getAttribute('src')).not.toContain('scroll=');
     life.stop();

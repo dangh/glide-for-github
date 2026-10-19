@@ -12,6 +12,12 @@
  * and the viewer ignores page positions older than its own newest request (`seq`), so the two never fight.
  *
  * Messages travel over their own MessageChannel, handed to the viewer with the `pierre:port` handshake.
+ *
+ * macOS's rubber band: until a stretch springs back, Chrome pulls its scroller back to the edge every frame
+ * (ElasticOverscrollController::ReconcileStretchAndScroll), undoing a scroll that follows the other scroller meanwhile,
+ * and the other scroller then follows that back. Without experiment `rubberBand`, GitHub's page never stretches, nor
+ * does the list under a gesture latched to it. With it, each keeps its rubber band at the edge where nothing follows
+ * it: the page at its top, the list at its bottom.
  */
 import type { ExperimentSettings } from './experiments';
 
@@ -33,6 +39,11 @@ export function parseScrollLayout(search: string): ScrollLayout {
   const v = new URLSearchParams(search).get(SCROLL_LAYOUT_PARAM);
   return v === 'page' || v === 'merged' ? v : 'frame';
 }
+
+/** The viewer URL parameter (`=1`) for experiment `rubberBand`. */
+export const RUBBER_BAND_PARAM = 'rubberBand';
+
+export const parseRubberBand = (search: string): boolean => new URLSearchParams(search).get(RUBBER_BAND_PARAM) === '1';
 
 /** Page → viewer: the list offset the page's scroll position maps to, and whether the iframe is stuck. */
 export interface PageScrollMessage {
@@ -94,6 +105,35 @@ export function listCanScroll(dy: number, scrollTop: number, extent: number): bo
  */
 export function wheelHandOff(latchedToList: boolean, stuck: boolean, dy: number, scrollTop: number, extent: number): number {
   return latchedToList && (!stuck || !listCanScroll(dy, scrollTop, extent)) ? dy : 0;
+}
+
+/**
+ * GitHub's page stretches only until the iframe sticks. Above that the list cannot scroll, so the page never follows
+ * it; from there on the page's end is the list's, where the next swipe up scrolls the list and the page follows.
+ */
+export function pageRubberBand(wrapperTop: number, stickTop: number): boolean {
+  return wrapperTop > stickTop + EDGE;
+}
+
+/** The list's `overscroll-behavior-y`: `contain` stretches the list without chaining the overscroll to the page. */
+export type ListOverscroll = '' | 'contain' | 'none';
+
+/**
+ * At its top GitHub's page always takes over from the list (the PR header is above it), so a gesture latched to the
+ * list that heads up is `none` before it gets there: Chrome starts the stretch in the frame the list reaches its edge,
+ * before the viewer sees that wheel event. At its bottom the page ends too: there the list stretches, under a gesture
+ * that heads down and under one that begins there (which `''` would chain to the page).
+ */
+export function listOverscroll(
+  rubberBand: boolean,
+  gesture: { latched: boolean; up: boolean } | null,
+  stuck: boolean,
+  scrollTop: number,
+  extent: number,
+): ListOverscroll {
+  if (gesture?.latched) return !rubberBand || gesture.up ? 'none' : 'contain';
+  const onlyAtBottom = stuck && !listCanScroll(1, scrollTop, extent) && listCanScroll(-1, scrollTop, extent);
+  return rubberBand && onlyAtBottom ? 'contain' : '';
 }
 
 const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);

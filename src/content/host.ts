@@ -1,5 +1,5 @@
 import { BRAND } from '../shared/brand';
-import { SCROLL_LAYOUT_PARAM, type ScrollLayout } from '../shared/page-scroll';
+import { RUBBER_BAND_PARAM, SCROLL_LAYOUT_PARAM, type ScrollLayout } from '../shared/page-scroll';
 import { prKey, type PrRef } from '../shared/pr-url';
 import { reachedBreakpoints, type ViewportMessage } from '../shared/viewport';
 import { createPageScroll, FRAME_OVERHANG } from './page-scroll';
@@ -28,6 +28,8 @@ export function setExtensionUrlResolver(fn: (path: string) => string): void {
 export interface ViewerHost {
   iframe: HTMLIFrameElement;
   layout: ScrollLayout;
+  /** Experiment `rubberBand` (src/shared/page-scroll.ts); only used with page scrolling. */
+  rubberBand: boolean;
   /** Removes the iframe, restores GitHub's content and tells the bridge to reset. Idempotent. */
   unmount(): void;
   /**
@@ -57,8 +59,8 @@ function originOf(url: string): string {
   return /^[a-z][a-z0-9+.-]*:\/\/[^/]+/i.exec(url)?.[0] ?? url;
 }
 
-/** `layout` other than 'frame' is the page-scrolling experiment (src/shared/page-scroll.ts). */
-export function mountViewer(doc: Document, ref: PrRef, layout: ScrollLayout = 'frame'): ViewerHost {
+/** `layout` other than 'frame' is the page-scrolling experiment (src/shared/page-scroll.ts), with `rubberBand`. */
+export function mountViewer(doc: Document, ref: PrRef, layout: ScrollLayout = 'frame', rubberBand = false): ViewerHost {
   const win = doc.defaultView;
   const anchor = findContentAnchor(doc);
   if (!win || !anchor || !anchor.parentElement) throw new Error(`${BRAND.short}: PR tab content container not found`);
@@ -66,14 +68,14 @@ export function mountViewer(doc: Document, ref: PrRef, layout: ScrollLayout = 'f
   let mounted = true;
 
   const iframe = doc.createElement('iframe');
-  const layoutParam = layout === 'frame' ? '' : `&${SCROLL_LAYOUT_PARAM}=${layout}`;
+  const layoutParam = layout === 'frame' ? '' : `&${SCROLL_LAYOUT_PARAM}=${layout}${rubberBand ? `&${RUBBER_BAND_PARAM}=1` : ''}`;
   iframe.setAttribute('src', resolveExtensionUrl('viewer.html?pr=' + encodeURIComponent(prKey(ref)) + layoutParam));
   iframe.setAttribute('title', BRAND.short);
   iframe.setAttribute('data-pierre-viewer', '');
   // A cross-origin frame may write the clipboard (copy branch name, copy path) only when its embedder delegates it.
   iframe.setAttribute('allow', 'clipboard-write');
   iframe.style.cssText = `display:block;border:0;min-height:${MIN_VIEWER_HEIGHT_PX}px;${FRAME_OVERHANG}`;
-  const pageScroll = layout === 'frame' ? null : createPageScroll(doc, anchor, iframe, layout);
+  const pageScroll = layout === 'frame' ? null : createPageScroll(doc, anchor, iframe, layout, rubberBand);
   /** What sits in the page: the iframe, or the page-scroll wrapper holding it. */
   const outer: HTMLElement = pageScroll?.wrapper ?? iframe;
   const fitHeight = () => {
@@ -159,6 +161,7 @@ export function mountViewer(doc: Document, ref: PrRef, layout: ScrollLayout = 'f
   return {
     iframe,
     layout,
+    rubberBand,
     refresh() {
       if (!mounted || !iframe.isConnected || findContentAnchor(doc) !== anchor || outer.parentElement !== parent) {
         return false;

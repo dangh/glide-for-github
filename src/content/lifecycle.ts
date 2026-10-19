@@ -60,10 +60,11 @@ export function createLifecycle(win: Window & typeof globalThis = window, settin
     }
     // Until the settings are read, the viewer waits (the source calls us once they are).
     if (!tab || !findContentAnchor(doc) || !stored) return;
-    const { layout } = stored;
+    const { layout, rubberBand } = stored;
 
-    if (mounted && (mounted.host.layout !== layout || !mounted.host.refresh())) unmountViewer();
-    mounted ??= { key, host: mountViewer(doc, ref, layout) };
+    const host = mounted?.host;
+    if (host && (host.layout !== layout || host.rubberBand !== rubberBand || !host.refresh())) unmountViewer();
+    mounted ??= { key, host: mountViewer(doc, ref, layout, rubberBand) };
     setTabActive(doc, true);
   }
 

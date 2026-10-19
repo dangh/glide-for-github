@@ -71,6 +71,7 @@
  *   layout.showTree           boolean, true: the file tree pane (the toolbar's file tree button, like GitHub's)
  *   experiments.pageScroll    boolean, false: GitHub's page scrolls the diffs (src/shared/page-scroll.ts), not the viewer
  *   experiments.mergedBar     boolean, false: GitHub's sticky PR header folds into Glide's toolbar (only with pageScroll)
+ *   experiments.rubberBand    boolean, true: macOS's rubber band where it cannot jank (try-out; only with pageScroll)
  *   github.replaceFilesTab    boolean, false: GitHub's Files changed tab is hidden and its page opens Glide instead
  *   fileGroups.*              enabled (true), defaultGroup ('' = All; else a group label), hideEmpty (true): the file
  *                             group tabs (./file-groups.ts). The groups themselves are stored apart (./file-groups-storage.ts).
@@ -377,7 +378,7 @@ export const DEFAULT_SETTINGS: DisplaySettings = deepFreeze({
   fonts: { codeFontFamily: '', uiFontFamily: '', codeFontSize: 'default', codeFontFeatures: '' },
   layout: { treePosition: 'left', showTree: true },
   review: { hideWhitespace: false },
-  experiments: { pageScroll: false, mergedBar: false },
+  experiments: { pageScroll: false, mergedBar: false, rubberBand: true },
   github: { replaceFilesTab: false },
   fileGroups: { enabled: true, defaultGroup: ALL_GROUP, hideEmpty: true },
   relatedFiles: { style: 'nested' },
@@ -457,7 +458,7 @@ const LAYOUT_SCHEMA: Schema<LayoutSettings> = { treePosition: oneOf(C.layout.tre
 
 const REVIEW_SCHEMA: Schema<ReviewSettings> = { hideWhitespace: isBool };
 
-const EXPERIMENTS_SCHEMA: Schema<ExperimentSettings> = { pageScroll: isBool, mergedBar: isBool };
+const EXPERIMENTS_SCHEMA: Schema<ExperimentSettings> = { pageScroll: isBool, mergedBar: isBool, rubberBand: isBool };
 
 const GITHUB_SCHEMA: Schema<GithubSettings> = { replaceFilesTab: isBool };
 

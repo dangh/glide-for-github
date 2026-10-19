@@ -40,15 +40,18 @@ describe('stored content settings', () => {
 
     storage.read(PAGE);
     await tick();
-    expect(source.get()).toEqual({ layout: 'page', replaceFilesTab: true });
+    expect(source.get()).toEqual({ layout: 'page', rubberBand: true, replaceFilesTab: true });
     expect(onChange).toHaveBeenCalledTimes(1);
 
     storage.change({ ...PAGE, diff: { lineWrap: true } });
     storage.change(PAGE, 'local');
     expect(onChange).toHaveBeenCalledTimes(1);
     storage.change({ experiments: { pageScroll: true, mergedBar: true } });
-    expect(source.get()).toEqual({ layout: 'merged', replaceFilesTab: false });
+    expect(source.get()).toEqual({ layout: 'merged', rubberBand: true, replaceFilesTab: false });
     expect(onChange).toHaveBeenCalledTimes(2);
+    storage.change({ experiments: { pageScroll: true, mergedBar: true, rubberBand: false } });
+    expect(source.get()).toEqual({ layout: 'merged', rubberBand: false, replaceFilesTab: false });
+    expect(onChange).toHaveBeenCalledTimes(3);
   });
 
   it('a change that arrives while the first read is in flight wins over what the read returns', async () => {
@@ -57,7 +60,7 @@ describe('stored content settings', () => {
     storage.change(PAGE);
     storage.read(undefined);
     await tick();
-    expect(source.get()).toEqual({ layout: 'page', replaceFilesTab: true });
+    expect(source.get()).toEqual({ layout: 'page', rubberBand: true, replaceFilesTab: true });
   });
 
   it('a failed read means the defaults', async () => {
@@ -65,7 +68,7 @@ describe('stored content settings', () => {
     const source = storedSettings();
     storage.fail();
     await tick();
-    expect(source.get()).toEqual({ layout: 'frame', replaceFilesTab: false });
+    expect(source.get()).toEqual({ layout: 'frame', rubberBand: true, replaceFilesTab: false });
   });
 
   it('a read that does not settle in time means the defaults; a late one still applies', async () => {
@@ -74,10 +77,10 @@ describe('stored content settings', () => {
     vi.advanceTimersByTime(READ_TIMEOUT_MS - 1);
     expect(source.get()).toBeUndefined();
     vi.advanceTimersByTime(1);
-    expect(source.get()).toEqual({ layout: 'frame', replaceFilesTab: false });
+    expect(source.get()).toEqual({ layout: 'frame', rubberBand: true, replaceFilesTab: false });
 
     storage.read(PAGE);
     await tick();
-    expect(source.get()).toEqual({ layout: 'page', replaceFilesTab: true });
+    expect(source.get()).toEqual({ layout: 'page', rubberBand: true, replaceFilesTab: true });
   });
 });

@@ -47,6 +47,17 @@ export function ExperimentSettingsForm({ experiments, update }: { experiments: E
         disabled={!experiments.pageScroll}
         onChange={(v) => set({ mergedBar: v })}
       />
+      <Experiment
+        label="Rubber band at the edges (try-out)"
+        description={
+          experiments.pageScroll
+            ? "On a Mac, GitHub's page bounces at its top and the diffs at their end. Off, both stop dead at their edges."
+            : 'Needs "Scroll with the page".'
+        }
+        value={experiments.rubberBand}
+        disabled={!experiments.pageScroll}
+        onChange={(v) => set({ rubberBand: v })}
+      />
     </div>
   );
 }

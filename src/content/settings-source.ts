@@ -9,15 +9,18 @@ import { scrollLayoutOf, type ScrollLayout } from '../shared/page-scroll';
 export interface ContentSettings {
   /** The layout for a viewer mounted now. */
   layout: ScrollLayout;
+  /** Experiment `rubberBand` (src/shared/page-scroll.ts), for a viewer mounted now. */
+  rubberBand: boolean;
   /** "Replace Files changed with Glide" (src/content/lifecycle.ts). */
   replaceFilesTab: boolean;
 }
 
-export const DEFAULT_CONTENT_SETTINGS: ContentSettings = { layout: 'frame', replaceFilesTab: false };
+export const DEFAULT_CONTENT_SETTINGS: ContentSettings = { layout: 'frame', rubberBand: true, replaceFilesTab: false };
 
 /** The content script's settings in a stored settings item; anything missing or invalid is the default. */
 export function contentSettingsOf(item: unknown): ContentSettings {
-  return { layout: scrollLayoutOf(experimentsOf(item)), replaceFilesTab: githubSettingsOf(item).replaceFilesTab };
+  const experiments = experimentsOf(item);
+  return { layout: scrollLayoutOf(experiments), rubberBand: experiments.rubberBand, replaceFilesTab: githubSettingsOf(item).replaceFilesTab };
 }
 
 export interface SettingsSource {
@@ -44,7 +47,7 @@ export function storedSettings(): SettingsSource {
   const listeners = new Set<() => void>();
   const adopt = (item: unknown) => {
     const next = contentSettingsOf(item);
-    if (value && next.layout === value.layout && next.replaceFilesTab === value.replaceFilesTab) return;
+    if (value && next.layout === value.layout && next.rubberBand === value.rubberBand && next.replaceFilesTab === value.replaceFilesTab) return;
     value = next;
     for (const fn of [...listeners]) fn();
   };

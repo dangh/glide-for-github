@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { experimentsOf } from '../../src/shared/experiments';
 import {
   listCanScroll,
+  listOverscroll,
   listScroll,
+  pageRubberBand,
   pageScrollDelta,
+  parseRubberBand,
   parseScrollAnchor,
   parseScrollLayout,
   ScrollRequests,
@@ -15,10 +18,11 @@ import {
 
 describe('scroll layout', () => {
   it('is frame unless page scrolling is on; the merged bar only counts with it', () => {
-    expect(scrollLayoutOf({ pageScroll: false, mergedBar: false })).toBe('frame');
-    expect(scrollLayoutOf({ pageScroll: false, mergedBar: true })).toBe('frame');
-    expect(scrollLayoutOf({ pageScroll: true, mergedBar: false })).toBe('page');
-    expect(scrollLayoutOf({ pageScroll: true, mergedBar: true })).toBe('merged');
+    const off = { pageScroll: false, mergedBar: false, rubberBand: true };
+    expect(scrollLayoutOf(off)).toBe('frame');
+    expect(scrollLayoutOf({ ...off, mergedBar: true })).toBe('frame');
+    expect(scrollLayoutOf({ ...off, pageScroll: true })).toBe('page');
+    expect(scrollLayoutOf({ ...off, pageScroll: true, mergedBar: true })).toBe('merged');
   });
 
   it('round-trips through the viewer URL, anything unknown is frame', () => {
@@ -29,11 +33,18 @@ describe('scroll layout', () => {
     expect(parseScrollLayout('?scroll=sideways')).toBe('frame');
   });
 
-  it('reads the experiments from a stored settings item; anything but true is off', () => {
-    expect(experimentsOf(undefined)).toEqual({ pageScroll: false, mergedBar: false });
-    expect(experimentsOf({ diff: {} })).toEqual({ pageScroll: false, mergedBar: false });
-    expect(experimentsOf({ experiments: { pageScroll: 'true', mergedBar: 1 } })).toEqual({ pageScroll: false, mergedBar: false });
-    expect(experimentsOf({ experiments: { pageScroll: true, mergedBar: true } })).toEqual({ pageScroll: true, mergedBar: true });
+  it('reads the experiments from a stored settings item; anything but true is off, the rubber band anything but false on', () => {
+    const defaults = { pageScroll: false, mergedBar: false, rubberBand: true };
+    expect(experimentsOf(undefined)).toEqual(defaults);
+    expect(experimentsOf({ diff: {} })).toEqual(defaults);
+    expect(experimentsOf({ experiments: { pageScroll: 'true', mergedBar: 1, rubberBand: 0 } })).toEqual(defaults);
+    expect(experimentsOf({ experiments: { pageScroll: true, mergedBar: true, rubberBand: false } })).toEqual({ pageScroll: true, mergedBar: true, rubberBand: false });
+  });
+
+  it('carries the rubber band try-out in the viewer URL only when on', () => {
+    expect(parseRubberBand('?pr=a%2Fb%231&scroll=page&rubberBand=1')).toBe(true);
+    expect(parseRubberBand('?pr=a%2Fb%231&scroll=page')).toBe(false);
+    expect(parseRubberBand('?rubberBand=true')).toBe(false);
   });
 });
 
@@ -110,6 +121,41 @@ describe('wheel hand-off', () => {
     expect(wheelHandOff(false, true, -100, 0, 5000)).toBe(0);
     expect(wheelHandOff(false, true, 100, 5000, 5000)).toBe(0);
     expect(wheelHandOff(false, false, 100, 5000, 5000)).toBe(0);
+  });
+});
+
+describe('rubber band (try-out)', () => {
+  it("keeps GitHub's page stretchy until the iframe reaches where it sticks, then not until it is back above", () => {
+    expect(pageRubberBand(261, 60)).toBe(true);
+    expect(pageRubberBand(60.6, 60)).toBe(true);
+    expect(pageRubberBand(60.4, 60)).toBe(false);
+    expect(pageRubberBand(-4940, 60)).toBe(false);
+    expect(pageRubberBand(-6000, 60)).toBe(false);
+  });
+
+  it('without the try-out: none under a gesture latched to the list, otherwise as the page has it', () => {
+    for (const up of [true, false]) expect(listOverscroll(false, { latched: true, up }, true, 2000, 5000)).toBe('none');
+    expect(listOverscroll(false, { latched: false, up: false }, true, 5000, 5000)).toBe('');
+    expect(listOverscroll(false, null, true, 5000, 5000)).toBe('');
+  });
+
+  it('with it: a latched gesture is none on its way up and stretches on its way down, without chaining to the page', () => {
+    expect(listOverscroll(true, { latched: true, up: true }, true, 2000, 5000)).toBe('none');
+    expect(listOverscroll(true, { latched: true, up: true }, false, 0, 5000)).toBe('none');
+    expect(listOverscroll(true, { latched: true, up: false }, true, 2000, 5000)).toBe('contain');
+    expect(listOverscroll(true, { latched: true, up: false }, true, 5000, 5000)).toBe('contain');
+  });
+
+  it('with it: a gesture that begins at the bottom stretches the list; at the top it chains to the page', () => {
+    for (const gesture of [null, { latched: false, up: false }]) {
+      expect(listOverscroll(true, gesture, true, 5000, 5000)).toBe('contain');
+      expect(listOverscroll(true, gesture, true, 4999.6, 5000)).toBe('contain');
+      expect(listOverscroll(true, gesture, true, 4990, 5000)).toBe('');
+      expect(listOverscroll(true, gesture, true, 0, 5000)).toBe('');
+      // Not stuck the list cannot scroll, and a list with no range is at its top too: both chain to the page.
+      expect(listOverscroll(true, gesture, false, 5000, 5000)).toBe('');
+      expect(listOverscroll(true, gesture, true, 0, 0)).toBe('');
+    }
   });
 });
 
