@@ -49,49 +49,62 @@ export function OptionsPage() {
           )}
         </div>
       </header>
-      <TokenSettings />
-      <section className="options-section" aria-labelledby="display-heading">
-        <h2 id="display-heading">Display</h2>
-        <p className="muted">Changes apply at once, also in pull requests that are already open.</p>
-        {loaded && (
-          <div className="options-display">
-            <DisplaySettingsForm settings={settings} update={update} relatedFiles={false} />
-            <div className="options-sample">
-              <h3>Preview</h3>
-              <SampleDiff diff={settings.diff} lineHeight={resolveFonts(settings.fonts).codeLineHeight} />
-            </div>
-          </div>
-        )}
-      </section>
-      <section className="options-section" aria-labelledby="github-heading">
-        <h2 id="github-heading">GitHub</h2>
-        <p className="muted">Changes apply at once, also in pull requests that are already open.</p>
-        {loaded && <GithubSettingsForm github={settings.github} update={update} />}
-      </section>
-      <section className="options-section" aria-labelledby="file-groups-heading">
-        <h2 id="file-groups-heading">File groups</h2>
-        <p className="muted">
-          Changes apply at once, also in pull requests that are already open. The groups come from{' '}
-          <a href="https://github.com/dangh/sift-for-github" target="_blank" rel="noopener noreferrer">
-            Sift for GitHub
-          </a>
-          .
-        </p>
-        {loaded && <FileGroupSettingsForm settings={settings.fileGroups} update={update} />}
-      </section>
-      <section className="options-section" aria-labelledby="related-files-heading">
-        <h2 id="related-files-heading">Related files</h2>
-        <p className="muted">
-          Show a file with its companions, like a lock file with its manifest, so they read as one change. Changes apply at
-          once, also in pull requests that are already open.
-        </p>
-        {loaded && <RelatedFilesSettingsForm style={settings.relatedFiles.style} update={update} />}
-      </section>
-      <section className="options-section" aria-labelledby="experiments-heading">
-        <h2 id="experiments-heading">Experimental</h2>
-        <p className="muted">Changes apply at once; an open Glide tab reloads its viewer to switch.</p>
-        {loaded && <ExperimentSettingsForm experiments={settings.experiments} update={update} />}
-      </section>
+      <div className="options-layout">
+        <nav className="options-nav" aria-label="Settings sections">
+          <h2>Settings</h2>
+          <a href="#tokens-heading">GitHub tokens</a>
+          <a href="#display-heading">Display</a>
+          <a href="#github-heading">GitHub</a>
+          <a href="#file-groups-heading">File groups</a>
+          <a href="#related-files-heading">Related files</a>
+          <a href="#experiments-heading">Experimental</a>
+        </nav>
+        <div className="options-content">
+          <TokenSettings />
+          <section className="options-section" aria-labelledby="display-heading">
+            <h2 id="display-heading">Display</h2>
+            <p className="muted">Changes apply at once, also in pull requests that are already open.</p>
+            {loaded && (
+              <div className="options-display">
+                <DisplaySettingsForm settings={settings} update={update} relatedFiles={false} />
+                <div className="options-sample">
+                  <h3>Preview</h3>
+                  <SampleDiff diff={settings.diff} lineHeight={resolveFonts(settings.fonts).codeLineHeight} />
+                </div>
+              </div>
+            )}
+          </section>
+          <section className="options-section" aria-labelledby="github-heading">
+            <h2 id="github-heading">GitHub</h2>
+            <p className="muted">Changes apply at once, also in pull requests that are already open.</p>
+            {loaded && <GithubSettingsForm github={settings.github} update={update} />}
+          </section>
+          <section className="options-section" aria-labelledby="file-groups-heading">
+            <h2 id="file-groups-heading">File groups</h2>
+            <p className="muted">
+              Changes apply at once, also in pull requests that are already open. The groups come from{' '}
+              <a href="https://github.com/dangh/sift-for-github" target="_blank" rel="noopener noreferrer">
+                Sift for GitHub
+              </a>
+              .
+            </p>
+            {loaded && <FileGroupSettingsForm settings={settings.fileGroups} update={update} />}
+          </section>
+          <section className="options-section" aria-labelledby="related-files-heading">
+            <h2 id="related-files-heading">Related files</h2>
+            <p className="muted">
+              Show a file with its companions, like a lock file with its manifest, so they read as one change. Changes apply at
+              once, also in pull requests that are already open.
+            </p>
+            {loaded && <RelatedFilesSettingsForm style={settings.relatedFiles.style} update={update} />}
+          </section>
+          <section className="options-section" aria-labelledby="experiments-heading">
+            <h2 id="experiments-heading">Experimental</h2>
+            <p className="muted">Changes apply at once; an open Glide tab reloads its viewer to switch.</p>
+            {loaded && <ExperimentSettingsForm experiments={settings.experiments} update={update} />}
+          </section>
+        </div>
+      </div>
     </main>
   );
 }
