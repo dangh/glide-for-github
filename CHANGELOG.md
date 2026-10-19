@@ -2,6 +2,14 @@
 
 Newest first. Each release's GitHub notes are its section here (`scripts/release-notes.sh`).
 
+## 0.3.1 (2026-10-19)
+
+### Fixes
+
+- The "Scroll with the page" option no longer says GitHub's footer is reachable: the page ends with the diffs, like
+  GitHub's own Files changed page.
+- The options page's version link now opens real release notes.
+
 ## 0.3.0 (2026-10-19)
 
 ### New
