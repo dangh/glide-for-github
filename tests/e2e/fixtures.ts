@@ -234,3 +234,45 @@ export async function githubViewedCount(page: Page, pr: PrId): Promise<{ viewed:
   const m = /(\d+) of (\d+) files? viewed/.exec(await label.innerText())!;
   return { viewed: Number(m[1]), total: Number(m[2]) };
 }
+
+/** Glide's sync items: the settings, the file groups and the related-files rules. */
+const isGlideKey = (k: string) => k === 'pierre.settings' || k.startsWith('pierre.fileGroups') || k === 'pierre.relatedFiles';
+
+export async function extensionPage(context: BrowserContext): Promise<Page> {
+  const page = await context.newPage();
+  await page.goto(`chrome-extension://${extensionId()}/options.html`);
+  return page;
+}
+
+export async function readGlideSync(context: BrowserContext): Promise<Record<string, unknown>> {
+  const ext = await extensionPage(context);
+  const all = await ext.evaluate(() => chrome.storage.sync.get(null));
+  await ext.close();
+  return Object.fromEntries(Object.entries(all).filter(([k]) => isGlideKey(k)));
+}
+
+export async function writeGlideSync(context: BrowserContext, items: Record<string, unknown>) {
+  const ext = await extensionPage(context);
+  await ext.evaluate(async (saved) => {
+    const all = await chrome.storage.sync.get(null);
+    const stale = Object.keys(all).filter((k) => (k === 'pierre.settings' || k.startsWith('pierre.fileGroups') || k === 'pierre.relatedFiles') && !(k in saved));
+    if (stale.length > 0) await chrome.storage.sync.remove(stale);
+    if (Object.keys(saved).length > 0) await chrome.storage.sync.set(saved);
+  }, items);
+  await ext.close();
+}
+
+/** Merges `patch` into one section of the stored settings. */
+export async function setSettings(context: BrowserContext, section: string, patch: Record<string, unknown>, back?: Page) {
+  const ext = await extensionPage(context);
+  await ext.evaluate(
+    async ([name, value]) => {
+      const stored = ((await chrome.storage.sync.get('pierre.settings'))['pierre.settings'] ?? {}) as Record<string, Record<string, unknown>>;
+      stored[name as string] = { ...stored[name as string], ...(value as Record<string, unknown>) };
+      await chrome.storage.sync.set({ 'pierre.settings': stored });
+    },
+    [section, patch] as const,
+  );
+  await ext.close();
+  await back?.bringToFront();
+}

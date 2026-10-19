@@ -4,55 +4,12 @@
  */
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { BrowserContext, Page } from '@playwright/test';
-import { expect, extensionId, openPierre, REACT, ROOT, test, type Viewer } from './fixtures';
+import { expect, extensionPage, openPierre, readGlideSync, REACT, ROOT, setSettings, test, writeGlideSync, type Viewer } from './fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
 const SHOTS = join(ROOT, '.superpowers/file-groups');
 mkdirSync(SHOTS, { recursive: true });
-
-/** Glide's sync items: the settings and the file groups. */
-const isGlideKey = (k: string) => k === 'pierre.settings' || k.startsWith('pierre.fileGroups');
-
-async function extensionPage(context: BrowserContext): Promise<Page> {
-  const page = await context.newPage();
-  await page.goto(`chrome-extension://${extensionId()}/options.html`);
-  return page;
-}
-
-async function readGlideSync(context: BrowserContext): Promise<Record<string, unknown>> {
-  const ext = await extensionPage(context);
-  const all = await ext.evaluate(() => chrome.storage.sync.get(null));
-  await ext.close();
-  return Object.fromEntries(Object.entries(all).filter(([k]) => isGlideKey(k)));
-}
-
-async function writeGlideSync(context: BrowserContext, items: Record<string, unknown>) {
-  const ext = await extensionPage(context);
-  await ext.evaluate(async (saved) => {
-    const all = await chrome.storage.sync.get(null);
-    const stale = Object.keys(all).filter((k) => (k === 'pierre.settings' || k.startsWith('pierre.fileGroups')) && !(k in saved));
-    if (stale.length > 0) await chrome.storage.sync.remove(stale);
-    if (Object.keys(saved).length > 0) await chrome.storage.sync.set(saved);
-  }, items);
-  await ext.close();
-}
-
-/** Merges `patch` into one section of the stored settings. */
-async function setSettings(context: BrowserContext, section: string, patch: Record<string, unknown>, back?: Page) {
-  const ext = await extensionPage(context);
-  await ext.evaluate(
-    async ([name, value]) => {
-      const stored = ((await chrome.storage.sync.get('pierre.settings'))['pierre.settings'] ?? {}) as Record<string, Record<string, unknown>>;
-      stored[name as string] = { ...stored[name as string], ...(value as Record<string, unknown>) };
-      await chrome.storage.sync.set({ 'pierre.settings': stored });
-    },
-    [section, patch] as const,
-  );
-  await ext.close();
-  await back?.bringToFront();
-}
 
 const tabs = (viewer: Viewer) => viewer.locator.getByRole('tablist', { name: 'File groups' }).getByRole('tab');
 const tab = (viewer: Viewer, name: string) => viewer.locator.getByRole('tab', { name: new RegExp(`^${name} \\d+$`) });
