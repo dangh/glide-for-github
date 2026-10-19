@@ -2,15 +2,14 @@
  * The options page's File groups section: the switches (`DisplaySettings.fileGroups`) and the group editor, which
  * saves each valid edit at once (debounced) to its own storage items (src/shared/file-groups-storage.ts).
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ALL_GROUP, classify, compileGroups, groupsProblem, parseSiftImport, type FileGroup, type SiftImport } from '../shared/file-groups';
 import { defaultGroups, loadFileGroups, onFileGroupsChange, saveFileGroups, sameGroups } from '../shared/file-groups-storage';
 import type { FileGroupSettings } from '../shared/settings';
 import type { Update } from '../viewer/ui/DisplaySettingsForm';
 import { RowActions } from './ListRow';
 import { AutoSizeTextarea } from './AutoSizeTextarea';
-
-const SAVE_DELAY_MS = 400;
+import { useEditableList } from './useEditableList';
 
 /** A group being edited: `id` follows it through renames and moves; `text` is the textarea, one pattern per line. */
 interface DraftGroup {
@@ -23,8 +22,6 @@ let nextId = 1;
 const toDraft = (groups: readonly FileGroup[]): DraftGroup[] => groups.map((g) => ({ id: nextId++, label: g.label, text: g.patterns.join('\n') }));
 const fromDraft = (draft: readonly DraftGroup[]): FileGroup[] =>
   draft.map((d) => ({ label: d.label.trim(), patterns: d.text.split('\n').map((p) => p.trim()).filter(Boolean) }));
-
-type Status = { kind: 'idle' } | { kind: 'saved' } | { kind: 'error'; message: string };
 
 function GroupEditor({ draft, index, count, onChange, onMove, onDelete }: {
   draft: DraftGroup;
@@ -111,100 +108,31 @@ function PathProbe({ groups }: { groups: readonly FileGroup[] }) {
 }
 
 export function FileGroupSettingsForm({ settings, update }: { settings: FileGroupSettings; update: Update }) {
-  const [draft, setDraft] = useState<DraftGroup[] | null>(null);
-  const [status, setStatus] = useState<Status>({ kind: 'idle' });
-  /** What storage holds, by draft id (renames and deletions of the default group follow from it). */
-  const saved = useRef<DraftGroup[]>([]);
-  const submitted = useRef<DraftGroup[] | null>(null);
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  /** A valid edit waiting out SAVE_DELAY_MS; written at once if the page is closed or hidden first. */
-  const pending = useRef<DraftGroup[] | null>(null);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
-
-  const commit = (next: DraftGroup[]) => {
-    clearTimeout(timer.current);
-    pending.current = null;
-    const previous = submitted.current ?? saved.current;
-    submitted.current = next;
-    const write = saveFileGroups(fromDraft(next));
-    const current = settingsRef.current.defaultGroup;
-    const named = (d: DraftGroup) => d.label.trim().toLowerCase() === current.toLowerCase();
-    const was = previous.find(named);
-    const now = was && next.find((d) => d.id === was.id);
-    const renamed = current !== ALL_GROUP && was && !next.some(named) ? (now?.label.trim() ?? ALL_GROUP) : undefined;
-    // Both writes must be issued before pagehide returns; this page may die before either promise settles.
-    if (renamed !== undefined) update({ fileGroups: { defaultGroup: renamed } });
-    write.then(
-      () => {
-        if (submitted.current !== next) return;
-        saved.current = next;
-        if (sameGroups(fromDraft(draftRef.current ?? []), fromDraft(next))) setStatus({ kind: 'saved' });
-      },
-      (err: unknown) => {
-        if (submitted.current !== next) return;
-        submitted.current = saved.current;
-        if (renamed !== undefined && settingsRef.current.defaultGroup === renamed) update({ fileGroups: { defaultGroup: current } });
-        setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
-      },
-    );
-  };
-  const commitRef = useRef(commit);
-  commitRef.current = commit;
-
-  useEffect(() => {
-    let active = true;
-    let changed = false;
-    const adopt = (groups: FileGroup[]) => {
-      // Another context's change (or the echo of ours): take it unless this page has unsaved edits.
-      setDraft((current) => {
-        if (current && !sameGroups(fromDraft(current), fromDraft(saved.current))) return current;
-        if (current && sameGroups(fromDraft(current), groups)) return current;
-        const next = toDraft(groups);
-        saved.current = next;
-        submitted.current = next;
-        return next;
-      });
-    };
-    const initial = (groups: FileGroup[]) => { if (active && !changed) adopt(groups); };
-    void loadFileGroups().then(initial, () => initial(defaultGroups()));
-    const off = onFileGroupsChange((groups) => {
-      changed = true;
-      adopt(groups);
-    });
-    const flush = () => {
-      if (pending.current) commitRef.current(pending.current);
-    };
-    const onHidden = () => document.visibilityState === 'hidden' && flush();
-    window.addEventListener('pagehide', flush);
-    document.addEventListener('visibilitychange', onHidden);
-    return () => {
-      active = false;
-      off();
-      window.removeEventListener('pagehide', flush);
-      document.removeEventListener('visibilitychange', onHidden);
-      flush();
-    };
-  }, []);
-
+  const { draft, status, edit } = useEditableList({
+    load: loadFileGroups,
+    subscribe: onFileGroupsChange,
+    defaults: defaultGroups,
+    toDraft,
+    fromDraft,
+    same: sameGroups,
+    problem: groupsProblem,
+    save: saveFileGroups,
+    onSave(next, previous) {
+      const current = settingsRef.current.defaultGroup;
+      const named = (d: DraftGroup) => d.label.trim().toLowerCase() === current.toLowerCase();
+      const was = previous.find(named);
+      const now = was && next.find((d) => d.id === was.id);
+      const renamed = current !== ALL_GROUP && was && !next.some(named) ? (now?.label.trim() ?? ALL_GROUP) : undefined;
+      if (renamed === undefined) return;
+      update({ fileGroups: { defaultGroup: renamed } });
+      return () => {
+        if (settingsRef.current.defaultGroup === renamed) update({ fileGroups: { defaultGroup: current } });
+      };
+    },
+  });
   const groups = useMemo(() => (draft ? fromDraft(draft) : []), [draft]);
-
-  const save = (next: DraftGroup[]) => {
-    clearTimeout(timer.current);
-    pending.current = null;
-    const problem = groupsProblem(fromDraft(next));
-    if (problem) return setStatus({ kind: 'error', message: problem });
-    setStatus({ kind: 'idle' });
-    pending.current = next;
-    timer.current = setTimeout(() => commit(next), SAVE_DELAY_MS);
-  };
-
-  const edit = (next: DraftGroup[]) => {
-    setDraft(next);
-    save(next);
-  };
 
   const move = (i: number, by: -1 | 1) => {
     if (!draft) return;

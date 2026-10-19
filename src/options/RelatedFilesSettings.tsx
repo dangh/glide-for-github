@@ -3,15 +3,14 @@
  * choices, each with a small preview drawn like the viewer's GitHub file boxes) and the rules that relate them, saved
  * at once (debounced) to their storage item (src/shared/related-files-storage.ts), as the file groups editor does.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { BASENAME, relateFiles, rulesProblem, type RelatedRule } from '../shared/related-files';
 import { defaultRules, loadRelatedRules, onRelatedRulesChange, saveRelatedRules, sameRules } from '../shared/related-files-storage';
 import { RELATED_STYLES, type RelatedStyle } from '../shared/settings';
 import { RELATED_STYLE_LABELS, type Update } from '../viewer/ui/DisplaySettingsForm';
 import { RowActions } from './ListRow';
 import { AutoSizeTextarea } from './AutoSizeTextarea';
-
-const SAVE_DELAY_MS = 400;
+import { useEditableList } from './useEditableList';
 
 /** A rule being edited: `id` follows it through moves; `text` is the textarea, one related-file pattern per line. */
 interface DraftRule {
@@ -24,8 +23,6 @@ let nextId = 1;
 const toDraft = (rules: readonly RelatedRule[]): DraftRule[] => rules.map((r) => ({ id: nextId++, main: r.main, text: r.companions.join('\n') }));
 const fromDraft = (draft: readonly DraftRule[]): RelatedRule[] =>
   draft.map((d) => ({ main: d.main.trim(), companions: d.text.split('\n').map((p) => p.trim()).filter(Boolean) }));
-
-type Status = { kind: 'idle' } | { kind: 'saved' } | { kind: 'error'; message: string };
 
 const DESCRIPTIONS: Record<RelatedStyle, string> = {
   nested: 'A related file folds into one line at the bottom of its main file. Click it to open its diff.',
@@ -188,85 +185,17 @@ function PathsProbe({ rules }: { rules: readonly RelatedRule[] }) {
 }
 
 export function RelatedFilesSettingsForm({ style, update }: { style: RelatedStyle; update: Update }) {
-  const [draft, setDraft] = useState<DraftRule[] | null>(null);
-  const [status, setStatus] = useState<Status>({ kind: 'idle' });
-  /** What storage holds. */
-  const saved = useRef<DraftRule[]>([]);
-  const submitted = useRef<DraftRule[] | null>(null);
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  /** A valid edit waiting out SAVE_DELAY_MS; written at once if the page is closed or hidden first. */
-  const pending = useRef<DraftRule[] | null>(null);
-
-  const commit = (next: DraftRule[]) => {
-    clearTimeout(timer.current);
-    pending.current = null;
-    submitted.current = next;
-    // Issued before pagehide returns; this page may die before the promise settles.
-    saveRelatedRules(fromDraft(next)).then(
-      () => {
-        if (submitted.current !== next) return;
-        saved.current = next;
-        if (sameRules(fromDraft(draftRef.current ?? []), fromDraft(next))) setStatus({ kind: 'saved' });
-      },
-      (err: unknown) => {
-        if (submitted.current !== next) return;
-        submitted.current = saved.current;
-        setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
-      },
-    );
-  };
-  const commitRef = useRef(commit);
-  commitRef.current = commit;
-
-  useEffect(() => {
-    let active = true;
-    let changed = false;
-    const adopt = (rules: RelatedRule[]) => {
-      // Another context's change (or the echo of ours): take it unless this page has unsaved edits.
-      setDraft((current) => {
-        if (current && !sameRules(fromDraft(current), fromDraft(saved.current))) return current;
-        if (current && sameRules(fromDraft(current), rules)) return current;
-        const next = toDraft(rules);
-        saved.current = next;
-        submitted.current = next;
-        return next;
-      });
-    };
-    const initial = (rules: RelatedRule[]) => { if (active && !changed) adopt(rules); };
-    void loadRelatedRules().then(initial, () => initial(defaultRules()));
-    const off = onRelatedRulesChange((rules) => {
-      changed = true;
-      adopt(rules);
-    });
-    const flush = () => {
-      if (pending.current) commitRef.current(pending.current);
-    };
-    const onHidden = () => document.visibilityState === 'hidden' && flush();
-    window.addEventListener('pagehide', flush);
-    document.addEventListener('visibilitychange', onHidden);
-    return () => {
-      active = false;
-      off();
-      window.removeEventListener('pagehide', flush);
-      document.removeEventListener('visibilitychange', onHidden);
-      flush();
-    };
-  }, []);
-
+  const { draft, status, edit } = useEditableList({
+    load: loadRelatedRules,
+    subscribe: onRelatedRulesChange,
+    defaults: defaultRules,
+    toDraft,
+    fromDraft,
+    same: sameRules,
+    problem: rulesProblem,
+    save: saveRelatedRules,
+  });
   const rules = useMemo(() => (draft ? fromDraft(draft) : []), [draft]);
-
-  const edit = (next: DraftRule[]) => {
-    setDraft(next);
-    clearTimeout(timer.current);
-    pending.current = null;
-    const problem = rulesProblem(fromDraft(next));
-    if (problem) return setStatus({ kind: 'error', message: problem });
-    setStatus({ kind: 'idle' });
-    pending.current = next;
-    timer.current = setTimeout(() => commit(next), SAVE_DELAY_MS);
-  };
 
   const move = (i: number, by: -1 | 1) => {
     if (!draft) return;
