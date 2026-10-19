@@ -6,6 +6,9 @@ Newest first. Each release's GitHub notes are its section here (`scripts/release
 
 ### Fixes
 
+- A push to the pull request now shows GitHub's Refresh button in the toolbar within seconds, as on GitHub's own Files
+  changed page. The old notice at the bottom of the viewer was below the screen with "Scroll with the page" on, and
+  showed up to a minute late. Refresh still keeps your drafts and open comment boxes.
 - With "Scroll with the page" on, messages at the bottom of the viewer (errors, for one) are on screen before you
   scroll, too.
 

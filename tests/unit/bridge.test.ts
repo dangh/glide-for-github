@@ -554,6 +554,108 @@ describe('bridge markViewed / unmarkViewed (R§3 file_review, session fallback)'
   });
 });
 
+describe("bridge waitForGitUpdate (GitHub's live channel, R§1.5)", () => {
+  const CHANNEL = 'eyJjIjoicHVsbF9yZXF1ZXN0OjEifQ==--0123abcd';
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    document.body.innerHTML = '';
+  });
+
+  /** What GitHub's page script dispatches on a subscribed `.js-socket-channel` element. */
+  const announce = (eventUpdates: Record<string, boolean>, wait = 0) => {
+    const el = document.querySelector<HTMLElement>(`.js-socket-channel[data-channel="${CHANNEL}"]`)!;
+    el.dispatchEvent(new CustomEvent('socket:message', { detail: { name: 'pull_request:1', data: { wait, reason: 'pull request #1 updated', event_updates: eventUpdates } } }));
+  };
+  const setup = (header: unknown = { aliveChannel: CHANNEL, pullRequest: { headSha: SHA } }) => {
+    const { fn, calls } = fakeFetch(() => json(header));
+    return { bridge: createBridgeImpl({ doc: document, fetch: fn }), calls };
+  };
+  const wait = (bridge: ReturnType<typeof createBridgeImpl>) => {
+    const state: { value?: boolean; done: boolean } = { done: false };
+    void Promise.resolve(bridge.waitForGitUpdate('dangh', 'pierre-sandbox', 1)).then((v) => Object.assign(state, { value: v, done: true }));
+    return state;
+  };
+
+  it("subscribes GitHub's way (a hidden .js-socket-channel element named by page_data/header) and answers true on a push", async () => {
+    const { bridge, calls } = setup();
+    const w = wait(bridge);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls.map((c) => c.url)).toEqual(['https://github.com/dangh/pierre-sandbox/pull/1/page_data/header']);
+    const el = document.querySelector<HTMLElement>('.js-socket-channel')!;
+    expect(el.dataset.channel).toBe(CHANNEL);
+    expect(el.hidden).toBe(true);
+    announce({ git_updated: true, timeline_updated: true });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(w).toEqual({ value: true, done: true });
+  });
+
+  it('ignores comments (timeline_updated only), and answers false after 25 s without a push', async () => {
+    const { bridge } = setup();
+    const w = wait(bridge);
+    await vi.advanceTimersByTimeAsync(0);
+    announce({ timeline_updated: true });
+    await vi.advanceTimersByTimeAsync(24_999);
+    expect(w.done).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w).toEqual({ value: false, done: true });
+  });
+
+  it("answers after GitHub's own wait (its jitter before refetching)", async () => {
+    const { bridge } = setup();
+    const w = wait(bridge);
+    await vi.advanceTimersByTimeAsync(0);
+    announce({ git_updated: true }, 430);
+    await vi.advanceTimersByTimeAsync(429);
+    expect(w.done).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w).toEqual({ value: true, done: true });
+  });
+
+  it('reads the channel once per pull request and shares one element; every waiting call hears the push', async () => {
+    const { bridge, calls } = setup();
+    const a = wait(bridge);
+    const b = wait(bridge);
+    await vi.advanceTimersByTimeAsync(0);
+    announce({ git_updated: true });
+    await vi.advanceTimersByTimeAsync(0);
+    expect([a.value, b.value]).toEqual([true, true]);
+    const c = wait(bridge);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls).toHaveLength(1);
+    expect(document.querySelectorAll('.js-socket-channel')).toHaveLength(1);
+    expect(c.done).toBe(false);
+  });
+
+  it('puts its element back when GitHub replaced the body', async () => {
+    const { bridge } = setup();
+    wait(bridge);
+    await vi.advanceTimersByTimeAsync(0);
+    document.body.innerHTML = '';
+    const w = wait(bridge);
+    await vi.advanceTimersByTimeAsync(0);
+    announce({ git_updated: true });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(w).toEqual({ value: true, done: true });
+  });
+
+  it('rejects unsupported when the header names no channel, and reads it again on the next call', async () => {
+    const { bridge, calls } = setup({ pullRequest: { headSha: SHA } });
+    await expect(bridge.waitForGitUpdate('dangh', 'pierre-sandbox', 1)).rejects.toMatchObject({ code: 'unsupported' });
+    await expect(bridge.waitForGitUpdate('dangh', 'pierre-sandbox', 1)).rejects.toMatchObject({ code: 'unsupported' });
+    expect(calls).toHaveLength(2);
+    expect(document.querySelector('.js-socket-channel')).toBeNull();
+  });
+
+  it('rejects a pull request that is not plain names and a positive number, with no request', async () => {
+    const { bridge, calls } = setup();
+    for (const [o, r, n] of [['..', 'r', 1], ['o', 'r/x', 1], ['o', 'r', 0], ['o', 'r', 1.5]] as const) {
+      await expect(bridge.waitForGitUpdate(o, r, n)).rejects.toMatchObject({ code: 'bad_request' });
+    }
+    expect(calls).toHaveLength(0);
+  });
+});
+
 describe('startBridge handshake', () => {
   const ports: MessagePort[] = [];
   const newChannel = () => {

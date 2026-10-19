@@ -26,8 +26,8 @@ review features: comments, suggestions, resolving threads, viewed files and revi
 - Commit range picker (all commits, one commit, a range) and hide-whitespace.
 - File groups: tabs in the toolbar show one kind of file at a time in the tree and the diffs (see
   [File groups](#file-groups)).
-- When someone pushes to the pull request, a "This pull request was updated" banner offers Reload. Glide checks every
-  60 s while its tab is visible and never reloads by itself; Reload keeps your drafts and open comment boxes.
+- When someone pushes to the pull request, a Refresh button appears in the toolbar within seconds, as on GitHub's Files
+  changed page. Glide never reloads by itself; Refresh keeps your drafts and open comment boxes.
 - Reading needs no token. Posting comments, replies, reviews, edits and reactions needs one (next section). Applying
   suggestions, resolving threads and marking files viewed use your signed-in GitHub session, so they work without a
   token.

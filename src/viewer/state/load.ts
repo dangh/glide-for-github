@@ -45,7 +45,7 @@ export async function loadPr(
 }
 
 /**
- * Soft reload of the current PR (the "This pull request was updated" banner, and after a head move): new PR data and
+ * Soft reload of the current PR (the toolbar's Refresh button, and after a head move): new PR data and
  * threads without reloading the page, so the suggestion batch, drafts and open composers are kept.
  */
 export async function reloadPr(): Promise<void> {

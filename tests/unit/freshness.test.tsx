@@ -3,6 +3,7 @@ import { getSingularPatch } from '@pierre/diffs';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { BridgeError } from '../../src/shared/rpc';
 import { PORT_TIMEOUT_MESSAGE, PORT_TIMEOUT_MS, watchPort } from '../../src/viewer/connection';
 import { fetchHeadOid, type FileSummary, type PrData, type Rpc } from '../../src/viewer/github/private';
 import { openComposer, targetFromRange } from '../../src/viewer/state/compose';
@@ -55,10 +56,14 @@ const route = (headOid: string) => ({
 /** The `page_data/header` payload `fetchHeadOid` reads (abridged), with the given head. */
 const header = (headSha: string) => ({ data: { pullRequest: { headSha, number: 7 }, mergeStatusButtonData: { headSha } }, link: null });
 
+/** The answer to `waitForGitUpdate` where a test is not about live updates: no push ever arrives. */
+const NO_PUSH = new Promise<boolean>(() => undefined);
+
 function fakeRpc(heads: () => string) {
   const calls: unknown[][] = [];
   const rpc = {
     call: vi.fn(async (...args: unknown[]) => {
+      if (args[0] === 'waitForGitUpdate') return NO_PUSH;
       calls.push(args);
       return String(args[1]).endsWith('/page_data/header') ? header(heads()) : route(heads());
     }),
@@ -219,6 +224,7 @@ describe('freshness polling', () => {
     const calls: unknown[][] = [];
     const rpc = {
       call: vi.fn(async (...args: unknown[]) => {
+        if (args[0] === 'waitForGitUpdate') return NO_PUSH;
         calls.push(args);
         await gate;
         return header(head);
@@ -357,6 +363,7 @@ describe('freshness polling', () => {
       headChecks = 0;
       return {
         call: vi.fn(async (method: string, path: string, _query?: unknown, opts?: unknown) => {
+          if (method === 'waitForGitUpdate') return NO_PUSH;
           if (method === 'applySuggestions') return {};
           if (method === 'get' && String(path).endsWith('/page_data/header')) {
             headChecks++;
@@ -407,6 +414,119 @@ describe('freshness polling', () => {
       await vi.advanceTimersByTimeAsync(30_000);
       expect(routeCalls + headChecks).toBe(0);
       stop();
+    });
+  });
+
+  describe("pushes reported by GitHub's live channel (waitForGitUpdate)", () => {
+    /** An rpc whose `waitForGitUpdate` calls the test settles one by one; every other call is a header read. */
+    const liveRpc = () => {
+      const waits: { args: unknown[]; resolve(v: boolean): void; reject(e: unknown): void }[] = [];
+      const reads: unknown[][] = [];
+      const rpc = {
+        call: vi.fn((...args: unknown[]) => {
+          if (args[0] === 'waitForGitUpdate') return new Promise((resolve, reject) => waits.push({ args: args.slice(1), resolve, reject }));
+          reads.push(args);
+          return Promise.resolve(header(head));
+        }),
+      } as unknown as Rpc;
+      return { rpc, waits, reads };
+    };
+    const startLive = (visibility: DocumentVisibilityState = 'visible') => {
+      const live = liveRpc();
+      const d = fakeDoc(visibility);
+      const f = createFreshness({ rpc: () => live.rpc, doc: d.doc });
+      f.start();
+      return { ...live, f, d };
+    };
+
+    it('a push shows Refresh within moments, without waiting for the 60 s poll, and the next push is awaited', async () => {
+      const { waits, reads, f } = startLive();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(waits).toHaveLength(1);
+      expect(waits[0]!.args).toEqual(['o', 'r', 7]);
+      head = HEAD2;
+      waits[0]!.resolve(true);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(reads).toHaveLength(1);
+      expect(usePr.getState().headMoved).toBe(true);
+      expect(waits).toHaveLength(2);
+      f.stop();
+    });
+
+    it('no push within the wait: waits again, no request', async () => {
+      const { waits, reads, f } = startLive();
+      await vi.advanceTimersByTimeAsync(0);
+      waits[0]!.resolve(false);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(waits).toHaveLength(2);
+      expect(reads).toHaveLength(0);
+      f.stop();
+    });
+
+    it('a push less than 15 s after the last check is checked 15 s after that check', async () => {
+      const { waits, reads, f } = startLive();
+      await f.check();
+      expect(reads).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(5_000);
+      head = HEAD2;
+      waits[0]!.resolve(true);
+      await vi.advanceTimersByTimeAsync(9_999);
+      expect(reads).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(reads).toHaveLength(2);
+      expect(usePr.getState().headMoved).toBe(true);
+      f.stop();
+    });
+
+    it('a push while the tab is hidden makes no request; becoming visible checks', async () => {
+      const { waits, reads, f, d } = startLive('hidden');
+      await vi.advanceTimersByTimeAsync(0);
+      head = HEAD2;
+      waits[0]!.resolve(true);
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(reads).toHaveLength(0);
+      d.set('visible');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(reads).toHaveLength(1);
+      expect(usePr.getState().headMoved).toBe(true);
+      f.stop();
+    });
+
+    it('a PR without a live channel stops waiting; the 60 s poll goes on', async () => {
+      const { waits, reads, f } = startLive();
+      await vi.advanceTimersByTimeAsync(0);
+      waits[0]!.reject(new BridgeError({ status: 0, code: 'unsupported', message: 'no channel' }));
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(waits).toHaveLength(1);
+      expect(reads).toHaveLength(1);
+      f.stop();
+    });
+
+    it('a failed wait is tried again 15 s later', async () => {
+      const { waits, f } = startLive();
+      await vi.advanceTimersByTimeAsync(0);
+      waits[0]!.reject(new BridgeError({ status: 0, code: 'network', message: 'offline' }));
+      await vi.advanceTimersByTimeAsync(14_999);
+      expect(waits).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(waits).toHaveLength(2);
+      f.stop();
+    });
+
+    it('starts waiting once the PR is loaded, and stop() ends it', async () => {
+      usePr.setState({ pr: null });
+      const { waits, reads, f } = startLive();
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(waits).toHaveLength(0);
+      usePr.getState().setPr(pr);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(waits).toHaveLength(1);
+      f.stop();
+      head = HEAD2;
+      waits[0]!.resolve(true);
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(reads).toHaveLength(0);
+      expect(waits).toHaveLength(1);
     });
   });
 });

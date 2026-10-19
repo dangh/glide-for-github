@@ -115,6 +115,12 @@ export type BridgeMethods = {
    */
   markViewed(owner: string, repo: string, number: number, path: string): Json;
   unmarkViewed(owner: string, repo: string, number: number, path: string): Json;
+  /**
+   * Resolves true when GitHub's live channel for the PR reports a git update (a push), false when none came within
+   * `GIT_UPDATE_WAIT_MS` (call again). Rejects `unsupported` when GitHub names no channel for the PR. No request per
+   * call: the PR's channel is read once (`page_data/header`) and subscribed the way GitHub's own page does.
+   */
+  waitForGitUpdate(owner: string, repo: string, number: number): boolean;
 };
 
 /**
@@ -123,7 +129,7 @@ export type BridgeMethods = {
  * other session write (resolve/unresolve, mark/unmark viewed) may already have reached GitHub when the port
  * closed, so it is never re-sent blindly: it rejects with `closed` and the user retries.
  */
-export const RETRY_ON_CLOSED: ReadonlySet<keyof BridgeMethods> = new Set<keyof BridgeMethods>(['get', 'getText', 'preview', 'applySuggestions']);
+export const RETRY_ON_CLOSED: ReadonlySet<keyof BridgeMethods> = new Set<keyof BridgeMethods>(['get', 'getText', 'preview', 'applySuggestions', 'waitForGitUpdate']);
 
 /** Orders apply-suggestion comments by (id, suggestionIndex), absent index first, as GitHub's client sends them (R§5). */
 export function sortSuggestionComments<T extends { id: number; suggestionIndex?: number }>(comments: readonly T[]): T[] {
