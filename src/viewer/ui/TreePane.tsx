@@ -11,7 +11,7 @@ import type { FileTreeDirectoryHandle, GitStatusEntry } from '@pierre/trees';
 import { FileTree, useFileTree } from '@pierre/trees/react';
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { DEFAULT_SETTINGS, toTreeOptions, type TreeSettings } from '../../shared/settings';
-import { useActiveGroup } from '../state/fileGroups';
+import { useActiveGroup, useFileGroups } from '../state/fileGroups';
 import { session } from '../state/session';
 import { effectiveThemeType, useSettings } from '../state/settings';
 import { usePr } from '../state/store';
@@ -136,6 +136,7 @@ function Tree({ paths, gitStatus, settings, colorScheme }: { paths: readonly str
 
 export const TreePane = memo(function TreePane() {
   const { shown } = useActiveGroup();
+  const groupsLoaded = useFileGroups((s) => s.loaded);
   const pr = usePr((s) => s.pr);
   const settings = useSettings((s) => s.settings.tree);
   const themeType = useSettings((s) => effectiveThemeType(s.settings.diff.themeType, s.colorMode));
@@ -143,7 +144,8 @@ export const TreePane = memo(function TreePane() {
   const key = useMemo(() => JSON.stringify(settings), [settings]);
   const colorScheme = themeType === 'system' ? 'light dark' : themeType;
 
-  if (!pr) return <aside className="pierre-tree-pane" />;
+  // Like the diff list, the tree waits for the file groups so it never shows another group's files first.
+  if (!pr || !groupsLoaded) return <aside className="pierre-tree-pane" />;
   return (
     <aside className="pierre-tree-pane" data-testid="tree">
       <Tree key={`${pr.headOid}:${key}`} paths={shown} gitStatus={gitStatus} settings={settings} colorScheme={colorScheme} />

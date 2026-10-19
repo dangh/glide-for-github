@@ -11,6 +11,7 @@ import type { DisplaySettings } from '../shared/settings';
 import { PORT_TIMEOUT_MESSAGE } from './connection';
 import type { Rpc } from './github/private';
 import { startLoader } from './state/controller';
+import { useFileGroups } from './state/fileGroups';
 import { loadPr } from './state/load';
 import { session } from './state/session';
 import { effectiveThemeType, useSettings } from './state/settings';
@@ -57,6 +58,7 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
   const fatal = usePr((s) => s.fatal);
   const range = usePr((s) => s.range);
   const settingsLoaded = useSettings((s) => s.loaded);
+  const groupsLoaded = useFileGroups((s) => s.loaded);
   const hideWhitespace = useSettings((s) => s.settings.review.hideWhitespace);
   const diffSettings = useSettings((s) => s.settings.diff);
   const themeType = useSettings((s) => effectiveThemeType(s.settings.diff.themeType, s.colorMode));
@@ -117,7 +119,10 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
         {/* A hidden tree stays mounted (display: none), so its expanded folders and filter survive a collapse. */}
         <div className="pierre-body" data-tree-position={treePosition} data-tree-hidden={showTree ? undefined : ''}>
           {treePosition === 'left' && <TreePane />}
-          <main className="pierre-main">{pr && settingsLoaded ? <DiffPane rpc={rpc} /> : <div className="pierre-loading">Loading pull request…</div>}</main>
+          {/* The list waits for the file groups too, so it never shows other groups' files first (Sift's no-flash fix). */}
+          <main className="pierre-main">
+            {pr && settingsLoaded && groupsLoaded ? <DiffPane rpc={rpc} /> : <div className="pierre-loading">Loading pull request…</div>}
+          </main>
           {treePosition === 'right' && <TreePane />}
         </div>
         <Notice />
