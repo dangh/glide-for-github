@@ -3,7 +3,7 @@
 <h1 align="center">Glide for GitHub</h1>
 
 A Chrome extension (Manifest V3) that adds a **Glide** tab next to **Files changed** on GitHub pull requests. The tab
-shows the same pull request with a fast diff viewer and file tree, powered by
+shows the same pull request with a virtualized diff viewer and file tree, powered by
 [Pierre](https://diffs.com) ([@pierre/diffs](https://www.npmjs.com/package/@pierre/diffs),
 [@pierre/trees](https://www.npmjs.com/package/@pierre/trees)), and keeps the GitHub
 review features: comments, suggestions, resolving threads, viewed files and review submission.
@@ -12,8 +12,8 @@ review features: comments, suggestions, resolving threads, viewed files and revi
 
 ## What it does
 
-- Renders every changed file in one fast, virtualized diff view (split or unified), with a file tree beside it. The
-  Glide tab shows the changed-file count, like Files changed.
+- Renders every changed file in one virtualized diff view (split or unified), with a file tree beside it. The
+  diffs scroll with GitHub's page, and the Glide tab shows the changed-file count, like Files changed.
 - A file tree button in the toolbar, like GitHub's, hides or shows the tree. It sits on the tree's side: first in the
   toolbar, or last when the tree is on the right.
 - Comment on a line, a range of lines (drag over the gutter) or a whole file. The composer has a Write / Preview toggle
@@ -41,10 +41,8 @@ review features: comments, suggestions, resolving threads, viewed files and revi
 - The options page shows Glide's icon and the installed version, which links to that version's release notes.
 - Replace Files changed with Glide, off by default, on the options page: GitHub's Files changed tab is hidden, Glide
   takes its place, and links to that page open Glide; the Display menu still links to GitHub's page.
-- Experimental, off by default, on the options page only: scroll the diffs with GitHub's page (its header scrolls
-  away and the page ends with the diffs, like GitHub's own Files changed page), and fold GitHub's sticky pull request
-  header into Glide's toolbar, with the stack button of a stacked pull request (its menu opens the other pull requests
-  of the stack in Glide).
+- Experimental, off by default, on the options page only: fold GitHub's sticky pull request header into Glide's
+  toolbar, with the stack button of a stacked pull request. Its menu opens the other pull requests of the stack in Glide.
 
 ## File groups
 
@@ -85,13 +83,9 @@ two.
   file" tag for lock files, its counts and its comment count. Click the line to open its diff, where comments,
   suggestions and expanders work as in any file. One Viewed covers the main file and its related files; it marks each
   of them viewed on GitHub, and shows checked only when all are viewed. The viewed counter still counts files.
-- **One box.** The files share one box under a "package.json + 1 related" header with their summed counts, each file
-  with its own small header and full diff.
-- **Group rail.** The files keep their own boxes under a "package.json · 2 files" line with a "Viewed all" checkbox, tied
-  by a rail.
 - **Off.** Every file on its own, in GitHub's order.
 
-Pick the look in the Display menu or on the options page, which shows a preview of each. In the file tree a related
+Choose Nested or Off in the Display menu or on the options page, which previews both choices. In the file tree a related
 file sits right after its main file, indented and dimmed; clicking it opens it. With file groups, files are related
 only when both are in the open group; otherwise each shows on its own, as does a related file whose main file the pull
 request doesn't change.
@@ -148,8 +142,8 @@ extension icon, then **Options**).
   used to expand unchanged context). The Preview tab of the comment box posts your draft text to github.com's `/preview`
   so GitHub can render it. No third parties; it has no server of its own, no analytics and loads no remote code.
 - Your token is stored in `chrome.storage.local`, on this device only, with the GitHub username it belongs to. It is
-  sent only to `api.github.com`, only from the extension's own pages, never to the github.com page, and the options
-  page never displays it.
+  sent only to `api.github.com`, directly from the extension's isolated content script or its options page. API
+  requests do not pass the token through GitHub's page scripts, and the options page never displays saved tokens.
 - Settings, file groups and related-files rules are stored in `chrome.storage.sync` (each file group is its own item),
   so Chrome can sync them between your signed-in browsers. They contain no tokens and no pull request data.
 - The Sift import only parses the text you paste; Glide reads nothing from Sift. The full list of what Glide stores,
