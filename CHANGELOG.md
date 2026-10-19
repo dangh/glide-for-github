@@ -8,6 +8,8 @@ Newest first. Each release's GitHub notes are its section here (`scripts/release
 
 - Split view no longer draws a white strip between the old and new sides: like GitHub's, the old side's code meets
   the new side's line numbers directly, through changed lines, empty sides and expander rows.
+- No more "ResizeObserver loop completed with undelivered notifications" in Glide's errors on chrome://extensions:
+  Chrome's harmless resize report is marked handled.
 
 ## 0.3.1 (2026-10-19)
 

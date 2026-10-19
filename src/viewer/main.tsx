@@ -4,6 +4,7 @@ import { parseScrollLayout, restoreKey } from '../shared/page-scroll';
 import { prKey } from '../shared/pr-url';
 import { reachedBreakpoints, type Breakpoint } from '../shared/viewport';
 import { App } from './App';
+import { ignoreBenignErrors } from './benignErrors';
 import { createConnection, parsePrParam, watchPort } from './connection';
 import { createPageScrollView, type PageScrollView } from './pageScroll';
 import { initBatchPersistence } from './state/batch';
@@ -22,6 +23,7 @@ declare global {
   }
 }
 window.__pierre = { store: usePr, settings: useSettings, session, review, fileGroups: useFileGroups };
+ignoreBenignErrors(window);
 
 const root = createRoot(document.getElementById('root')!);
 const prRef = parsePrParam(location.search);
