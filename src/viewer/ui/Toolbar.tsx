@@ -1,6 +1,6 @@
 /**
- * Toolbar, laid out like GitHub's Files changed toolbar: file tree button, commit range, then viewed counter, Submit
- * review and the Display (settings) button; with the tree on the right, its button ends the toolbar instead. The file
+ * Toolbar, laid out like GitHub's Files changed toolbar: file tree button, commit range, then Refresh (once the pull
+ * request was pushed to), viewed counter, Submit review and the Display (settings) button; with the tree on the right, its button ends the toolbar instead. The file
  * group tabs take the space left before the viewed counter, as Sift puts them on GitHub's toolbar. Outside
  * the merged bar, Split/Unified, Wrap and Hide whitespace sit after the commit range while the toolbar is wide enough
  * (they are also in the Display menu). With the merged bar (page-scrolling experiment) the toolbar has no such toggles,
@@ -22,6 +22,7 @@ import { session } from '../state/session';
 import { usePr } from '../state/store';
 import { CommitRangePicker } from './CommitRangePicker';
 import { DisplayMenu } from './DisplayMenu';
+import { RefreshButton } from './Notice';
 import { FileGroupTabs } from './FileGroupTabs';
 import {
   CheckIcon,
@@ -254,6 +255,7 @@ export const Toolbar = memo(function Toolbar() {
         </>
       )}
       <FileGroupTabs />
+      <RefreshButton />
       <ViewedCounter />
       <span className="toolbar-divider" />
       <ReviewMenu />

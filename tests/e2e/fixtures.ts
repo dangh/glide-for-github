@@ -204,6 +204,56 @@ export class Viewer {
   }
 }
 
+/**
+ * Whether the viewer element `selector` is on screen and on top: inside the iframe's viewport and GitHub's, the viewer
+ * hits it at its centre, and GitHub's page hits the iframe there.
+ */
+export async function placement(page: Page, viewer: Viewer, selector: string) {
+  const inner = await viewer.frame().evaluate((sel) => {
+    const el = document.querySelector(sel)!;
+    const r = el.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return { left: r.left, top: r.top, width: r.width, height: r.height, frameHeight: innerHeight, onTop: !!hit && el.contains(hit) };
+  }, selector);
+  const outer = await page.evaluate((b) => {
+    const iframe = document.querySelector('iframe[data-pierre-viewer]')!;
+    const r = iframe.getBoundingClientRect();
+    const top = r.top + b.top;
+    const hit = document.elementFromPoint(r.left + b.left + b.width / 2, top + b.height / 2);
+    return { top, bottom: top + b.height, viewportHeight: innerHeight, onTop: hit === iframe };
+  }, inner);
+  return {
+    inFrame: inner.top >= 0 && inner.top + inner.height <= inner.frameHeight,
+    inViewport: outer.top >= 0 && outer.bottom <= outer.viewportHeight,
+    onTopInViewer: inner.onTop,
+    onTopInPage: outer.onTop,
+  };
+}
+export const ON_SCREEN = { inFrame: true, inViewport: true, onTopInViewer: true, onTopInPage: true };
+
+export type Experiments = { pageScroll: boolean; mergedBar: boolean } | null;
+
+/**
+ * Writes (or with null removes) the stored experiments, and the tree side when given, keeping every other stored
+ * setting, then brings `back` to the front again (a background tab renders no frames, so it would not scroll).
+ */
+export async function setExperiments(context: BrowserContext, experiments: Experiments, back?: Page, treePosition?: 'left' | 'right') {
+  const ext = await context.newPage();
+  await ext.goto(`chrome-extension://${extensionId()}/options.html`);
+  await ext.evaluate(
+    async ({ value, side }) => {
+      const stored = ((await chrome.storage.sync.get('pierre.settings'))['pierre.settings'] ?? {}) as Record<string, unknown>;
+      if (value) stored.experiments = value;
+      else delete stored.experiments;
+      if (side) stored.layout = { ...(stored.layout as object | undefined), treePosition: side };
+      await chrome.storage.sync.set({ 'pierre.settings': stored });
+    },
+    { value: experiments, side: treePosition },
+  );
+  await ext.close();
+  await back?.bringToFront();
+}
+
 /** Opens a PR page and switches to the Glide tab by clicking it (or with `#glide`). */
 export async function openPierre(page: Page, pr: PrId, how: 'click' | 'hash' = 'click'): Promise<Viewer> {
   if (how === 'hash') {

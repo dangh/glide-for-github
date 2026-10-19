@@ -1254,7 +1254,7 @@ html[data-scroll-layout] .pierre-body[data-tree-position='left'] .pierre-diffs {
 /* Notices */
 .toast {
   position: fixed;
-  bottom: 16px;
+  bottom: calc(16px + var(--hidden-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -1282,11 +1282,47 @@ html[data-scroll-layout] .pierre-body[data-tree-position='left'] .pierre-diffs {
   line-height: 1;
 }
 
-.banner {
-  padding: 6px 12px;
-  background: var(--pierre-accent-bg);
-  border-top: 1px solid var(--pierre-accent-border);
-  font-size: 13px;
+/*
+ * GitHub's Refresh button (the pull request was pushed to): a small invisible Primer button in its severe colors,
+ * semibold, underlined on hover; below GitHub's md viewport the icon alone.
+ */
+.refresh-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  color: light-dark(#bc4c00, #db6d28);
+  background: light-dark(#fff1e5, rgba(219, 109, 40, 0.1));
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.refresh-button:hover {
+  text-decoration: underline;
+}
+
+.refresh-button[data-busy] {
+  cursor: progress;
+}
+
+.refresh-button[data-busy] svg {
+  animation: refresh-spin 1s linear infinite;
+}
+
+@keyframes refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+html:not([data-viewport~='md']) .refresh-label {
+  display: none;
 }
 
 .fatal {

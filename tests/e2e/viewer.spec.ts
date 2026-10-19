@@ -67,6 +67,19 @@ const gitLane = (viewer: Viewer) =>
     return { rows: lanes.length, letters: lanes.map((l) => l.textContent?.trim() ?? '').filter((t) => /^[AMDR]$/.test(t)) };
   });
 
+/** One row of screen pixels at viewer coordinates, as '#rrggbb', read from a real screenshot. */
+async function pixelRow(viewer: Viewer, x: number, y: number, width: number): Promise<string[]> {
+  const frame = (await viewer.page.locator('iframe[data-pierre-viewer]').boundingBox())!;
+  const png = await viewer.page.screenshot({ clip: { x: frame.x + x, y: frame.y + y, width, height: 1 } });
+  return viewer.frame().evaluate(async (b64) => {
+    const img = await createImageBitmap(new Blob([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))]));
+    const g = new OffscreenCanvas(img.width, 1).getContext('2d')!;
+    g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, img.width, 1).data;
+    return Array.from({ length: img.width }, (_, i) => `#${[0, 1, 2].map((k) => d[i * 4 + k]!.toString(16).padStart(2, '0')).join('')}`);
+  }, png.toString('base64'));
+}
+
 test.describe('sandbox PR', () => {
   test('Glide tab is visible right after Files changed', async ({ page }) => {
     await page.goto(prUrl(SANDBOX), { waitUntil: 'domcontentloaded' });
@@ -538,6 +551,46 @@ test.describe('react/react#37778 (read-only)', () => {
     await row.click();
     await expect.poll(async () => (await viewer.item(FILE))!.lines - before, { timeout: 30_000 }).toBe(20);
     await expect.poll(() => diffText(viewer)).toContain(`${row.gap - 20} unmodified lines`);
+  });
+
+  test("Split view: the old side meets the new side's line numbers with no divider, like GitHub's", async ({ page }) => {
+    const viewer = await openPierre(page, REACT, 'hash');
+    await resetSettings(viewer);
+    // Line 7 is changed on both sides, and expander rows run above and below it.
+    const FILE = '.github/PULL_REQUEST_TEMPLATE.md';
+    for (const overflow of ['wrap', 'scroll'] as const) {
+      await viewer.frame().evaluate((o) => window.__pierre!.settings.getState().update({ diff: { diffStyle: 'split', overflow: o } }), overflow);
+      await viewer.scrollToFile(FILE);
+      const edge = () =>
+        viewer.frame().evaluate((p) => {
+          const header = [...document.querySelectorAll<HTMLElement>('.fh')].find((e) => e.dataset.path === p);
+          const root = header?.closest('diffs-container')?.shadowRoot;
+          const del = root?.querySelector('[data-deletions] [data-content] [data-line-type="change-deletion"]');
+          if (!root || !del) return null;
+          const top = del.getBoundingClientRect().top;
+          const num = [...root.querySelectorAll('[data-additions] [data-column-number][data-line-type="change-addition"]')].find(
+            (n) => Math.abs(n.getBoundingClientRect().top - top) < 1,
+          );
+          const separator = root.querySelector('[data-additions] [data-gutter] [data-separator]');
+          if (!num || !separator) return null;
+          return {
+            overflow: root.querySelector('[data-diff]')!.getAttribute('data-overflow'),
+            x: Math.round(num.getBoundingClientRect().left),
+            // Just inside the top of each row, above the text.
+            rowY: Math.round(top) + 1,
+            separatorY: Math.round(separator.getBoundingClientRect().top) + 2,
+          };
+        }, FILE);
+      await expect.poll(async () => (await edge())?.overflow, { timeout: 30_000 }).toBe(overflow);
+      const { x, rowY, separatorY } = (await edge())!;
+      // 8 px of the old side's deletion row, then 2 px of the new side's number cell.
+      const row = await pixelRow(viewer, x - 8, rowY, 10);
+      expect(row[0], `${overflow}: a colored deletion row`).not.toBe(row[9]);
+      expect(row.slice(0, 8), `${overflow}: deletion row up to the number cell, ${row.join(' ')}`).toEqual(Array(8).fill(row[0]));
+      const separator = await pixelRow(viewer, x - 8, separatorY, 16);
+      expect(separator, `${overflow}: one unbroken expander row, ${separator.join(' ')}`).toEqual(Array(16).fill(separator[0]));
+    }
+    await resetSettings(viewer);
   });
 
   test('one early click on the Glide tab opens Glide while GitHub is still loading', async ({ page }) => {

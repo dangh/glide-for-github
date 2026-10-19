@@ -6,7 +6,7 @@
  *   retried after a failure whose outcome is unknown (network, closed port, 5xx), so a request that did reach GitHub
  *   is not applied twice; it is cleared after success and after a definite refusal (4xx), so the next commit (other
  *   suggestions, or after a reload) never collides with a finished request.
- * - 409 `HEAD_OID_MISMATCH` ("head moved"): the store's `headMoved` is set (the "This pull request was updated" banner)
+ * - 409 `HEAD_OID_MISMATCH` ("head moved"): the store's `headMoved` is set (the toolbar's Refresh button)
  *   and the batch is kept. Recovery is a soft reload (`reloadPr`: new PR data, `headMoved` reset, batch kept and
  *   pruned); the batch also survives a real page reload (sessionStorage, see batch.ts).
  * - Success: the committed suggestions leave the batch and the PR data is reloaded (new head, threads marked applied).

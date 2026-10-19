@@ -49,6 +49,25 @@ export interface PageScrollView {
   attach(root: HTMLElement | null, anchors: ListAnchors | null): void;
 }
 
+/** Visibility steps of 1 %: the hidden part is known to within 1 % of the iframe's height (the toast's margin is 16 px). */
+const VISIBLE_STEPS = Array.from({ length: 101 }, (_, i) => i / 100);
+
+/**
+ * Until the page has scrolled the iframe up to where it sticks, the iframe's bottom is below GitHub's viewport.
+ * `--hidden-bottom` on the root element says by how much, so a notice anchored to the bottom (the toast) stays on
+ * screen.
+ */
+export function trackHiddenBottom(win: Window): void {
+  const root = win.document.documentElement;
+  new IntersectionObserver(
+    ([entry]) => {
+      const hidden = entry?.isIntersecting ? Math.max(0, win.innerHeight - entry.intersectionRect.bottom) : 0;
+      root.style.setProperty('--hidden-bottom', `${Math.round(hidden)}px`);
+    },
+    { threshold: VISIBLE_STEPS },
+  ).observe(root);
+}
+
 export function createPageScrollView(win: Window, layout: Exclude<ScrollLayout, 'frame'>, storageKey: string): PageScrollView {
   usePageScroll.setState({ layout });
   const requests = new ScrollRequests();
