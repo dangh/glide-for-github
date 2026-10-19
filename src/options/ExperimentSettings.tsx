@@ -32,7 +32,7 @@ export function ExperimentSettingsForm({ experiments, update }: { experiments: E
     <div className="options-checks">
       <Experiment
         label="Scroll with the page"
-        description="GitHub's page scrolls the diffs, so its header scrolls away and the footer is reachable, like GitHub's own Files changed page."
+        description="GitHub's page scrolls the diffs, so its header scrolls away and the page ends with the diffs, like GitHub's own Files changed page."
         value={experiments.pageScroll}
         onChange={(v) => set({ pageScroll: v })}
       />

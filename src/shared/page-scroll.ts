@@ -3,7 +3,8 @@
  *
  * Layout (src/content/page-scroll.ts): the viewer iframe is `position: sticky` at `stickTop` inside a wrapper that is
  * as tall as the iframe plus the list's scroll range (`extent`). Scrolling the page first moves GitHub's header out
- * of view; while the iframe is stuck, every page pixel is a list pixel; past the end, GitHub's footer scrolls in.
+ * of view; while the iframe is stuck, every page pixel is a list pixel. The page ends with the list: GitHub's footer is
+ * hidden while Glide scrolls with the page (src/content/page-scroll.ts).
  *
  * While the iframe is stuck the list scrolls natively (no lag on a busy GitHub page) and tells the page where it is;
  * otherwise the list cannot scroll and the wheel reaches the page. The page is the single source of truth: it maps

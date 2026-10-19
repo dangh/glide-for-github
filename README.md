@@ -33,8 +33,9 @@ review features: comments, suggestions, resolving threads, viewed files and revi
 - Replace Files changed with Glide, off by default, on the options page: GitHub's Files changed tab is hidden, Glide
   takes its place, and links to that page open Glide; the Display menu still links to GitHub's page.
 - Experimental, off by default, on the options page only: scroll the diffs with GitHub's page (its header scrolls
-  away and the footer is reachable), and fold GitHub's sticky pull request header into Glide's toolbar, with the
-  stack button of a stacked pull request (its menu opens the other pull requests of the stack in Glide).
+  away and the page ends with the diffs, like GitHub's own Files changed page), and fold GitHub's sticky pull request
+  header into Glide's toolbar, with the stack button of a stacked pull request (its menu opens the other pull requests
+  of the stack in Glide).
 
 ## File groups
 
