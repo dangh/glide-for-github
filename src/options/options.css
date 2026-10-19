@@ -599,6 +599,10 @@ body {
   resize: none;
 }
 
+.rule-editor-list .group-patterns[data-more] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5em), transparent);
+}
+
 /* Long group patterns stay scrollable; resizing is available while editing. */
 .rule-editor-list .group-patterns:not(.related-patterns):hover,
 .rule-editor-list .group-patterns:not(.related-patterns):focus {

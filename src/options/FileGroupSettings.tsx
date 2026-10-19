@@ -7,7 +7,7 @@ import { ALL_GROUP, classify, compileGroups, groupsProblem, parseSiftImport, typ
 import { defaultGroups, loadFileGroups, onFileGroupsChange, saveFileGroups, sameGroups } from '../shared/file-groups-storage';
 import type { FileGroupSettings } from '../shared/settings';
 import type { Update } from '../viewer/ui/DisplaySettingsForm';
-import { RowActions, textRows } from './ListRow';
+import { RowActions, usePreviewRows } from './ListRow';
 
 const SAVE_DELAY_MS = 400;
 
@@ -52,7 +52,7 @@ function GroupEditor({ draft, index, count, onChange, onMove, onDelete }: {
         aria-label={`Patterns of ${name}`}
         spellCheck={false}
         placeholder="One pattern per line"
-        rows={textRows(draft.text, 2, 6)}
+        {...usePreviewRows(draft.text, 2, 6)}
         value={draft.text}
         onChange={(e) => onChange({ ...draft, text: e.target.value })}
       />
