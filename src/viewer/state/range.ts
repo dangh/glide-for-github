@@ -29,8 +29,6 @@ export function commitIndexes(commits: CommitInfo[], range: CommitRange): { from
   return { from, to };
 }
 
-export const isWholePr = (range: CommitRange) => !range.base && !range.head;
-
 /** GitHub's `range` param for `diff_entries` / `diff_entry_lines`. */
 export function rangeParam(pr: Pick<PrData, 'headOid'>, range: CommitRange): string {
   const head = range.head ?? pr.headOid;

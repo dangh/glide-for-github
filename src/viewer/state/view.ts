@@ -44,9 +44,6 @@ export function itemMetricsFor(lineHeight: number, diff: MetricsChoices = DEFAUL
   return m;
 }
 
-/** Metrics at the default code font size and diff settings. */
-export const ITEM_METRICS = itemMetricsFor(DEFAULT_LINE_HEIGHT);
-
 export type DiffViewOptions = CodeViewReactOptions<AnnotationMeta, undefined>;
 
 /**

@@ -17,7 +17,6 @@ import {
   type ApplySuggestionsBody,
   type BridgeErrorPayload,
   type BridgeMethods,
-  type BridgeQuery,
   type Json,
   type PreviewContext,
   type RpcImpl,

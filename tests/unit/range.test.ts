@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { commitIndexes, isWholePr, rangeForCommits, rangeLabel, rangeOids, rangeParam } from '../../src/viewer/state/range';
+import { commitIndexes, rangeForCommits, rangeLabel, rangeOids, rangeParam } from '../../src/viewer/state/range';
 
 const commits = ['a1', 'b2', 'c3', 'd4'].map((oid) => ({ oid: oid.repeat(10), shortOid: oid, message: `commit ${oid}` }));
 const [a, b, c, d] = commits.map((x) => x.oid) as [string, string, string, string];
@@ -31,7 +31,5 @@ describe('commit range', () => {
     expect(rangeLabel(commits, {})).toBe('All commits');
     expect(rangeLabel(commits, { base: b, head: c })).toBe('1 commit: c3');
     expect(rangeLabel(commits, { base: a, head: d })).toBe('3 commits: b2..d4');
-    expect(isWholePr({})).toBe(true);
-    expect(isWholePr({ head: a })).toBe(false);
   });
 });
