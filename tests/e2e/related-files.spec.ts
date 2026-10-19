@@ -334,7 +334,7 @@ test.describe('related files', () => {
     }
   });
 
-  test('options page: two styles with previews, and the rules editor with add, reorder, delete, reset and try paths', async ({ page, extContext }) => {
+  test('options page: two styles with previews, and the rules editor with add, reorder, delete, reset and try paths', async ({ extContext }) => {
     const options = await extensionPage(extContext);
     try {
       const section = options.getByRole('region', { name: 'Related files' });
