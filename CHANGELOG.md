@@ -2,40 +2,36 @@
 
 Newest first. Each release's GitHub notes are its section here (`scripts/release-notes.sh`).
 
-## Unreleased
+## 0.4.0 (2026-10-20)
 
 ### New
 
-- **Related files.** A lock file shows with its manifest, and serverless parts with serverless.yml, so they read as one
-  change. By default each related file folds into one line at the bottom of its main file's box, with a "lock file" tag,
-  its counts and its comments; click it to open its diff. One Viewed covers the main file and its related files, and
-  marks each of them viewed on GitHub. In the tree, a related file sits right under its main file, indented. Pick
-  another look in the Display menu or on the options page (one box, a group rail, or off), and edit the rules there:
-  a main file pattern and its related files, in the same folder, with `${basename}` for the main file's name.
+- **Related files.** Lock files fold under their manifests, and serverless parts under `serverless.yml`. Open a related
+  file to read its diff, comment or suggest changes. One Viewed checkbox marks the main file and its related files
+  on GitHub. Related files also sit under their main file in the tree. Choose Nested or Off in Display or on the
+  options page, where you can edit the rules and try paths against them.
 
 ### Changed
 
-- The options page follows GitHub’s settings layout, with section navigation, consistent controls and responsive spacing.
-  It also has far fewer boxes. File groups and related-files rules share one outer border with horizontal dividers.
-  Names and patterns have subtly shaded fields and a clear focus outline,
-  instead of a border around every field. Up, Down and Delete are small arrow and trash icons that name what they act
-  on. Every textarea grows to fit its content, with at least four rows, even when unfocused.
-  Only the chosen related-files style has a frame.
+- **Page scrolling is now standard.** Diffs scroll directly with GitHub's page. The old "Scroll with the page" switch
+  is gone; merging GitHub's sticky header into Glide's toolbar remains optional and off by default.
+- The options page has section navigation and responsive spacing. File groups and related-files rules use compact
+  editable rows, and textareas grow to fit their content, with at least four rows.
 
 ### Fixes
 
-- A push to the pull request now shows GitHub's Refresh button in the toolbar within seconds, as on GitHub's own Files
-  changed page. The old notice at the bottom of the viewer was below the screen with "Scroll with the page" on, and
-  showed up to a minute late. Refresh still keeps your drafts and open comment boxes.
-- With "Scroll with the page" on, messages at the bottom of the viewer (errors, for one) are on screen before you
-  scroll, too.
-- Split view no longer draws a white strip between the old and new sides: like GitHub's, the old side's code meets
-  the new side's line numbers directly, through changed lines, empty sides and expander rows.
-- No more "ResizeObserver loop completed with undelivered notifications" in Glide's errors on chrome://extensions:
-  Chrome's harmless resize report is marked handled.
-- File boxes keep their right border when the page is zoomed, for one to 90% on a Retina Mac. A box that reached the
-  edge of the diff list or of Glide's frame lost its border there. The boxes still line up with the toolbar and with
-  GitHub's page above.
+- GitHub's Refresh button appears in the toolbar within seconds of a push to the pull request. Refresh keeps drafts
+  and open comment boxes.
+- Newer settings and related-files rules survive a slower initial storage read. File-group and related-rule editors
+  also preserve edits made while a save is in progress.
+- Rapid Viewed toggles run in order and restore the last confirmed state if a request fails.
+- Related-file rules handle malformed patterns safely and preserve literal characters in `${basename}`.
+- Named Jest configuration files belong to Manifest in the default file groups.
+- File-tree search, chevrons and viewed checkmarks line up with the rows. A tree on the right aligns with the header edge.
+- Nested related files sit directly under their main file without an extra gap.
+- Split view no longer draws a white strip between the old and new sides.
+- File boxes retain their right border when the page is zoomed, including 90% on a Retina display.
+- Chrome's harmless "ResizeObserver loop completed with undelivered notifications" report no longer appears as a Glide error.
 
 ## 0.3.1 (2026-10-19)
 

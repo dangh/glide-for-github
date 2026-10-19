@@ -1,17 +1,16 @@
 #!/usr/bin/env node
 /**
- * Takes the Chrome Web Store screenshots (1280x800) into store/screenshots/, headed, from react/react#37778 (public)
- * and the options page, all on the default settings and file groups (the profile's own are put back afterwards). Needs `npm run build` (dist/) and the logged-in e2e profile (see playwright.config.ts), and a
- * display: `DISPLAY=:0 WAYLAND_DISPLAY= node scripts/store-screenshots.mjs [out-dir]`.
- *
- * Read-only on GitHub: it opens a comment composer and types into it but never submits. Avatars are hidden, and the
- * script refuses to write a screenshot if the signed-in login (read from the page header), a STORE_SHOT_DENY word or a token-looking string
- * appears in any visible text.
+ * Capture five Chrome Web Store screenshots (1280x800) from a public PR and the options page.
+ * Requires a built dist/ and Node 24. Set PIERRE_SPIKE_PROFILE to the authorized signed-in profile;
+ * the browser fixtures clone it into a disposable directory, including this build's extension credentials.
+ * Run headless with PIERRE_E2E_HEADLESS=1 node scripts/store-screenshots.mjs [out-dir].
+ * A comment draft is typed and cancelled, never submitted. Private visible text blocks capture.
  */
 import { chromium } from '@playwright/test';
 import { evaluateInpage, waitForInpage, VIEWER_HOST } from './inpage-driver.mjs';
-import { mkdirSync, readdirSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { browserEnv, chromePath, cloneProfile, DIST, HEADLESS } from '../tests/e2e/browser-fixtures.ts';
+import { mkdirSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,22 +18,6 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const out = resolve(process.argv[2] ?? join(root, 'store/screenshots'));
 mkdirSync(out, { recursive: true });
 const PR = 'https://github.com/react/react/pull/37778';
-const CHROME_DIR = join(homedir(), '.agent-browser/browsers');
-const num = (d) => d.replace('chrome-', '').split('.').map(Number);
-const chromeBin =
-  process.env.PIERRE_E2E_CHROME ??
-  join(
-    CHROME_DIR,
-    readdirSync(CHROME_DIR)
-      .filter((d) => /^chrome-\d/.test(d))
-      .sort((a, b) => {
-        const [x, y] = [num(a), num(b)];
-        for (let i = 0; i < 4; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) - (y[i] ?? 0);
-        return 0;
-      })
-      .at(-1),
-    'chrome',
-  );
 
 const HIDE_AVATARS = `
   img[src*="avatars.githubusercontent.com"], img.avatar, img[data-testid="github-avatar"], .avatar, .AppHeader-user img,
@@ -42,84 +25,85 @@ const HIDE_AVATARS = `
   .fh img, .thread img, .composer img { visibility: hidden !important; }
 `;
 
-const context = await chromium.launchPersistentContext(join(root, '.e2e-profile'), {
-  executablePath: chromeBin,
-  headless: false,
-  env: { ...process.env, DISPLAY: process.env.DISPLAY || ':0', WAYLAND_DISPLAY: '' },
-  args: [`--disable-extensions-except=${join(root, 'dist')}`, `--load-extension=${join(root, 'dist')}`],
-  viewport: { width: 1280, height: 800 },
-  deviceScaleFactor: 1,
-});
-const page = await context.newPage();
-
-/** Hides avatars in every open shadow tree and refuses visible login or token text. */
-async function sanitize(login) {
-  const all = await page.evaluate(css => {
-    const texts = [];
-    const scan = root => {
-      const style = document.createElement('style');
-      style.textContent = css;
-      (root instanceof Document ? root.head : root).append(style);
-      const container = root instanceof Document ? root.body : root;
-      for (const el of container.querySelectorAll('*')) {
-        if (el.shadowRoot) scan(el.shadowRoot);
-        if (el instanceof HTMLElement && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden') {
-          for (const child of el.childNodes) if (child.nodeType === Node.TEXT_NODE) texts.push(child.textContent ?? '');
-        }
-      }
-    };
-    scan(document);
-    return texts.join('\n');
-  }, HIDE_AVATARS);
-  const deny = (process.env.STORE_SHOT_DENY ?? '').split(',').filter(Boolean).map(w => new RegExp(w, 'i'));
-  const bad = [new RegExp('ghp' + '_[A-Za-z0-9]'), new RegExp('github' + '_pat_'), ...deny, login ? new RegExp(`\\b${login}\\b`, 'i') : null].filter(Boolean);
-  for (const re of bad) if (re.test(all)) throw new Error(`refusing to screenshot: ${re} is visible on the page`);
-}
-
-const viewer = page.locator(VIEWER_HOST);
-const viewerReady = () => waitForInpage(page);
-
-/** The signed-in login, only to make sure it is not on screen; never printed or stored. */
-async function signedInLogin() {
-  await page.goto('https://github.com/', { waitUntil: 'domcontentloaded' });
-  return page.evaluate(() => document.querySelector('meta[name="user-login"]')?.getAttribute('content') ?? '');
-}
-
-const login = await signedInLogin();
-if (!login) throw new Error('not signed in on the e2e profile');
-
-await page.goto(`${PR}#glide`, { waitUntil: 'domcontentloaded' });
-await viewerReady();
-
-// The shots show the defaults, so the profile's synced settings and file groups are set aside (kept in memory, never
-// printed) and put back at the end.
-const id = await evaluateInpage(page, () => chrome.runtime.id);
-const options = await context.newPage();
-await options.setViewportSize({ width: 1280, height: 800 });
-await options.goto(`chrome-extension://${id}/options.html`);
-const savedSync = await options.evaluate(() => chrome.storage.sync.get(null));
-const resetSync = () => options.evaluate(() => chrome.storage.sync.clear());
-
-const FILE = 'compiler/apps/playground/components/Header.tsx';
-const LINE = 113;
-const shot = async (name) => {
-  await sanitize(login);
-  await page.screenshot({ path: join(out, name) });
-  console.log('wrote', name);
-};
-const openPr = async () => {
-  await page.bringToFront();
-  await page.goto(`${PR}#glide`, { waitUntil: 'domcontentloaded' });
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  return viewerReady();
-};
-
+const profile = await cloneProfile();
+let context;
 try {
+  context = await chromium.launchPersistentContext(profile, {
+    executablePath: chromePath(),
+    headless: HEADLESS,
+    env: { ...process.env, ...browserEnv() },
+    args: [`--disable-extensions-except=${DIST}`, `--load-extension=${DIST}`, '--disable-sync'],
+    viewport: { width: 1280, height: 800 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  /** Hides avatars in every open shadow tree and refuses visible login or token text. */
+  async function sanitize(target, login) {
+    const all = await target.evaluate(css => {
+      const texts = [];
+      const scan = root => {
+        const style = document.createElement('style');
+        style.textContent = css;
+        (root instanceof Document ? root.head : root).append(style);
+        const container = root instanceof Document ? root.body : root;
+        for (const el of container.querySelectorAll('*')) {
+          if (el.shadowRoot) scan(el.shadowRoot);
+          const rect = el.getBoundingClientRect();
+          if (el instanceof HTMLElement && rect.bottom > 0 && rect.top < innerHeight && rect.right > 0 && rect.left < innerWidth && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden') {
+            if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) texts.push(el.value);
+            for (const child of el.childNodes) if (child.nodeType === Node.TEXT_NODE) texts.push(child.textContent ?? '');
+          }
+        }
+      };
+      scan(document);
+      return texts.join('\n');
+    }, HIDE_AVATARS);
+    const deny = (process.env.STORE_SHOT_DENY ?? '').split(',').filter(Boolean).map(w => new RegExp(w, 'i'));
+    const bad = [new RegExp('ghp' + '_[A-Za-z0-9]'), new RegExp('github' + '_pat_'), ...deny, login ? new RegExp(`\\b${login}\\b`, 'i') : null].filter(Boolean);
+    for (const re of bad) if (re.test(all)) throw new Error('Refusing screenshot: private text is visible on the page');
+  }
+
+  const viewer = page.locator(VIEWER_HOST);
+  const viewerReady = () => waitForInpage(page);
+
+  /** The signed-in login, only to make sure it is not on screen; never printed or stored. */
+  async function signedInLogin() {
+    await page.goto('https://github.com/', { waitUntil: 'domcontentloaded' });
+    return page.evaluate(() => document.querySelector('meta[name="user-login"]')?.getAttribute('content') ?? '');
+  }
+
+  const login = await signedInLogin();
+  if (!login) throw new Error('not signed in on the e2e profile');
+
+  await page.goto(`${PR}#glide`, { waitUntil: 'domcontentloaded' });
+  await viewerReady();
+
+  // Reset settings only in the disposable profile; local credentials stay available for GitHub reads.
+  const id = await evaluateInpage(page, () => chrome.runtime.id);
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${id}/options.html`);
+  const resetSync = () => options.evaluate(() => chrome.storage.sync.clear());
+
+  const FILE = 'compiler/apps/playground/components/Header.tsx';
+  const LINE = 113;
+  const shot = async (name) => {
+    await sanitize(page, login);
+    await page.screenshot({ path: join(out, name) });
+    console.log('wrote', name);
+  };
+  const openPr = async () => {
+    await page.bringToFront();
+    await page.goto(`${PR}#glide`, { waitUntil: 'domcontentloaded' });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    return viewerReady();
+  };
+
   await resetSync();
   await openPr();
 
   // 1. The Glide tab: file group tabs, file tree (expanded) and diffs.
-  await evaluateInpage(page, () => window.__pierre.settings.getState().update({ tree: { initialExpansion: 'open' } }));
+  await evaluateInpage(page, () => window.__pierre.settings.getState().update({ tree: { initialExpansion: 'open' }, layout: { treePosition: 'right' } }));
   await page.waitForTimeout(1500);
   await shot('1-glide-tab.png');
 
@@ -159,32 +143,27 @@ try {
   await openPr();
   await viewer.getByRole('tablist', { name: 'File groups' }).getByRole('tab', { name: /^Tests/ }).click();
   await page.waitForTimeout(2000);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(300);
   await page.mouse.move(640, 20);
   await shot('5-file-groups.png');
 
-  // 4. The options page, on the defaults: its header (icon, version) and File groups. The sections above File groups
-  // are left out: the Display ones are in shot 3, and the saved-token list names the owners the profile holds tokens for.
+  // 4. Native sidebar navigation to Related files keeps saved token owners outside the viewport.
   await resetSync();
   await options.bringToFront();
   await options.reload();
-  await options.getByRole('heading', { name: 'GitHub tokens' }).waitFor();
-  await options.getByRole('heading', { name: 'File groups' }).waitFor();
-  await options.evaluate(() => {
-    const groups = document.getElementById('file-groups-heading').closest('section');
-    for (const section of document.querySelectorAll('main > section')) {
-      if (section === groups) break;
-      section.remove();
-    }
-  });
+  await options.getByRole('navigation', { name: 'Settings sections' })
+    .getByRole('link', { name: 'Related files', exact: true }).click();
+  await options.getByRole('region', { name: 'Related files' }).getByRole('radio', { name: /Nested/ }).waitFor();
   await options.waitForTimeout(800);
+  await sanitize(options, login);
   await options.screenshot({ path: join(out, '4-options.png') });
   console.log('wrote 4-options.png');
 } finally {
-  await resetSync();
-  await options.evaluate((items) => chrome.storage.sync.set(items), savedSync);
-  const restored = await options.evaluate(() => chrome.storage.sync.get(null));
-  const canonical = (items) => JSON.stringify(Object.entries(items).sort(([a], [b]) => a.localeCompare(b)));
-  await context.close();
-  if (canonical(restored) !== canonical(savedSync)) throw new Error('the profile\'s synced settings were not restored');
-  console.log('restored the profile\'s synced settings');
+  try {
+    await context?.close();
+  } finally {
+    await rm(profile, { recursive: true, force: true });
+    console.log('removed disposable profile');
+  }
 }
