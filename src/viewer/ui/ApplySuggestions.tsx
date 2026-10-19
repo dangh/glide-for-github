@@ -81,6 +81,7 @@ export function CommitDialogHost() {
 }
 
 function CommitDialog({ refs }: { refs: SuggestionRef[] }) {
+  const dialog = useRef<HTMLFormElement>(null);
   const title = useRef<HTMLInputElement>(null);
   const description = useRef<HTMLTextAreaElement>(null);
   const [busy, setBusy] = useState(false);
@@ -103,15 +104,37 @@ function CommitDialog({ refs }: { refs: SuggestionRef[] }) {
   busyRef.current = busy;
 
   useEffect(() => {
+    const scope = viewerRoot.scope;
+    const opener = scope.activeElement;
     title.current?.focus();
     title.current?.select();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      e.stopPropagation();
-      if (!busyRef.current) close();
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!busyRef.current) close();
+        return;
+      }
+      if (e.key !== 'Tab' || !dialog.current) return;
+      const items = dialog.current.querySelectorAll<HTMLElement>('input:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href]');
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) return;
+      const active = scope.activeElement;
+      const outside = !Array.from(items).some(item => item === active);
+      if (e.shiftKey && (active === first || outside)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || outside)) {
+        e.preventDefault();
+        first.focus();
+      }
     };
-    viewerRoot.scope.addEventListener('keydown', onKey as EventListener, true);
-    return () => viewerRoot.scope.removeEventListener('keydown', onKey as EventListener, true);
+    scope.addEventListener('keydown', onKey as EventListener, true);
+    return () => {
+      scope.removeEventListener('keydown', onKey as EventListener, true);
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+    };
   }, []);
 
   const commit = async (event?: React.FormEvent) => {
@@ -119,6 +142,8 @@ function CommitDialog({ refs }: { refs: SuggestionRef[] }) {
     const subject = title.current?.value.trim() ?? '';
     if (!subject || busy) return;
     const body = description.current?.value.trim() ?? '';
+    // The clicked submit becomes disabled; keep focus on a control that remains in the tab order.
+    title.current?.focus();
     setBusy(true);
     setError(null);
     try {
@@ -136,7 +161,7 @@ function CommitDialog({ refs }: { refs: SuggestionRef[] }) {
 
   return (
     <div className="modal-backdrop">
-      <form className="modal commit-dialog" role="dialog" aria-modal="true" aria-labelledby="commit-dialog-title" onSubmit={commit}>
+      <form ref={dialog} className="modal commit-dialog" role="dialog" aria-modal="true" aria-labelledby="commit-dialog-title" onSubmit={commit}>
         <h2 id="commit-dialog-title">{refs.length === 1 ? 'Commit suggestion' : `Commit ${plural(refs.length)}`}</h2>
         <label className="modal-field">
           Commit message

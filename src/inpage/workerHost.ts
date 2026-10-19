@@ -1,4 +1,7 @@
-/** Extension-origin host. It only relays Pierre's worker protocol; it exposes no storage or GitHub APIs. */
+/** Extension-origin workers and a read-only, authenticated recovery path for old per-PR session state. */
+import { serveLegacyState } from './legacyState';
+
+const legacyReady = serveLegacyState();
 declare global {
   interface Window {
     __glideWorkerHost?: { spawned: number; initialized: number; renders: number; errors: number };
@@ -54,7 +57,7 @@ window.addEventListener('message', (event: MessageEvent<unknown>) => {
       }
     };
   };
-  control.postMessage('glide:workers-ready');
+  void legacyReady.then(() => control.postMessage('glide:workers-ready'));
 });
 window.addEventListener('pagehide', () => {
   for (const worker of workers) worker.terminate();

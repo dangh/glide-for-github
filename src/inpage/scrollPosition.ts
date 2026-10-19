@@ -18,8 +18,9 @@ function readPosition(win: Window, key: string): Position | null {
 }
 
 /** Browser pixel restoration cannot follow files that change height as their diffs load. */
-export function createScrollPosition(win: Window, key: string) {
-  const saved = readPosition(win, key);
+export function createScrollPosition(win: Window, key: string, { deferRestore = false } = {}) {
+  let started = !deferRestore;
+  let saved = started ? readPosition(win, key) : null;
   if (saved && 'path' in saved) session.viewport = [saved.path];
   let anchors: ListAnchors | null = null;
   let restored = false;
@@ -58,7 +59,7 @@ export function createScrollPosition(win: Window, key: string) {
     return load && (!['pending', 'loading', 'needs-lines'].includes(load.status) || !!load.message);
   };
   const restore = () => {
-    if (!anchors || restored || restoreFrame !== undefined || !ready()) return;
+    if (!started || !anchors || restored || restoreFrame !== undefined || !ready()) return;
     restoreFrame = win.requestAnimationFrame(() => {
       restoreFrame = undefined;
       if (!anchors || !ready()) return;
@@ -73,6 +74,13 @@ export function createScrollPosition(win: Window, key: string) {
   win.addEventListener('pagehide', save);
   for (const event of inputs) win.addEventListener(event, onInput, { passive: true, capture: true });
   return {
+    start() {
+      if (started || disposed) return;
+      saved = readPosition(win, key);
+      if (saved && 'path' in saved && !interacted) session.viewport = [saved.path];
+      started = true;
+      restore();
+    },
     attach(_root: HTMLElement | null, next: ListAnchors | null) {
       if (disposed) return;
       if (!next) save();

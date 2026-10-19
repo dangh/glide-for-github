@@ -1,6 +1,6 @@
 /** Rerunnable synthetic probe. Run the bundle with DevTools/evaluate on a PR page or local harness. */
 import '../../src/inpage/windowScroll';
-import { setInsetTop } from '../../src/inpage/windowScroll';
+import { setInsetTop, scrollWindowToTop } from '../../src/inpage/windowScroll';
 import { CodeView, parseDiffFromFile } from '@pierre/diffs';
 import { WorkerPoolManager } from '@pierre/diffs/worker';
 
@@ -47,6 +47,6 @@ window.__spikeStart = async ({ mode = 'page', count = 500, workers = false } = {
   view.setup(list);
   if (mode === 'frame') list.style.setProperty('--glide-sticky-top', '0px');
   view.setItems(items);
-  window.__spike = { view, host, shadow, list, pool, workerErrors, mode, count, cleanUp() { view.cleanUp(); pool?.terminate(); host.remove(); for(const [e,s] of hidden) {if(s===null)e.removeAttribute('style');else e.setAttribute('style',s)} } };
+  window.__spike = { view, host, shadow, list, pool, workerErrors, mode, count, scrollWindowToTop, cleanUp() { view.cleanUp(); pool?.terminate(); host.remove(); for(const [e,s] of hidden) {if(s===null)e.removeAttribute('style');else e.setAttribute('style',s)} } };
   return { mode, count, workers: pool?.isWorkingPool() ?? false, workerErrors };
 };

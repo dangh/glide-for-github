@@ -1,5 +1,5 @@
 /** The viewer shares GitHub's document scroll; only highlighting workers live in an extension-origin frame. */
-import './windowScroll';
+import { scrollWindowToTop } from './windowScroll';
 import { terminateWorkerPoolSingleton } from '@pierre/diffs/worker';
 import { createRoot } from 'react-dom/client';
 import { createLifecycle } from '../content/lifecycle';
@@ -23,6 +23,7 @@ import { createWorkerBridge } from './workerBridge';
 import { createScrollPosition } from './scrollPosition';
 import { restoreKey } from '../shared/page-scroll';
 import { prKey } from '../shared/pr-url';
+import { migrateLegacyState } from './legacyState';
 
 ignoreBenignErrors(window);
 const lifecycle = createLifecycle(window, storedSettings(), (doc, ref, layout) => {
@@ -58,12 +59,13 @@ const lifecycle = createLifecycle(window, storedSettings(), (doc, ref, layout) =
     return true;
   };
   refresh();
-  const scrollPosition = createScrollPosition(window, restoreKey(prKey(ref)));
+  const scrollPosition = createScrollPosition(window, restoreKey(prKey(ref)), { deferRestore: true });
   session.pageScroll = scrollPosition;
-  session.scrollPageToTop = () => window.scrollTo({ top: 0, behavior: 'instant' });
+  const migration = new AbortController();
+  session.scrollPageToTop = scrollWindowToTop;
   shadow.addEventListener('keydown', (event) => event.stopPropagation());
   usePr.setState(usePr.getInitialState());
-  const cleanups = [initSettings(), initBatchPersistence(), initDraftPersistence(), initFileGroups(), initRelatedFiles()];
+  const cleanups = [initSettings()];
   const connection = createConnection(window, { source: window });
   session.rpc = connection.rpc;
   const connect = () => {
@@ -82,8 +84,12 @@ const lifecycle = createLifecycle(window, storedSettings(), (doc, ref, layout) =
   const root = createRoot(container);
   root.render(<div className="pierre-loading">Starting highlighting workers…</div>);
   workers = createWorkerBridge(doc);
-  void workers.ready.then(factory => {
+  void workers.ready.then(async factory => {
     if (!mounted) return;
+    await migrateLegacyState(ref, migration.signal);
+    if (!mounted) return;
+    scrollPosition.start();
+    cleanups.push(initBatchPersistence(), initDraftPersistence(), initFileGroups(), initRelatedFiles());
     workerSpike.factory = factory;
     root.render(<App prRef={ref} rpc={connection.rpc} />);
   }).catch((error: unknown) => {
@@ -95,6 +101,7 @@ const lifecycle = createLifecycle(window, storedSettings(), (doc, ref, layout) =
     unmount() {
       if (!mounted) return;
       mounted = false;
+      migration.abort();
       scrollPosition.dispose();
       root.unmount();
       resetReviewCaches();

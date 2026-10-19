@@ -14,6 +14,30 @@ let frame: FrameRequestCallback | undefined;
 const nextFrame = () => { const next = frame; frame = undefined; next?.(0); };
 const anchors = (): ListAnchors => ({ anchor: () => ({ path: 'second.ts', offset: 320 }), scrollToAnchor: vi.fn() });
 
+it('observes input during migration and does not jump when recovered state arrives', () => {
+  const position = createScrollPosition(window, KEY, { deferRestore: true });
+  const list = anchors();
+  position.attach(root, list);
+  window.dispatchEvent(new WheelEvent('wheel'));
+  sessionStorage.setItem(KEY, JSON.stringify({ path: 'first.ts', offset: 90 }));
+  position.start();
+  nextFrame();
+  expect(list.scrollToAnchor).not.toHaveBeenCalled();
+  position.dispose();
+});
+
+it('reads recovered state only when migration is complete', () => {
+  const position = createScrollPosition(window, KEY, { deferRestore: true });
+  const list = anchors();
+  position.attach(root, list);
+  expect(frame).toBeUndefined();
+  sessionStorage.setItem(KEY, JSON.stringify({ path: 'first.ts', offset: 90 }));
+  position.start();
+  nextFrame();
+  expect(list.scrollToAnchor).toHaveBeenCalledWith({ path: 'first.ts', offset: 90 });
+  position.dispose();
+});
+
 beforeEach(() => {
   sessionStorage.clear();
   history.scrollRestoration = 'auto';

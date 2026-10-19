@@ -4,8 +4,8 @@
  * CodeView reads three things from its root: `scrollTop`, its height (getBoundingClientRect) and `scroll` events, and
  * writes one: `root.scrollTo` (applyScrollFix, for anchoring and programmatic scrolls). Here the root does not scroll
  * (overflow visible, as tall as the list), and the logical scrollTop is how far the list's top has gone above the
- * viewport's top inset (GitHub's sticky header + Glide's sticky toolbar). The paged scroll rebase (12M px) is off:
- * the window cannot be rebased.
+ * viewport's top inset (GitHub's sticky header + Glide's sticky toolbar). Pierre keeps very tall lists in a bounded
+ * physical scroll window; its logical page offset is applied to document scroll reads and writes too.
  */
 import { CodeView } from '@pierre/diffs';
 
@@ -13,8 +13,6 @@ let insetTop = (): number => 0;
 export function setInsetTop(fn: () => number): void {
   insetTop = fn;
 }
-
-const NO_REBASE = { containerHeight: Infinity, triggerTop: -Infinity, targetTop: 0, targetBottom: Infinity, threshold: Infinity };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type CV = any;
@@ -34,7 +32,6 @@ export function refreshWindowViewport(): void {
 
 const setup = proto.setup;
 proto.setup = function (this: CV, root: HTMLElement) {
-  this.scrollRebaseConfig = NO_REBASE;
   setup.call(this, root);
   views.add(this);
   root.removeEventListener('scroll', this.handleScroll);
@@ -65,7 +62,7 @@ proto.getScrollTop = function (this: CV) {
   if (!this.scrollDirty) return this.scrollTop;
   this.scrollDirty = false;
   const top = this.root ? this.root.getBoundingClientRect().top : 0;
-  this.scrollTop = this.clampScrollTop(insetTop() - top);
+  this.scrollTop = this.clampScrollTop(Math.max(0, insetTop() - top) + this.scrollPageOffset);
   return this.scrollTop;
 };
 
@@ -76,24 +73,42 @@ proto.getHeight = function (this: CV) {
   return this.height;
 };
 
-/** Original applyScrollFix with `root.scrollTo(paged)` replaced by a window scroll to the logical position. */
-proto.applyScrollFix = function (this: CV, targetScrollTop: number, syncedScrollTop: number) {
+/** Preserve Pierre's logical scroll pages while moving the document's physical viewport. */
+proto.applyScrollFix = function (this: CV, targetScrollTop: number, syncedScrollTop: number, windowSpecs: unknown) {
   if (this.root == null) return;
   const round = (n: number) => Math.round(n * devicePixelRatio) / devicePixelRatio;
   const target = round(this.clampScrollTop(targetScrollTop));
   const synced = round(syncedScrollTop);
-  if (target === this.renderState.scrollTop && target === synced) return;
+  const previousOffset = this.scrollPageOffset;
+  const syncedPaged = round(this.clampPagedScrollTop(synced - previousOffset));
+  const { pagedScrollTop, scrollPageOffset } = this.resolvePagedScrollPosition(target);
+  const rebased = previousOffset !== scrollPageOffset;
+  if (target === this.renderState.scrollTop && target === synced && pagedScrollTop === syncedPaged && !rebased) return;
   this.suspendScrollInteractions();
-  if (target !== synced) {
-    this.syncContainerHeight();
+  if (pagedScrollTop !== syncedPaged || rebased) {
+    this.scrollPageOffset = scrollPageOffset;
+    this.syncPagedScrollScaffolding(windowSpecs);
+  }
+  if (pagedScrollTop !== syncedPaged) {
     const current = insetTop() - this.root.getBoundingClientRect().top;
-    const dy = target - current;
+    const dy = pagedScrollTop - current;
     if (Math.abs(dy) >= 0.5) window.scrollBy({ top: dy, behavior: 'instant' });
   }
   this.renderState.scrollTop = target;
   this.scrollTop = target;
   this.scrollDirty = false;
 };
+
+/** Physical page zero must also discard any logical offset from a very tall list. */
+export function scrollWindowToTop(): void {
+  for (const view of views) {
+    view.clearPendingScroll();
+    view.scrollPageOffset = 0;
+    view.scrollDirty = true;
+    view.render();
+  }
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
 
 /** The rendered window sticks to the viewport below the inset, not to the window's top edge. */
 const applyStickyPositioning = proto.applyStickyPositioning;

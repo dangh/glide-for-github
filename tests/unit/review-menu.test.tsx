@@ -330,6 +330,38 @@ describe('apply suggestion', () => {
       </>,
     );
 
+  it('wraps keyboard focus inside the commit dialog and returns focus on Escape', async () => {
+    usePr.getState().setThreads([thread('1')]);
+    await ui();
+    const opener = button('Commit suggestion')!;
+    opener.focus();
+    await click(opener);
+    const title = document.querySelector<HTMLInputElement>('[name="commit-message"]')!;
+    const submit = button('Commit changes')!;
+    expect(document.activeElement).toBe(title);
+    await act(async () => title.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true })));
+    expect(document.activeElement).toBe(submit);
+    await act(async () => submit.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })));
+    expect(document.activeElement).toBe(title);
+    await act(async () => title.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it('keeps focus inside the dialog while a commit disables its action buttons', async () => {
+    fakeRpc(() => new Promise(() => {}));
+    usePr.getState().setThreads([thread('1')]);
+    await ui();
+    await click(button('Commit suggestion')!);
+    const submit = button('Commit changes')!;
+    submit.focus();
+    await click(submit);
+    const title = document.querySelector<HTMLInputElement>('[name="commit-message"]')!;
+    expect(document.activeElement).toBe(title);
+    await act(async () => title.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true })));
+    expect(document.activeElement).toBe(document.querySelector('[name="commit-description"]'));
+  });
+
   it('does not reopen the previous PR suggestion dialog after remount', async () => {
     usePr.getState().setThreads([thread('1')]);
     await ui();
