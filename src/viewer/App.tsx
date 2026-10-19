@@ -11,6 +11,7 @@ import type { DisplaySettings } from '../shared/settings';
 import { PORT_TIMEOUT_MESSAGE } from './connection';
 import type { Rpc } from './github/private';
 import { startLoader } from './state/controller';
+import { useFileGroups } from './state/fileGroups';
 import { loadPr } from './state/load';
 import { session } from './state/session';
 import { effectiveThemeType, useSettings } from './state/settings';
@@ -18,7 +19,6 @@ import { usePr } from './state/store';
 import { BatchBar, CommitDialogHost } from './ui/ApplySuggestions';
 import { DiffPane } from './ui/DiffPane';
 import { DisplayStyle } from './ui/DisplayStyle';
-import { FileGroupTabs } from './ui/FileGroupTabs';
 import { FatalError, Notice } from './ui/Notice';
 import { TokenPromptHost } from './ui/TokenPrompt';
 import { Toolbar } from './ui/Toolbar';
@@ -58,6 +58,11 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
   const fatal = usePr((s) => s.fatal);
   const range = usePr((s) => s.range);
   const settingsLoaded = useSettings((s) => s.loaded);
+  const groupsLoaded = useFileGroups((s) => s.loaded);
+  const hasGroups = useFileGroups((s) => s.groups.length > 0);
+  const groupsEnabled = useSettings((s) => s.settings.fileGroups.enabled);
+  const fileCount = usePr((s) => s.order.length);
+  const showGroupPanel = groupsEnabled && groupsLoaded && hasGroups && fileCount > 0;
   const hideWhitespace = useSettings((s) => s.settings.review.hideWhitespace);
   const diffSettings = useSettings((s) => s.settings.diff);
   const themeType = useSettings((s) => effectiveThemeType(s.settings.diff.themeType, s.colorMode));
@@ -92,9 +97,9 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
   }, [rpc, prRef, attempt]);
 
   useEffect(() => {
-    if (!pr || !settingsLoaded) return;
+    if (!pr || !settingsLoaded || !groupsLoaded) return;
     startLoader(rpc, hideWhitespace);
-  }, [rpc, pr, range, hideWhitespace, settingsLoaded]);
+  }, [rpc, pr, range, hideWhitespace, settingsLoaded, groupsLoaded]);
   useEffect(() => () => session.loader?.cancel(), []);
 
   useEffect(() => {
@@ -113,13 +118,22 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
       <div className="pierre-app">
         <DisplayStyle />
         <Toolbar />
-        <FileGroupTabs />
         <BatchBar />
         {/* DOM order follows the visual order (tree first or last), so keyboard focus order matches the screen. */}
         {/* A hidden tree stays mounted (display: none), so its expanded folders and filter survive a collapse. */}
-        <div className="pierre-body" data-tree-position={treePosition} data-tree-hidden={showTree ? undefined : ''}>
+        <div
+          className="pierre-body"
+          id="file-group-panel"
+          role={showGroupPanel ? 'tabpanel' : undefined}
+          aria-label={showGroupPanel ? 'Changed files' : undefined}
+          data-tree-position={treePosition}
+          data-tree-hidden={showTree ? undefined : ''}
+        >
           {treePosition === 'left' && <TreePane />}
-          <main className="pierre-main">{pr && settingsLoaded ? <DiffPane rpc={rpc} /> : <div className="pierre-loading">Loading pull request…</div>}</main>
+          {/* The list waits for the file groups too, so it never shows other groups' files first (Sift's no-flash fix). */}
+          <main className="pierre-main">
+            {pr && settingsLoaded && groupsLoaded ? <DiffPane rpc={rpc} /> : <div className="pierre-loading">Loading pull request…</div>}
+          </main>
           {treePosition === 'right' && <TreePane />}
         </div>
         <Notice />

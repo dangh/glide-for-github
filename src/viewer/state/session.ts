@@ -18,6 +18,11 @@ export interface Session {
   scrollToFile?(path: string): void;
   /** Marks a file as the current one in the tree (diff scroll position). */
   revealInTree?(path: string): void;
+  /**
+   * Notes the tree's open search; the returned function reopens it with the same text if it has closed since (a press
+   * on a file group tab blurs the search, which closes it).
+   */
+  keepTreeSearch?(): () => void;
   /** Page scrolling's list side, when the viewer was mounted with it (src/viewer/pageScroll.ts). */
   pageScroll?: PageScrollView;
 }

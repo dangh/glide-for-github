@@ -38,10 +38,16 @@ review features: comments, suggestions, resolving threads, viewed files and revi
 
 ## File groups
 
-Tabs under the toolbar split a pull request by kind of file: **All**, **Source**, **Tests**, **Docs**, **Infra**,
-**Manifest** and **Artifacts**, each with its file count. A tab filters the file tree and the diff list together, and
-switching is instant: diffs that already loaded stay loaded, and collapsed files stay collapsed. The viewed counter
-still counts the whole pull request. Arrow keys, Home and End move between the tabs.
+Tabs in the toolbar, left of the viewed counter, split a pull request by kind of file: **All**, **Source**,
+**Tests**, **Docs**, **Infra**, **Manifest** and **Artifacts**, each with its file count. A tab filters the file tree
+and the diff list together, and switching is instant: diffs that already loaded stay loaded, collapsed files and
+folders stay collapsed, and an open tree search stays open. The open group's diffs load first, then the rest of the
+pull request. The viewed counter counts the open group (the whole pull request's count is in its tooltip). Arrow keys,
+Home and End move between the tabs.
+
+When the toolbar is too narrow for the tabs, a button showing the open group and its count takes their place and
+opens a menu of the groups. Split/Unified, Wrap and Hide whitespace make room for the tabs first, and in the merged
+bar the pull request's title does.
 
 - **Smart defaults.** Source is code and business logic only. Lock files, readmes, changelogs and tool config go to
   Manifest; Dockerfiles, Terraform, CDK, serverless and CI config to Infra; `dist/`, minified and generated code and
@@ -55,7 +61,9 @@ still counts the whole pull request. Arrow keys, Home and End move between the t
   as before.
 
 The groups, their patterns and the pattern engine come from [Sift for GitHub](https://github.com/dangh/sift-for-github),
-which adds the same tabs to GitHub's own Files changed page. Already use Sift? The options page imports its tabs.
+which adds the same tabs to GitHub's own Files changed page. Already use Sift? The options page imports its tabs, the
+tab it opens pull requests on and its hide-empty switch. Unlike Sift, which opens on Source, Glide opens on All until
+you pick another group there.
 
 ## Install
 

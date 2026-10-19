@@ -5,6 +5,7 @@
 import { parseDiffFromFile, type FileDiffMetadata } from '@pierre/diffs';
 import { BridgeError } from '../../shared/rpc';
 import { fetchFullFile, type FileSummary, type PrData, type Rpc } from '../github/private';
+import { currentGroup } from './fileGroups';
 import { createLoader, type Loader, type LoaderStats } from './loader';
 import { rangeOids, type CommitRange } from './range';
 import { session } from './session';
@@ -68,7 +69,8 @@ export async function fullFileDiff(
 
 /**
  * Starts a loader for the store's PR and range. The last viewport priority (`session.viewport`) is replayed
- * so a restart (range or whitespace change) still loads the visible files, and their collapsed lines, first.
+ * so a restart (range or whitespace change) still loads the visible files, and their collapsed lines, first; then the
+ * open file group's files, then the rest (DiffPane re-sends the group on a switch).
  */
 export function startLoader(rpc: Rpc, whitespace: boolean, store = usePr): Loader | undefined {
   const state = store.getState();
@@ -99,6 +101,7 @@ export function startLoader(rpc: Rpc, whitespace: boolean, store = usePr): Loade
     );
   });
   if (session.viewport?.length) loader.prioritize(session.viewport);
+  loader.prefer(currentGroup().shown);
   loader.start();
   return loader;
 }

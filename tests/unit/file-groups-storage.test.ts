@@ -65,11 +65,40 @@ describe('file groups storage', () => {
     expect(data).toEqual({});
   });
 
-  it('removes items a shorter list leaves behind', async () => {
+  it('writes before it reads anything, so a save started as the options page closes is not lost', () => {
+    const { data, storage } = fakeSync({ [FILE_GROUPS_KEY]: 3 });
+    const stalled: GroupsStorage = { ...storage, get: () => new Promise(() => undefined) };
+    void saveFileGroups(custom, stalled);
+    expect(data[FILE_GROUPS_KEY]).toBe(2);
+    expect(data[`${FILE_GROUPS_KEY}.1`]).toEqual({ label: 'Tests', patterns: '*.test.*\n# a comment' });
+    void saveFileGroups(DEFAULT_FILE_GROUPS, stalled);
+    expect(data[FILE_GROUPS_KEY]).toBeUndefined();
+  });
+
+  it('an older short save cannot delete groups from a newer longer save', async () => {
+    const { storage } = fakeSync();
+    let release!: () => void;
+    const delayed: GroupsStorage = {
+      ...storage,
+      async set(items) {
+        await storage.set(items);
+        if (items[FILE_GROUPS_KEY] === 1) await new Promise<void>((resolve) => { release = resolve; });
+      },
+    };
+    const older = saveFileGroups(custom.slice(0, 1), delayed);
+    await Promise.resolve();
+    await saveFileGroups(custom, storage);
+    release();
+    await older;
+    expect(await loadFileGroups(storage)).toEqual(custom);
+  });
+
+  it('ignores items a shorter list leaves behind', async () => {
     const { data, storage } = fakeSync();
     await saveFileGroups([...custom, { label: 'Docs', patterns: ['*.md'] }], storage);
     await saveFileGroups(custom, storage);
-    expect(Object.keys(data).sort()).toEqual([FILE_GROUPS_KEY, `${FILE_GROUPS_KEY}.0`, `${FILE_GROUPS_KEY}.1`]);
+    expect(data[`${FILE_GROUPS_KEY}.2`]).toBeDefined();
+    expect(await loadFileGroups(storage)).toEqual(custom);
   });
 
   it('keeps rules bigger than one sync item could hold in total (Sift\'s defaults are about 5 KB)', async () => {
@@ -100,6 +129,34 @@ describe('file groups storage', () => {
       expect(groupsFromItems(damaged)).toEqual(DEFAULT_FILE_GROUPS);
     }
     expect(groupsFromItems({ [FILE_GROUPS_KEY]: 0 })).toEqual([]);
+  });
+
+  it('ignores an older change read that resolves after a newer change read', async () => {
+    const { storage } = fakeSync();
+    let finishOld!: (items: Record<string, unknown>) => void;
+    let first = true;
+    const delayed: GroupsStorage = {
+      ...storage,
+      get: () => {
+        if (!first) return storage.get(null);
+        first = false;
+        return new Promise((resolve) => { finishOld = resolve; });
+      },
+    };
+    const seen: FileGroup[][] = [];
+    const off = onFileGroupsChange((groups) => seen.push(groups), delayed);
+    try {
+      await saveFileGroups(custom, storage);
+      const old = await storage.get(null);
+      const newer = [{ label: 'New', patterns: ['*.new'] }];
+      await saveFileGroups(newer, storage);
+      await new Promise((r) => setTimeout(r, 0));
+      finishOld(old);
+      await new Promise((r) => setTimeout(r, 0));
+      expect(seen).toEqual([newer]);
+    } finally {
+      off();
+    }
   });
 
   it('reports changes to the groups, not to other items', async () => {

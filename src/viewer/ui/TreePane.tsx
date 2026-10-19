@@ -4,16 +4,18 @@
  *
  * Tree options are construction-time in @pierre/trees, so a Display-menu change remounts the tree (cheap).
  * Decoration changes (viewed, comments, renames) re-render the mounted rows via `model.render({})`.
- * A file group switch swaps the tree's paths in place (`resetPaths`), keeping the search and each folder's expansion.
+ * A file group switch swaps the tree's paths in place (`resetPaths`), keeping the search and each folder's expansion;
+ * a click on a group tab, which blurs and so closes the search, reopens it (`session.keepTreeSearch`).
  */
 import type { FileTreeDirectoryHandle, GitStatusEntry } from '@pierre/trees';
 import { FileTree, useFileTree } from '@pierre/trees/react';
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { DEFAULT_SETTINGS, toTreeOptions, type TreeSettings } from '../../shared/settings';
-import { useActiveGroup } from '../state/fileGroups';
+import { useActiveGroup, useFileGroups } from '../state/fileGroups';
 import { session } from '../state/session';
 import { effectiveThemeType, useSettings } from '../state/settings';
 import { usePr } from '../state/store';
+import { chainExpanded, folderChains, noteExpansion } from '../state/treeFolders';
 import { decorationFor, gitStatusEntries } from '../state/view';
 
 type TreeModel = ReturnType<typeof useFileTree>['model'];
@@ -28,8 +30,6 @@ const directoryOf = (m: TreeModel, dir: string): FileTreeDirectoryHandle | undef
   const item = m.getItem(dir) ?? m.getItem(dir.slice(0, -1));
   return item?.isDirectory() ? (item as FileTreeDirectoryHandle) : undefined;
 };
-
-const foldersOf = (paths: readonly string[]) => new Set(paths.flatMap(ancestorsOf));
 
 function Tree({ paths, gitStatus, settings, colorScheme }: { paths: readonly string[]; gitStatus: GitStatusEntry[] | undefined; settings: TreeSettings; colorScheme: string }) {
   /** True while the diff scroll position updates the selection: that selection must not scroll the diff. */
@@ -49,24 +49,26 @@ function Tree({ paths, gitStatus, settings, colorScheme }: { paths: readonly str
   });
   modelRef.current = model;
 
-  // A group switch: the new paths, with each folder as the user last left it in any group.
+  // A group switch: the new paths, with each folder row as the user last left it in any group (rows of merged
+  // single-child folders included, however the new group merges them: state/treeFolders.ts).
   const shownPaths = useRef(paths);
   const expansion = useRef(new Map<string, boolean>());
   useEffect(() => {
     if (shownPaths.current === paths) return;
-    for (const dir of foldersOf(shownPaths.current)) {
-      const item = directoryOf(model, dir);
-      if (item) expansion.current.set(dir, item.isExpanded());
-    }
+    const flatten = settings.flattenEmptyDirectories;
+    noteExpansion(folderChains(shownPaths.current, flatten), (dir) => directoryOf(model, dir)?.isExpanded(), expansion.current);
     shownPaths.current = paths;
     const query = model.isSearchOpen() ? model.getSearchValue() : '';
     model.resetPaths(paths);
-    for (const dir of foldersOf(paths)) {
-      const expanded = expansion.current.get(dir);
-      const item = expanded === undefined ? undefined : directoryOf(model, dir);
-      if (item && item.isExpanded() !== expanded) {
-        if (expanded) item.expand();
-        else item.collapse();
+    for (const chain of folderChains(paths, flatten)) {
+      const expanded = chainExpanded(chain, expansion.current);
+      if (expanded === undefined) continue;
+      for (const dir of chain) {
+        const item = directoryOf(model, dir);
+        if (item && item.isExpanded() !== expanded) {
+          if (expanded) item.expand();
+          else item.collapse();
+        }
       }
     }
     // resetPaths keeps the query but not its matches (still the old paths'); searching again finds the new ones.
@@ -74,7 +76,7 @@ function Tree({ paths, gitStatus, settings, colorScheme }: { paths: readonly str
       model.setSearch('');
       model.setSearch(query);
     }
-  }, [model, paths]);
+  }, [model, paths, settings.flattenEmptyDirectories]);
 
   // Diff scroll position → tree selection.
   useEffect(() => {
@@ -96,8 +98,16 @@ function Tree({ paths, gitStatus, settings, colorScheme }: { paths: readonly str
         syncing.current = false;
       }
     };
+    session.keepTreeSearch = () => {
+      const query = modelRef.current?.isSearchOpen() ? modelRef.current.getSearchValue() : null;
+      return () => {
+        const m = modelRef.current;
+        if (query !== null && m && !m.isSearchOpen()) m.setSearch(query);
+      };
+    };
     return () => {
       session.revealInTree = undefined;
+      session.keepTreeSearch = undefined;
     };
   }, []);
 
@@ -126,6 +136,8 @@ function Tree({ paths, gitStatus, settings, colorScheme }: { paths: readonly str
 
 export const TreePane = memo(function TreePane() {
   const { shown } = useActiveGroup();
+  const groupsLoaded = useFileGroups((s) => s.loaded);
+  const settingsLoaded = useSettings((s) => s.loaded);
   const pr = usePr((s) => s.pr);
   const settings = useSettings((s) => s.settings.tree);
   const themeType = useSettings((s) => effectiveThemeType(s.settings.diff.themeType, s.colorMode));
@@ -133,7 +145,8 @@ export const TreePane = memo(function TreePane() {
   const key = useMemo(() => JSON.stringify(settings), [settings]);
   const colorScheme = themeType === 'system' ? 'light dark' : themeType;
 
-  if (!pr) return <aside className="pierre-tree-pane" />;
+  // Like the diff list, the tree waits for the file groups so it never shows another group's files first.
+  if (!pr || !groupsLoaded || !settingsLoaded) return <aside className="pierre-tree-pane" />;
   return (
     <aside className="pierre-tree-pane" data-testid="tree">
       <Tree key={`${pr.headOid}:${key}`} paths={shown} gitStatus={gitStatus} settings={settings} colorScheme={colorScheme} />

@@ -169,9 +169,11 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
   }, [treeSync, sync]);
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
-  // A group switch: the list keeps its place when the file at its top is in the new group, else starts at the top.
+  // A group switch: its files load next, and the list keeps its place when the file at its top is in the new group,
+  // else starts at the top.
   const { shown } = useActiveGroup();
   useEffect(() => {
+    session.loader?.prefer(shown);
     const handle = handleRef.current;
     const instance = handle?.getInstance();
     if (!handle || !instance || sync.mountedPaths === shown) return;

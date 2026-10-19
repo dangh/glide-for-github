@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ALL_GROUP,
   classify,
   compileGroups,
   compilePattern,
@@ -161,13 +162,26 @@ describe('import from Sift', () => {
 
   it('takes the JSON of Sift\'s config item, wrapped or not, or the bare tabs list', () => {
     const config = { defaultTab: 'Code', hideEmptyTabs: true, tabs, experiments: { parallelLoad: true } };
-    expect(parseSiftImport(JSON.stringify({ config }))).toEqual(tabs);
-    expect(parseSiftImport(JSON.stringify(config))).toEqual(tabs);
-    expect(parseSiftImport(JSON.stringify(tabs))).toEqual(tabs);
+    expect(parseSiftImport(JSON.stringify({ config }))).toEqual({ groups: tabs, defaultGroup: 'Code', hideEmpty: true });
+    expect(parseSiftImport(JSON.stringify(config))).toEqual({ groups: tabs, defaultGroup: 'Code', hideEmpty: true });
+    expect(parseSiftImport(JSON.stringify(tabs))).toEqual({ groups: tabs });
+  });
+
+  it('brings Sift\'s tab to open on (empty: All, an unknown tab: left alone) and its hide-empty switch', () => {
+    const parse = (config: object) => parseSiftImport(JSON.stringify({ config: { tabs, ...config } }));
+    expect(parse({ defaultTab: '', hideEmptyTabs: false })).toEqual({ groups: tabs, defaultGroup: ALL_GROUP, hideEmpty: false });
+    expect(parse({ defaultTab: 'tests' })).toEqual({ groups: tabs, defaultGroup: 'Tests' });
+    expect(parse({ defaultTab: 'Gone' })).toEqual({ groups: tabs });
+  });
+
+  it('turns an old Sift config\'s catch-all tab (fallbackLabel) into a group excluding every other, as Sift does', () => {
+    expect(parseSiftImport(JSON.stringify({ config: { tabs, fallbackLabel: 'Other' } }))).toEqual({
+      groups: [...tabs, { label: 'Other', patterns: ['!Code', '!Tests'] }],
+    });
   });
 
   it('takes plain text: a [Label] line, then that tab\'s patterns', () => {
-    expect(parseSiftImport('[Code]\n!Tests\n\n[Tests]\n  *.test.*\n')).toEqual(tabs);
+    expect(parseSiftImport('[Code]\n!Tests\n\n[Tests]\n  *.test.*\n')).toEqual({ groups: tabs });
   });
 
   it('explains what is wrong', () => {

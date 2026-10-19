@@ -3,7 +3,7 @@
  * saves each valid edit at once (debounced) to its own storage items (src/shared/file-groups-storage.ts).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ALL_GROUP, classify, compileGroups, groupsProblem, parseSiftImport, type FileGroup } from '../shared/file-groups';
+import { ALL_GROUP, classify, compileGroups, groupsProblem, parseSiftImport, type FileGroup, type SiftImport } from '../shared/file-groups';
 import { defaultGroups, loadFileGroups, onFileGroupsChange, saveFileGroups, sameGroups } from '../shared/file-groups-storage';
 import type { FileGroupSettings } from '../shared/settings';
 import type { Update } from '../viewer/ui/DisplaySettingsForm';
@@ -65,7 +65,7 @@ function GroupEditor({ draft, index, count, onChange, onMove, onDelete }: {
   );
 }
 
-function SiftImport({ onImport }: { onImport(groups: FileGroup[]): void }) {
+function SiftImportForm({ onImport }: { onImport(imported: SiftImport): void }) {
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const run = () => {
@@ -82,7 +82,8 @@ function SiftImport({ onImport }: { onImport(groups: FileGroup[]): void }) {
         Sift has no export button. On Sift's options page, open the developer tools console and run{' '}
         <code>copy(JSON.stringify(await chrome.storage.sync.get('config')))</code>, then paste the result here (nothing
         copied means Sift still has its default tabs, which Glide's defaults match). Or paste tabs as text: a line with
-        the tab's name in brackets, like <code>[Tests]</code>, then its patterns. Importing replaces the groups below.
+        the tab's name in brackets, like <code>[Tests]</code>, then its patterns. Importing replaces the groups below, and
+        Sift's tab to open on and its hide-empty switch replace the ones above.
       </p>
       <textarea className="group-patterns" aria-label="Sift settings to import" spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} />
       <div className="options-actions">
@@ -119,9 +120,44 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   /** What storage holds, by draft id (renames and deletions of the default group follow from it). */
   const saved = useRef<DraftGroup[]>([]);
+  const submitted = useRef<DraftGroup[] | null>(null);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /** A valid edit waiting out SAVE_DELAY_MS; written at once if the page is closed or hidden first. */
+  const pending = useRef<DraftGroup[] | null>(null);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+
+  const commit = (next: DraftGroup[]) => {
+    clearTimeout(timer.current);
+    pending.current = null;
+    const previous = submitted.current ?? saved.current;
+    submitted.current = next;
+    const write = saveFileGroups(fromDraft(next));
+    const current = settingsRef.current.defaultGroup;
+    const named = (d: DraftGroup) => d.label.trim().toLowerCase() === current.toLowerCase();
+    const was = previous.find(named);
+    const now = was && next.find((d) => d.id === was.id);
+    const renamed = current !== ALL_GROUP && was && !next.some(named) ? (now?.label.trim() ?? ALL_GROUP) : undefined;
+    // Both writes must be issued before pagehide returns; this page may die before either promise settles.
+    if (renamed !== undefined) update({ fileGroups: { defaultGroup: renamed } });
+    write.then(
+      () => {
+        if (submitted.current !== next) return;
+        saved.current = next;
+        if (sameGroups(fromDraft(draftRef.current ?? []), fromDraft(next))) setStatus({ kind: 'saved' });
+      },
+      (err: unknown) => {
+        if (submitted.current !== next) return;
+        submitted.current = saved.current;
+        if (renamed !== undefined && settingsRef.current.defaultGroup === renamed) update({ fileGroups: { defaultGroup: current } });
+        setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+      },
+    );
+  };
+  const commitRef = useRef(commit);
+  commitRef.current = commit;
 
   useEffect(() => {
     const adopt = (groups: FileGroup[]) => {
@@ -131,14 +167,23 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
         if (current && sameGroups(fromDraft(current), groups)) return current;
         const next = toDraft(groups);
         saved.current = next;
+        submitted.current = next;
         return next;
       });
     };
     void loadFileGroups().then(adopt, () => adopt(defaultGroups()));
     const off = onFileGroupsChange(adopt);
+    const flush = () => {
+      if (pending.current) commitRef.current(pending.current);
+    };
+    const onHidden = () => document.visibilityState === 'hidden' && flush();
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onHidden);
     return () => {
       off();
-      clearTimeout(timer.current);
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onHidden);
+      flush();
     };
   }, []);
 
@@ -146,26 +191,12 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
 
   const save = (next: DraftGroup[]) => {
     clearTimeout(timer.current);
+    pending.current = null;
     const problem = groupsProblem(fromDraft(next));
     if (problem) return setStatus({ kind: 'error', message: problem });
     setStatus({ kind: 'idle' });
-    timer.current = setTimeout(() => {
-      const previous = saved.current;
-      saveFileGroups(fromDraft(next)).then(
-        () => {
-          saved.current = next;
-          setStatus({ kind: 'saved' });
-          // The default group follows a rename, and All replaces it once it is deleted.
-          const current = settingsRef.current.defaultGroup;
-          const was = previous.find((d) => d.label.trim().toLowerCase() === current.toLowerCase());
-          if (current === ALL_GROUP || !was) return;
-          const now = next.find((d) => d.id === was.id);
-          const label = now ? now.label.trim() : ALL_GROUP;
-          if (label !== current) update({ fileGroups: { defaultGroup: label } });
-        },
-        (err: unknown) => setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) }),
-      );
-    }, SAVE_DELAY_MS);
+    pending.current = next;
+    timer.current = setTimeout(() => commit(next), SAVE_DELAY_MS);
   };
 
   const edit = (next: DraftGroup[]) => {
@@ -188,8 +219,8 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
           <span>
             <span className="options-check-label">Show file groups</span>
             <span className="options-check-description">
-              Tabs above the tree and the diffs that show one kind of file at a time, each with its file count. All shows
-              every file.
+              Tabs in the toolbar that show one kind of file at a time in the tree and the diffs, each with its file
+              count. All shows every file.
             </span>
           </span>
         </label>
@@ -275,7 +306,13 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
             )}
           </div>
           <PathProbe groups={groups} />
-          <SiftImport onImport={(imported) => edit(toDraft(imported))} />
+          <SiftImportForm
+            onImport={({ groups: imported, defaultGroup, hideEmpty }) => {
+              edit(toDraft(imported));
+              const patch = { ...(defaultGroup === undefined ? {} : { defaultGroup }), ...(hideEmpty === undefined ? {} : { hideEmpty }) };
+              if (Object.keys(patch).length > 0) update({ fileGroups: patch });
+            }}
+          />
         </>
       )}
     </div>

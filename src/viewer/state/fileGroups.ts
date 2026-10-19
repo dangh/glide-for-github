@@ -3,7 +3,8 @@
  *
  * Files are classified once per (groups, files) pair; switching groups only picks another precomputed list, so the
  * tree and the diff list swap their paths without a request. The choice made on a PR is kept per PR in
- * `sessionStorage`, so a reload reopens it; a PR opened fresh starts on the default group.
+ * `sessionStorage`, so a reload reopens it; a PR opened fresh starts on the default group. A group renamed on the
+ * options page stays picked (`renamedGroups`).
  */
 import { create } from 'zustand';
 import { ALL_GROUP, groupPaths, type FileGroup } from '../../shared/file-groups';
@@ -115,6 +116,44 @@ export function useActiveGroup() {
 
 /** `sessionStorage` key holding the group picked on a PR. */
 export const groupMemoryKey = (ref: PrRef): string => `pierre.fileGroup:${prKey(ref)}`;
+const MEMORY_PREFIX = 'pierre.fileGroup:';
+
+/**
+ * Old label → new label for the groups `next` renamed from `prev`: a label gone whose patterns one new label has (the
+ * options page saves a rename on its own as you type), else, with as many groups as before, the new label in its place.
+ */
+export function renamedGroups(prev: readonly FileGroup[], next: readonly FileGroup[]): Map<string, string> {
+  const has = (list: readonly FileGroup[], label: string) => list.some((g) => g.label.toLowerCase() === label.toLowerCase());
+  const added = new Set(next.filter((g) => !has(prev, g.label)).map((g) => g.label));
+  const renames = new Map<string, string>();
+  prev.forEach((old, i) => {
+    if (has(next, old.label)) return;
+    const patterns = old.patterns.join('\n');
+    const same = next.filter((g) => added.has(g.label) && g.patterns.join('\n') === patterns);
+    const label = same.length === 1 ? same[0]!.label : prev.length === next.length && added.has(next[i]!.label) ? next[i]!.label : undefined;
+    if (label === undefined) return;
+    renames.set(old.label, label);
+    added.delete(label);
+  });
+  return renames;
+}
+
+/** Follows renames in the open choice and in every PR's remembered group. */
+function followRenames(renames: ReadonlyMap<string, string>) {
+  if (renames.size === 0) return;
+  const renamed = (label: string | null) => (label === null ? undefined : [...renames].find(([old]) => old.toLowerCase() === label.toLowerCase())?.[1]);
+  try {
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      const now = key?.startsWith(MEMORY_PREFIX) ? renamed(sessionStorage.getItem(key)) : undefined;
+      if (key && now !== undefined) sessionStorage.setItem(key, now);
+    }
+  } catch {
+    // blocked storage (the in-memory stand-in only holds this PR's): only the open choice follows
+  }
+  const choice = renamed(useFileGroups.getState().choice);
+  if (choice !== undefined) useFileGroups.getState().choose(choice);
+}
 
 /**
  * Loads the groups and follows their changes, and keeps each PR's choice: restored when the PR is set, written
@@ -122,11 +161,17 @@ export const groupMemoryKey = (ref: PrRef): string => `pierre.fileGroup:${prKey(
  */
 export function initFileGroups(store = usePr, storage?: GroupsStorage): () => void {
   let active = true;
+  let changed = false;
   void loadFileGroups(storage).then(
-    (groups) => active && useFileGroups.setState({ groups, loaded: true }),
-    () => active && useFileGroups.setState({ loaded: true }),
+    (groups) => active && !changed && useFileGroups.setState({ groups, loaded: true }),
+    () => active && !changed && useFileGroups.setState({ loaded: true }),
   );
-  const offStorage = onFileGroupsChange((groups) => useFileGroups.setState({ groups }), storage);
+  const offStorage = onFileGroupsChange((groups) => {
+    changed = true;
+    const renames = renamedGroups(useFileGroups.getState().groups, groups);
+    useFileGroups.setState({ groups, loaded: true });
+    followRenames(renames);
+  }, storage);
 
   let name: string | null = null;
   const onPr = (s: PrState) => {

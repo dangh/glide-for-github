@@ -105,12 +105,17 @@ html[data-scroll-layout='merged'] .pierre-app {
   padding: 8px var(--gutter);
 }
 
-/* GitHub's sticky PR header in the toolbar: state label, then title + number above the commit range and branches. */
+/*
+ * GitHub's sticky PR header in the toolbar: state label, then title + number above the commit range and branches.
+ * The title and the branch summary take only the room the file group tabs leave (their own width counts for nothing:
+ * `contain: inline-size`), down to a 96 px title, like GitHub's sticky title beside Sift's tabs; only then do the tabs
+ * fold into their menu. The header takes the toolbar's free width, so a short title sits at its natural width.
+ */
 .pr-header {
   display: flex;
+  flex: 1000 1 auto;
   align-items: center;
   gap: 8px;
-  min-width: 0;
 }
 
 /* Primer's large StateLabel (measured on /changes: 32 px, 14px/600, 8 px 12 px, 16 px icon 4 px from the text). */
@@ -147,13 +152,14 @@ html[data-scroll-layout='merged'] .pierre-app {
 /* 45 px: the 21 px title row overlaps the 28 px row below it by 4 px, as on GitHub. */
 .pr-summary {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
-  min-width: 0;
 }
 
 .pr-title-row {
   display: flex;
-  min-width: 0;
+  contain: inline-size;
+  min-width: 96px;
   font-size: 14px;
   line-height: 21px;
 }
@@ -375,9 +381,12 @@ html[data-scroll-layout='merged'] .pierre-app {
   line-height: 18px;
 }
 
-/* GitHub shows the branch summary from 1012 px. */
+/* GitHub shows the branch summary from 1012 px, cut off where the row ends. */
 .pr-branches {
   display: none;
+  flex: 1 1 auto;
+  contain: inline-size;
+  overflow: hidden;
   align-items: center;
   min-width: 0;
   font-size: 12px;
@@ -1796,41 +1805,72 @@ html[data-scroll-layout] .pierre-body[data-tree-position='left'] .pierre-diffs {
 }
 
 /*
- * File groups (FileGroupTabs.tsx): GitHub's UnderlineNav, as on the pull request's own tabs: 14 px items with a
- * Counter, the open one bold and underlined in GitHub's coral. Its own row under the toolbar (40 px, GitHub's is 48),
- * so it fits beside nothing: any number of groups, every tree position and the merged bar.
+ * File groups (FileGroupTabs.tsx), in the toolbar left of the viewed counter, as Sift for GitHub draws them there
+ * (measured on react/react#37778 with Sift 0.7.1, 2026-10-19): a 28 px segmented control on the muted background,
+ * 12 px tabs with 11 px muted counts, the open one bold on the page background inside the strip's border, 12 px
+ * before the viewed counter. The slot takes the toolbar's leftover width but never less than its menu button (in
+ * flow); the tabs sit over the slot's right end, out of flow, so they never push the toolbar wider.
  */
 .file-groups {
+  position: relative;
   display: flex;
+  flex: 1 1 var(--file-groups-want, 0px);
+  min-width: var(--file-groups-min, 0);
+  justify-content: flex-end;
   align-items: center;
-  gap: 8px;
-  flex: none;
-  height: 40px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  border-bottom: 1px solid var(--pierre-border);
+  margin-right: 4px;
+}
+
+.file-groups-tabs {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  display: flex;
+  width: max-content;
+  transform: translateY(-50%);
+  border: 1px solid var(--pierre-border);
+  border-radius: 6px;
+  background: var(--pierre-bg-subtle);
+}
+
+/* The tabs' room is taken from Split/Unified, Wrap and Hide whitespace first (FileGroupTabs.tsx). */
+.pierre-toolbar[data-groups-room] .diff-toggle {
+  display: none;
+}
+
+.file-groups:not([data-compact]) > .file-groups-menu,
+.file-groups[data-compact] > .file-groups-tabs {
+  visibility: hidden;
 }
 
 .file-group {
-  position: relative;
   display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  gap: 4px;
   flex: none;
-  height: 32px;
-  padding: 0 8px;
-  border: 0;
+  margin: -1px 0;
+  padding: 3px 7px;
+  border: 1px solid transparent;
   border-radius: 6px;
   background: none;
-  color: var(--pierre-fg);
-  font-size: 14px;
-  line-height: 30px;
+  color: var(--pierre-muted);
+  font-size: 12px;
+  line-height: 20px;
   white-space: nowrap;
   cursor: pointer;
 }
 
+.file-group:first-child {
+  margin-left: -1px;
+}
+
+.file-group:last-child {
+  margin-right: -1px;
+}
+
 .file-group:hover {
-  background: light-dark(#818b9826, #656c7633);
+  color: var(--pierre-fg);
+  background: light-dark(#818b981f, #656c7633);
 }
 
 .file-group:focus-visible {
@@ -1839,28 +1879,70 @@ html[data-scroll-layout] .pierre-body[data-tree-position='left'] .pierre-diffs {
 }
 
 .file-group[aria-selected='true'] {
+  color: var(--pierre-fg);
   font-weight: 600;
+  background: var(--pierre-bg);
+  border-color: var(--pierre-border);
 }
 
-.file-group[aria-selected='true']::after {
-  content: '';
-  position: absolute;
-  inset: auto 0 -4px;
-  height: 2px;
-  border-radius: 6px;
-  background: light-dark(#fd8c73, #f78166);
-}
-
-/* Primer Counter. */
 .file-group-count {
-  min-width: 20px;
-  padding: 0 6px;
-  border-radius: 2em;
-  background: light-dark(#818b981f, #656c7633);
+  color: var(--pierre-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+/* Narrow: Sift's dropdown, as a Primer button showing the open group; its name gives way before anything else. */
+.file-groups-menu {
+  display: flex;
+  min-width: 0;
+}
+
+.file-groups-menu > .pill {
+  min-width: 0;
+}
+
+.file-groups-menu-label {
+  min-width: 3ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-groups-menu > .popover-panel {
+  left: auto;
+  right: 0;
+  min-width: 200px;
+  max-width: calc(100vw - 16px);
+}
+
+.file-groups-item {
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-groups-item:focus {
+  outline: none;
+  background: var(--pierre-bg-subtle);
+}
+
+.file-groups-item:focus-visible {
+  outline: 2px solid var(--pierre-accent);
+  outline-offset: -2px;
+}
+
+.file-groups-check {
+  display: inline-flex;
+  flex: none;
+  width: 16px;
+}
+
+.file-groups-item .menu-text {
+  flex: 1;
+}
+
+.file-groups-item-count {
+  color: var(--pierre-muted);
   font-size: 12px;
-  font-weight: 500;
-  line-height: 18px;
-  text-align: center;
 }
 
 .pierre-empty-group {
