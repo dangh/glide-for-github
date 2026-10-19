@@ -115,7 +115,7 @@ describe('DEFAULT_SETTINGS', () => {
       fonts: { codeFontFamily: '', uiFontFamily: '', codeFontSize: 'default', codeFontFeatures: '' },
       layout: { treePosition: 'left', showTree: true },
       review: { hideWhitespace: false },
-      experiments: { pageScroll: false, mergedBar: false },
+      experiments: { mergedBar: false },
       github: { replaceFilesTab: false },
       fileGroups: { enabled: true, defaultGroup: '', hideEmpty: true },
       relatedFiles: { style: 'nested' },
@@ -203,9 +203,16 @@ describe('theme names', () => {
 describe('experiments', () => {
   it('are off unless stored as true; anything else falls back to off', async () => {
     fake.data[SETTINGS_STORAGE_KEY] = { experiments: { pageScroll: 'yes', mergedBar: 1, extra: true } };
-    expect((await loadSettings()).experiments).toEqual({ pageScroll: false, mergedBar: false });
+    expect((await loadSettings()).experiments).toEqual({ mergedBar: false });
     fake.data[SETTINGS_STORAGE_KEY] = { experiments: { pageScroll: true } };
-    expect((await loadSettings()).experiments).toEqual({ pageScroll: true, mergedBar: false });
+    expect((await loadSettings()).experiments).toEqual({ mergedBar: false });
+  });
+
+  it.each([false, true])('migrates legacy pageScroll=%s without changing the effective toolbar', async (pageScroll) => {
+    fake.data[SETTINGS_STORAGE_KEY] = { experiments: { pageScroll, mergedBar: true } };
+    expect((await loadSettings()).experiments).toEqual({ mergedBar: pageScroll });
+    await saveSettings({ tree: { search: false } });
+    expect(fake.data[SETTINGS_STORAGE_KEY]).toEqual({ experiments: { mergedBar: pageScroll }, tree: { search: false } });
   });
 
   it('save as sparse overrides next to the display settings and reach followers', async () => {
@@ -215,7 +222,7 @@ describe('experiments', () => {
     await saveSettings({ experiments: { mergedBar: true, bogus: true } as never });
     off();
     expect(fake.data[SETTINGS_STORAGE_KEY]).toEqual({ diff: { diffStyle: 'split' }, experiments: { mergedBar: true } });
-    expect(seen.at(-1)?.experiments).toEqual({ pageScroll: false, mergedBar: true });
+    expect(seen.at(-1)?.experiments).toEqual({ mergedBar: true });
   });
 });
 

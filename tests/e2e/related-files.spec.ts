@@ -18,7 +18,7 @@ mkdirSync(SHOTS, { recursive: true });
 
 /** The diff list's files, in the order the CodeView lays them out. */
 const listItems = (viewer: Viewer) =>
-  viewer.frame().evaluate(() => {
+  viewer.evaluate(() => {
     const view = window.__pierre!.session.codeView!;
     const ids = window.__pierre!.store.getState().order.filter((id) => view.getItem(id));
     const top = (id: string) => view.getInstance()!.getTopForItem(id)!;
@@ -27,24 +27,24 @@ const listItems = (viewer: Viewer) =>
 
 /** Scrolls an item into view without unfolding it (the tree and `scrollToFile` unfold a folded file). */
 const reveal = (viewer: Viewer, id: string) =>
-  viewer.frame().evaluate((i) => window.__pierre!.session.codeView!.scrollTo({ type: 'item', id: i, align: 'center' }), id);
+  viewer.evaluate((i) => window.__pierre!.session.codeView!.scrollTo({ type: 'item', id: i, align: 'center' }), id);
 
 const header = (viewer: Viewer, path: string) => viewer.locator.locator(`.fh[data-path="${path}"]`);
 
 const setCollapsed = (viewer: Viewer, path: string, collapsed: boolean) =>
-  viewer.frame().evaluate(([p, c]) => window.__pierre!.store.getState().setCollapsed(p, c), [path, collapsed] as const);
+  viewer.evaluate(([p, c]) => window.__pierre!.store.getState().setCollapsed(p, c), [path, collapsed] as const);
 
 /**
  * Each item's box (its `diffs-container`) and header, in the viewer's px, and `drift`: how far the box is drawn from
  * where CodeView laid the item out (`getTopForItem`), which every scroll offset relies on.
  */
 const boxes = (viewer: Viewer, ids: readonly string[]) =>
-  viewer.frame().evaluate((list) => {
+  viewer.evaluate((list, viewerRoot) => {
     const view = window.__pierre!.session.codeView!.getInstance()!;
     const root = view.getContainerElement()!;
     const origin = root.getBoundingClientRect().top - root.scrollTop;
     return list.map((id) => {
-      const fh = document.querySelector<HTMLElement>(`.fh[data-path="${CSS.escape(id)}"]`);
+      const fh = viewerRoot.querySelector<HTMLElement>(`.fh[data-path="${CSS.escape(id)}"]`);
       const box = fh?.closest('diffs-container');
       if (!fh || !box) return null;
       const b = box.getBoundingClientRect();
@@ -55,18 +55,19 @@ const boxes = (viewer: Viewer, ids: readonly string[]) =>
 
 /** Where a scroll to `id` landed: its header's distance from the top it should be at (the list's end clamps it). */
 const scrolledTo = (viewer: Viewer, id: string) =>
-  viewer.frame().evaluate((target) => {
+  viewer.evaluate((target, viewerRoot) => {
     const view = window.__pierre!.session.codeView!.getInstance()!;
     const root = view.getContainerElement()!;
-    const fh = document.querySelector<HTMLElement>(`.fh[data-path="${CSS.escape(target)}"]`);
+    const fh = viewerRoot.querySelector<HTMLElement>(`.fh[data-path="${CSS.escape(target)}"]`);
     const box = fh?.closest('diffs-container');
     if (!fh || !box) return { found: false };
     const itemTop = view.getTopForItem(target)!;
-    const scrollTop = Math.min(itemTop, root.scrollHeight - root.clientHeight);
+    const inset = viewerRoot.querySelector('.pierre-toolbar')!.getBoundingClientRect().bottom;
+    const scrollTop = Math.min(scrollY + root.getBoundingClientRect().top + itemTop - inset, document.scrollingElement!.scrollHeight - innerHeight);
     const rootTop = root.getBoundingClientRect().top;
     return {
       found: true,
-      offset: Math.round(root.scrollTop - scrollTop),
+      offset: Math.round(scrollY - scrollTop),
       drift: Math.round(box.getBoundingClientRect().top - (rootTop + itemTop - root.scrollTop)),
     };
   }, id);
@@ -277,8 +278,8 @@ test.describe('related files', () => {
     const COMPANION = 'scripts/extra.py';
     let viewer = await openPierre(page, SANDBOX, 'hash');
     const rpc = (method: 'markViewed' | 'unmarkViewed', path: string) =>
-      viewer.frame().evaluate(([m, p]) => window.__pierre!.session.rpc!.call(m, 'dangh', 'pierre-sandbox', 1, p), [method, path] as const);
-    const before = await viewer.frame().evaluate(() => [...window.__pierre!.store.getState().viewed]);
+      viewer.evaluate(([m, p]) => window.__pierre!.session.rpc!.call(m, 'dangh', 'pierre-sandbox', 1, p), [method, path] as const);
+    const before = await viewer.evaluate(() => [...window.__pierre!.store.getState().viewed]);
     try {
       // Comments: Button.ts (one review thread) folds under Tooltip.ts and says so on its row.
       await viewer.scrollToFile('src/components/Tooltip.ts');

@@ -4,13 +4,20 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { hideFilesTab, injectTab, removeTab, setTabActive } from '../../src/content/tab';
-import { mountViewer, setExtensionUrlResolver } from '../../src/content/host';
-import { createLifecycle } from '../../src/content/lifecycle';
+import { createContentHost } from '../../src/content/host';
+import { createLifecycle as createProductionLifecycle } from '../../src/content/lifecycle';
 import { DEFAULT_CONTENT_SETTINGS, fixedSettings, type SettingsSource } from '../../src/content/settings-source';
-import { filesChangedUrl, glideUrl, type PrRef } from '../../src/shared/pr-url';
+import { filesChangedUrl, glideUrl, prKey, type PrRef } from '../../src/shared/pr-url';
 
 const ref: PrRef = { owner: 'dangh', repo: 'pierre-sandbox', number: 1, page: 'changes' };
-const EXT = 'chrome-extension://abcdefghijklmnop/';
+const createLifecycle = (win = window, settings: SettingsSource = fixedSettings()) =>
+  createProductionLifecycle(win, settings, (doc, ref, layout) => {
+    const element = doc.createElement('div');
+    element.dataset.testViewer = prKey(ref);
+    const host = createContentHost(doc, element);
+    host.refresh();
+    return { layout, refresh: () => host.refresh() !== null, unmount: host.unmount };
+  });
 
 const fixture = (name: string) =>
   readFileSync(resolve(__dirname, '../fixtures/dom', name), 'utf8');
@@ -22,21 +29,15 @@ const fixtures = [
 
 const go = (path: string) => window.history.pushState(null, '', path);
 const pierreTabs = () => document.querySelectorAll('[data-pierre-tab]');
-const viewers = () => document.querySelectorAll('iframe[data-pierre-viewer]');
-type FramePost = [unknown, string, unknown[]];
-/** The messages posted to the viewer's window, of one type. */
-const posted = (spy: { mock: { calls: unknown[][] } }, type: string) =>
-  spy.mock.calls.filter((c) => (c[0] as { type?: string }).type === type) as unknown as FramePost[];
-
+const viewers = () => document.querySelectorAll('[data-test-viewer]');
 /** Document HTML with the Glide tab and viewer removed, to compare against the untouched fixture. */
 function bodyWithoutPierre(): string {
   const clone = document.body.cloneNode(true) as HTMLElement;
-  clone.querySelectorAll('[data-pierre-tab], iframe[data-pierre-viewer]').forEach((e) => e.remove());
+  clone.querySelectorAll('[data-pierre-tab], [data-test-viewer]').forEach((e) => e.remove());
   return clone.innerHTML;
 }
 
 beforeEach(() => {
-  setExtensionUrlResolver((path) => EXT + path);
   vi.spyOn(window, 'postMessage').mockImplementation(() => {});
 });
 
@@ -164,168 +165,26 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
     });
   });
 
-  describe('mountViewer', () => {
-    it('hides the content, adds one iframe for this PR, and unmount restores both', () => {
-      injectTab(document, ref);
-      const content = document.querySelector('#fixture-content')!;
-      const host = mountViewer(document, ref);
-
-      expect(viewers()).toHaveLength(1);
-      expect(host.iframe.getAttribute('src')).toBe(
-        EXT + 'viewer.html?pr=' + encodeURIComponent('dangh/pierre-sandbox#1'),
-      );
-      expect(host.iframe.src).toContain('pr=dangh%2Fpierre-sandbox%231');
-      expect(host.iframe.style.height).toMatch(/^calc\(100vh - \d+px\)$/);
-      expect(host.iframe.style.minHeight).toBe('320px');
-      expect(host.iframe.getAttribute('allow')).toBe('clipboard-write');
+  describe('in-page content host', () => {
+    it('moves the same host after a replaced GitHub layout and restores hidden styles', () => {
+      const content = document.querySelector<HTMLElement>('#fixture-content')!;
+      content.setAttribute('style', 'color: red');
+      const before = content.getAttribute('style');
+      const element = document.createElement('div');
+      const host = createContentHost(document, element);
+      expect(host.refresh()).not.toBeNull();
       expect(hiddenAncestor(content)).toBe(true);
-
+      const parent = element.parentElement!;
+      const fresh = parent.cloneNode(true) as HTMLElement;
+      fresh.querySelectorAll('[style]').forEach((node) => node.removeAttribute('style'));
+      parent.replaceWith(fresh);
+      expect(host.refresh()).not.toBeNull();
+      expect(element.parentElement).toBe(fresh);
       host.unmount();
-      expect(viewers()).toHaveLength(0);
-      expect(hiddenAncestor(content)).toBe(false);
-      expect(bodyWithoutPierre()).toBe(original);
-    });
-
-    it('hands the bridge port to the page and the viewer port to the iframe', () => {
-      document.documentElement.setAttribute('data-color-mode', 'dark');
-      const host = mountViewer(document, ref);
-      const framePost = vi.spyOn(host.iframe.contentWindow!, 'postMessage').mockImplementation(() => {});
-
-      const bridgeCall = vi.mocked(window.postMessage).mock.calls[0]! as unknown as [unknown, string, unknown[]];
-      expect(bridgeCall[0]).toEqual({ type: 'pierre:bridge-port' });
-      expect(bridgeCall[1]).toBe(window.location.origin);
-      expect(bridgeCall[2]).toHaveLength(1);
-
-      host.iframe.dispatchEvent(new Event('load'));
-      expect(posted(framePost, 'pierre:port')).toHaveLength(1);
-      const [msg, origin, transfer] = posted(framePost, 'pierre:port')[0]!;
-      expect(msg).toEqual({ type: 'pierre:port', colorMode: 'dark' });
-      expect(origin).toBe('chrome-extension://abcdefghijklmnop');
-      expect(transfer).toHaveLength(1);
-    });
-
-    it("reports the breakpoints GitHub's viewport reaches with the handshake, then whenever they change", () => {
-      let width = 1280;
-      vi.spyOn(window, 'innerWidth', 'get').mockImplementation(() => width);
-      const host = mountViewer(document, ref);
-      const framePost = vi.spyOn(host.iframe.contentWindow!, 'postMessage').mockImplementation(() => {});
-      const reports = () => posted(framePost, 'pierre:viewport').map(([msg, origin]) => [(msg as { reached: string[] }).reached, origin]);
-      window.dispatchEvent(new Event('resize'));
-      expect(reports()).toEqual([]);
-
-      host.iframe.dispatchEvent(new Event('load'));
-      expect(reports()).toEqual([[['md', 'lg'], 'chrome-extension://abcdefghijklmnop']]);
-      width = 1100;
-      window.dispatchEvent(new Event('resize'));
-      expect(reports()).toHaveLength(1);
-      width = 1011;
-      window.dispatchEvent(new Event('resize'));
-      width = 767;
-      window.dispatchEvent(new Event('resize'));
-      expect(reports().map(([reached]) => reached)).toEqual([['md', 'lg'], ['md'], []]);
       host.unmount();
-    });
-
-    it('sends no breakpoints once GitHub dropped the iframe, before the lifecycle unmounts the viewer', () => {
-      let width = 1280;
-      vi.spyOn(window, 'innerWidth', 'get').mockImplementation(() => width);
-      const host = mountViewer(document, ref);
-      const framePost = vi.spyOn(host.iframe.contentWindow!, 'postMessage').mockImplementation(() => {});
-      host.iframe.dispatchEvent(new Event('load'));
-      host.iframe.remove();
-      width = 767;
-      window.dispatchEvent(new Event('resize'));
-      expect(posted(framePost, 'pierre:viewport')).toHaveLength(1);
-      host.unmount();
-    });
-
-    it('sizes the viewer to end at the bottom of the viewport, from its own top', () => {
-      const rect = vi.spyOn(HTMLIFrameElement.prototype, 'getBoundingClientRect');
-      rect.mockReturnValue({ top: 261.4, left: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 261.4, toJSON() {} } as DOMRect);
-      const host = mountViewer(document, ref);
-      expect(host.iframe.style.height).toBe('calc(100vh - 261px)');
-
-      // Layout above the viewer changed (GitHub re-rendered the header): resize and refresh re-measure.
-      rect.mockReturnValue({ top: 300, left: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 300, toJSON() {} } as DOMRect);
-      window.dispatchEvent(new Event('resize'));
-      expect(host.iframe.style.height).toBe('calc(100vh - 300px)');
-      host.unmount();
-    });
-
-    it('tells the bridge to reset on unmount', () => {
-      const host = mountViewer(document, ref);
-      host.unmount();
-      expect(window.postMessage).toHaveBeenLastCalledWith({ type: 'pierre:bridge-reset' }, window.location.origin);
-    });
-
-    describe('bridge-ready handshake (bridge loaded after mount)', () => {
-      const bridgeCalls = () =>
-        vi.mocked(window.postMessage).mock.calls.filter(
-          (c) => (c[0] as { type?: string }).type === 'pierre:bridge-port',
-        ) as unknown as [unknown, string, MessagePort[]][];
-
-      it('re-creates the channel once and re-sends a fresh port to both the bridge and the viewer', () => {
-        document.documentElement.setAttribute('data-color-mode', 'light');
-        const host = mountViewer(document, ref);
-        const framePost = vi.spyOn(host.iframe.contentWindow!, 'postMessage').mockImplementation(() => {});
-        host.iframe.dispatchEvent(new Event('load'));
-        expect(bridgeCalls()).toHaveLength(1);
-        expect(posted(framePost, 'pierre:port')).toHaveLength(1);
-
-        deliverMessage({ type: 'pierre:bridge-ready' });
-
-        // A reset goes first so a bridge that already accepted the first port takes the new one.
-        expect(vi.mocked(window.postMessage).mock.calls.map((c) => (c[0] as { type: string }).type)).toEqual([
-          'pierre:bridge-port',
-          'pierre:bridge-reset',
-          'pierre:bridge-port',
-        ]);
-        expect(bridgeCalls()).toHaveLength(2);
-        expect(bridgeCalls()[1]![1]).toBe(window.location.origin);
-        expect(bridgeCalls()[1]![2]).toHaveLength(1);
-        expect(posted(framePost, 'pierre:port')).toHaveLength(2);
-        expect(posted(framePost, 'pierre:viewport')).toHaveLength(2);
-        const [msg, origin, transfer] = posted(framePost, 'pierre:port')[1]!;
-        expect(msg).toEqual({ type: 'pierre:port', colorMode: 'light' });
-        expect(origin).toBe('chrome-extension://abcdefghijklmnop');
-        expect(transfer).toHaveLength(1);
-        // The two sides got ends of the same new channel, distinct from the first handshake's.
-        expect(transfer[0]).not.toBe(posted(framePost, 'pierre:port')[0]![2][0]);
-        host.unmount();
-      });
-
-      it('before the iframe has loaded, re-sends only to the bridge; the load then delivers the newest port', () => {
-        const host = mountViewer(document, ref);
-        const framePost = vi.spyOn(host.iframe.contentWindow!, 'postMessage').mockImplementation(() => {});
-        deliverMessage({ type: 'pierre:bridge-ready' });
-        expect(bridgeCalls()).toHaveLength(2);
-        expect(framePost).not.toHaveBeenCalled();
-        host.iframe.dispatchEvent(new Event('load'));
-        expect(posted(framePost, 'pierre:port')).toHaveLength(1);
-        host.unmount();
-      });
-
-      it.each([
-        ['foreign origin', { origin: 'https://evil.example' }],
-        ['another source', { source: {} }],
-      ])('ignores bridge-ready from a %s', (_n, opts) => {
-        const host = mountViewer(document, ref);
-        deliverMessage({ type: 'pierre:bridge-ready' }, opts);
-        expect(bridgeCalls()).toHaveLength(1);
-        host.unmount();
-      });
-
-      it('does nothing once unmounted', () => {
-        const host = mountViewer(document, ref);
-        host.unmount();
-        deliverMessage({ type: 'pierre:bridge-ready' });
-        expect(bridgeCalls()).toHaveLength(1);
-      });
-
-      it('does nothing when no viewer is mounted', () => {
-        deliverMessage({ type: 'pierre:bridge-ready' });
-        expect(bridgeCalls()).toHaveLength(0);
-      });
+      expect(element.isConnected).toBe(false);
+      expect(content.getAttribute('style')).toBe(before);
+      expect(host.refresh()).toBeNull();
     });
   });
 
@@ -397,7 +256,7 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
       go('/dangh/pierre-sandbox/pull/2/changes#glide');
       life.sync();
       expect(viewers()).toHaveLength(1);
-      expect(viewers()[0]!.getAttribute('src')).toContain('pr=dangh%2Fpierre-sandbox%232');
+      expect(viewers()[0]!.getAttribute('data-test-viewer')).toBe('dangh/pierre-sandbox#2');
     });
 
     it('keeps observing after Turbo replaces document.body', async () => {
@@ -684,17 +543,6 @@ describe.each(fixtures)('$name', ({ file, filesTab }) => {
     });
   });
 });
-
-/** Delivers a `message` event to the window the way the browser does for window.postMessage. */
-function deliverMessage(data: unknown, opts: { source?: unknown; origin?: string } = {}): void {
-  const ev = new Event('message');
-  Object.defineProperties(ev, {
-    data: { value: data },
-    source: { value: 'source' in opts ? opts.source : window },
-    origin: { value: opts.origin ?? window.location.origin },
-  });
-  window.dispatchEvent(ev);
-}
 
 /** True when the node or any ancestor is display:none (jsdom computes inline styles). */
 function hiddenAncestor(el: Element): boolean {

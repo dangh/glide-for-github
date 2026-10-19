@@ -38,7 +38,7 @@ test('body replacement remounts the viewer and workers without losing its draft'
   await waitForViewer(page);
   const host = page.locator('#glide-inpage-spike');
   await expect(host.locator('[data-line]').first()).toBeVisible();
-  await host.getByTestId('review-button').press('Enter');
+  await host.getByTestId('review-button').click();
   await host.locator('.review-menu textarea').fill('Body replacement draft');
   await page.keyboard.press('Escape');
   await page.evaluate(() => {
@@ -49,7 +49,7 @@ test('body replacement remounts the viewer and workers without losing its draft'
     document.dispatchEvent(new Event('turbo:render'));
   });
   await expect(host.locator('[data-line]').first()).toBeVisible();
-  await host.getByTestId('review-button').press('Enter');
+  await host.getByTestId('review-button').click();
   await expect(host.locator('.review-menu textarea')).toHaveValue('Body replacement draft');
   await expect(page.locator('iframe[data-glide-worker-host]')).toHaveCount(1);
   await expect.poll(async () => page.frames().find(frame => frame.url().includes('/worker-host.html'))?.evaluate(() => window.__glideWorkerHost?.renders ?? 0)).toBeGreaterThan(0);

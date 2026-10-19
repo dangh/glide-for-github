@@ -39,7 +39,7 @@ for (const mode of ['merged', 'page'] as const) for (const scale of [1, 2]) {
       await options.goto(`chrome-extension://${extensionId()}/options.html`);
       await options.evaluate(async merged => {
         const saved = (await chrome.storage.sync.get('pierre.settings'))['pierre.settings'];
-        await chrome.storage.sync.set({ 'pierre.settings': { ...(typeof saved === 'object' && saved !== null ? saved : {}), experiments: { pageScroll: true, mergedBar: merged } } });
+        await chrome.storage.sync.set({ 'pierre.settings': { ...(typeof saved === 'object' && saved !== null ? saved : {}), experiments: { mergedBar: merged } } });
       }, mode === 'merged');
       await options.close();
       const page = await context.newPage();

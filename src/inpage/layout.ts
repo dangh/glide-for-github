@@ -5,9 +5,8 @@ import { usePageScroll } from '../viewer/pageScroll';
 import { refreshWindowViewport, setInsetTop } from './windowScroll';
 
 /** The document owns scrolling; only the toolbar and tree stick inside the viewer. */
-export function createInPageLayout(doc: Document, host: HTMLElement, shadow: ShadowRoot, requested: ScrollLayout, initialAnchor: HTMLElement) {
+export function createInPageLayout(doc: Document, host: HTMLElement, shadow: ShadowRoot, layout: ScrollLayout, initialAnchor: HTMLElement) {
   const win = doc.defaultView!;
-  const layout = requested === 'merged' ? 'merged' : 'page';
   const hidden = new Map<HTMLElement, string | null>();
   let nativeTop = 0;
   let inset = 60;

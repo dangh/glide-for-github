@@ -1,17 +1,6 @@
-/**
- * The viewer's side of the port handshake (see src/shared/rpc.ts and src/content/host.ts).
- *
- * The content script posts `{type: 'pierre:port', colorMode}` with a MessagePort to this frame, and may
- * post a replacement at any time (bridge-ready race). `createConnection` exposes one stable `rpc` facade:
- * calls wait for the first port, and a call that fails because its port was replaced (`closed`) is re-issued
- * on the new port, for reads and applySuggestions only (see `RETRY_ON_CLOSED`).
- * With page scrolling (src/shared/page-scroll.ts) the message carries a second port, the scroll channel.
- * The page also reports which of GitHub's viewport breakpoints it reaches (src/shared/viewport.ts).
- */
+/** Stable RPC facade over the in-page bridge's replaceable MessagePort. */
 import { BRAND } from '../shared/brand';
 import { BridgeError, createRpcClient, RETRY_ON_CLOSED, type BridgeMethods, type RpcClient } from '../shared/rpc';
-import type { PrRef } from '../shared/pr-url';
-import { parseViewportMessage, type Breakpoint } from '../shared/viewport';
 import type { Rpc } from './github/private';
 
 export const GITHUB_ORIGIN = 'https://github.com';
@@ -30,10 +19,7 @@ export interface ConnectionOptions {
   /** Only messages from this window are accepted (the embedding github.com page). Defaults to `win.parent`. */
   source?: MessageEventSource | null;
   createClient?: (port: MessagePort) => RpcClient<BridgeMethods>;
-  /** Receives the scroll channel of each handshake that has one (page scrolling). */
-  onScrollPort?: (port: MessagePort) => void;
-  /** Receives the breakpoints GitHub's viewport reaches, with every handshake and whenever they change. */
-  onViewport?: (reached: Breakpoint[]) => void;
+
 }
 
 export function createConnection(win: Window, options: ConnectionOptions = {}): Connection {
@@ -50,11 +36,6 @@ export function createConnection(win: Window, options: ConnectionOptions = {}): 
   const onMessage = (event: MessageEvent) => {
     if (disposed || event.origin !== GITHUB_ORIGIN) return;
     if (source !== null && event.source !== source) return;
-    const reached = parseViewportMessage(event.data);
-    if (reached) {
-      options.onViewport?.(reached);
-      return;
-    }
     const data = event.data as { type?: unknown; colorMode?: unknown } | null;
     if (!data || data.type !== 'pierre:port') return;
     const port = event.ports[0];
@@ -62,11 +43,6 @@ export function createConnection(win: Window, options: ConnectionOptions = {}): 
     const previous = client;
     client = createClient(port);
     previous?.close();
-    const scrollPort = event.ports[1];
-    if (scrollPort) {
-      if (options.onScrollPort) options.onScrollPort(scrollPort);
-      else scrollPort.close();
-    }
     resolveReady(typeof data.colorMode === 'string' ? data.colorMode : undefined);
     for (const wake of [...waiters]) wake();
   };
@@ -118,33 +94,5 @@ export function createConnection(win: Window, options: ConnectionOptions = {}): 
   };
 }
 
-/** The PR from the viewer URL's `?pr=owner/repo#n` (set by the content script, see src/content/host.ts). */
-export function parsePrParam(search: string): PrRef | null {
-  const key = new URLSearchParams(search).get('pr') ?? '';
-  const m = /^([^/#\s]+)\/([^/#\s]+)#([1-9]\d*)$/.exec(key);
-  return m ? { owner: m[1]!, repo: m[2]!, number: Number(m[3]), page: 'changes' } : null;
-}
-
-/** How long the viewer waits for the content script's port before telling the user to reload the page. */
-export const PORT_TIMEOUT_MS = 5000;
 /** Shown when no port ever arrives: the extension was updated (or reloaded) and this page's content script is gone. */
 export const PORT_TIMEOUT_MESSAGE = `Reload the page to use ${BRAND.short}. The extension was updated, so this page can no longer talk to it.`;
-
-/**
- * Calls `onTimeout(PORT_TIMEOUT_MESSAGE)` when `ready` (the first port) has not resolved within `ms`. A port that
- * arrives later still connects (the caller clears the message by loading the PR). Returns a cancel function.
- */
-export function watchPort(ready: Promise<unknown>, onTimeout: (message: string) => void, ms = PORT_TIMEOUT_MS): () => void {
-  let settled = false;
-  const timer = setTimeout(() => {
-    if (!settled) onTimeout(PORT_TIMEOUT_MESSAGE);
-  }, ms);
-  void ready.then(() => {
-    settled = true;
-    clearTimeout(timer);
-  });
-  return () => {
-    settled = true;
-    clearTimeout(timer);
-  };
-}

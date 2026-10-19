@@ -1,10 +1,11 @@
 /** The viewer shares GitHub's document scroll; only highlighting workers live in an extension-origin frame. */
+import '../viewer/inspection';
 import { scrollWindowToTop } from './windowScroll';
 import { terminateWorkerPoolSingleton } from '@pierre/diffs/worker';
 import { createRoot } from 'react-dom/client';
 import { createLifecycle } from '../content/lifecycle';
 import { storedSettings } from '../content/settings-source';
-import { findContentAnchor } from '../content/host';
+import { createContentHost, findContentAnchor } from '../content/host';
 import { App, workerSpike } from '../viewer/App';
 import { createConnection } from '../viewer/connection';
 import { ignoreBenignErrors } from '../viewer/benignErrors';
@@ -18,6 +19,7 @@ import { startFreshness } from '../viewer/state/freshness';
 import { session } from '../viewer/state/session';
 import { usePr } from '../viewer/state/store';
 import { resetReviewCaches } from '../viewer/state/review';
+import { connectBridge } from './connectBridge';
 import { createInPageLayout } from './layout';
 import { createWorkerBridge } from './workerBridge';
 import { createScrollPosition } from './scrollPosition';
@@ -27,7 +29,7 @@ import { migrateLegacyState } from './legacyState';
 
 ignoreBenignErrors(window);
 const lifecycle = createLifecycle(window, storedSettings(), (doc, ref, layout) => {
-  if (window.top !== window) throw new Error('In-page spike must run in GitHub’s top document');
+  if (window.top !== window) throw new Error('Glide must run in GitHub’s top document');
   const anchor = findContentAnchor(doc);
   if (!anchor) throw new Error('Glide: PR content anchor missing');
   const host = doc.createElement('div');
@@ -42,19 +44,13 @@ const lifecycle = createLifecycle(window, storedSettings(), (doc, ref, layout) =
   shadow.append(css, container);
   setViewerRoot(host, shadow);
   const pageLayout = createInPageLayout(doc, host, shadow, layout, anchor);
-  const hidden = new Map<HTMLElement, string | null>();
+  const contentHost = createContentHost(doc, host);
   let mounted = true;
   let workers: ReturnType<typeof createWorkerBridge> | undefined;
   const refresh = () => {
-    const currentAnchor = findContentAnchor(doc);
-    if (!mounted || !currentAnchor || (workers && !workers.isConnected())) return false;
-    // GitHub may replace its layout after the initial route load. Keep the existing React root and worker pool.
-    if (host.previousElementSibling !== currentAnchor) currentAnchor.after(host);
-    for (let el = currentAnchor.nextElementSibling; el; el = el.nextElementSibling) {
-      if (el === host || !(el instanceof HTMLElement)) continue;
-      if (!hidden.has(el)) hidden.set(el, el.getAttribute('style'));
-      if (el.style.display !== 'none') el.style.setProperty('display', 'none', 'important');
-    }
+    if (!mounted || (workers && !workers.isConnected())) return false;
+    const currentAnchor = contentHost.refresh();
+    if (!currentAnchor) return false;
     pageLayout.refresh(currentAnchor);
     return true;
   };
@@ -68,17 +64,7 @@ const lifecycle = createLifecycle(window, storedSettings(), (doc, ref, layout) =
   const cleanups = [initSettings()];
   const connection = createConnection(window, { source: window });
   session.rpc = connection.rpc;
-  const connect = () => {
-    const channel = new MessageChannel();
-    window.postMessage({ type: 'pierre:bridge-reset' }, location.origin);
-    window.postMessage({ type: 'pierre:bridge-port' }, location.origin, [channel.port2]);
-    window.postMessage({ type: 'pierre:port', colorMode: doc.documentElement.getAttribute('data-color-mode') }, location.origin, [channel.port1]);
-  };
-  const onBridgeReady = (event: MessageEvent) => {
-    if (event.source === window && event.origin === location.origin && event.data?.type === 'pierre:bridge-ready') connect();
-  };
-  window.addEventListener('message', onBridgeReady);
-  connect();
+  const disconnectBridge = connectBridge(window);
   void connection.ready.then(color => mounted && useSettings.getState().setColorMode(color));
   cleanups.push(startFreshness());
   const root = createRoot(container);
@@ -115,13 +101,8 @@ const lifecycle = createLifecycle(window, storedSettings(), (doc, ref, layout) =
       session.pageScroll = undefined;
       session.viewport = undefined;
       workerSpike.factory = undefined;
-      window.removeEventListener('message', onBridgeReady);
-      host.remove();
-      for (const [el, style] of hidden) {
-        if (style === null) el.removeAttribute('style');
-        else el.setAttribute('style', style);
-      }
-      window.postMessage({ type: 'pierre:bridge-reset' }, location.origin);
+      disconnectBridge();
+      contentHost.unmount();
     },
   };
 });

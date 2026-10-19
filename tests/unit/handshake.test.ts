@@ -1,16 +1,9 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"url": "https://github.com/dangh/pierre-sandbox/pull/1/changes"}
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mountViewer, setExtensionUrlResolver } from '../../src/content/host';
+import { connectBridge } from '../../src/inpage/connectBridge';
+import { createConnection } from '../../src/viewer/connection';
 import { startBridge } from '../../src/page/bridge';
-import { createRpcClient, type BridgeMethods } from '../../src/shared/rpc';
-import type { PrRef } from '../../src/shared/pr-url';
-
-const ref: PrRef = { owner: 'dangh', repo: 'pierre-sandbox', number: 1, page: 'changes' };
-const EXT = 'chrome-extension://abcdefghijklmnop/';
-
 type Queued = { data: unknown; ports: MessagePort[] };
 
 describe('content script + bridge handshake, in-order message delivery', () => {
@@ -36,8 +29,6 @@ describe('content script + bridge handshake, in-order message delivery', () => {
 
   beforeEach(() => {
     queue = [];
-    setExtensionUrlResolver((path) => EXT + path);
-    document.body.innerHTML = readFileSync(resolve(__dirname, '../fixtures/dom/pr-tabs-new.html'), 'utf8');
     vi.spyOn(window, 'postMessage').mockImplementation(((data: unknown, target: string, transfer?: MessagePort[]) => {
       expect(target).toBe(window.location.origin);
       queue.push({ data, ports: transfer ?? [] });
@@ -53,54 +44,43 @@ describe('content script + bridge handshake, in-order message delivery', () => {
   const fetchOk = (async () =>
     new Response('{"ok":true}', { status: 200, headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch;
 
-  async function viewerCanCall(portsSentToViewer: MessagePort[]): Promise<void> {
-    const client = createRpcClient<BridgeMethods>(portsSentToViewer.at(-1)!, { timeoutMs: 1000 });
-    clients.push(client);
-    await expect(client.call('get', '/dangh/pierre-sandbox/pull/1/changes', {}, { dataRouter: true })).resolves.toMatchObject({
-      data: { ok: true },
-    });
+
+  async function viewerCanCall(connection: ReturnType<typeof createConnection>) {
+    await expect(connection.rpc.call('get', '/dangh/pierre-sandbox/pull/1/changes', {}, { dataRouter: true })).resolves.toMatchObject({ data: { ok: true } });
   }
 
-  function mountWithViewerSpy() {
-    const host = mountViewer(document, ref);
-    const toViewer: MessagePort[] = [];
-    vi.spyOn(host.iframe.contentWindow!, 'postMessage').mockImplementation(((_m: unknown, _o: string, transfer?: MessagePort[]) => {
-      toViewer.push(...(transfer ?? []));
-    }) as Window['postMessage']);
-    return { host, toViewer };
-  }
-
-  it('bridge-port queued before the bridge started, then ready: the viewer\'s newest port works', async () => {
-    const { host, toViewer } = mountWithViewerSpy(); // queues [bridge-port#1]
-    host.iframe.dispatchEvent(new Event('load')); // viewer already holds port1#1
-    stopBridge = startBridge(window, { fetch: fetchOk }); // queues [bridge-ready]
-    expect(queue.map((q) => (q.data as { type: string }).type)).toEqual(['pierre:bridge-port', 'pierre:bridge-ready']);
-
-    flush(); // bridge accepts #1, content re-handshakes on ready
-
-    expect(toViewer).toHaveLength(2);
-    await viewerCanCall(toViewer);
-    host.unmount();
-  });
-
-  it('same race before the iframe has loaded: the load delivers the working port', async () => {
-    const { host, toViewer } = mountWithViewerSpy();
+  it('renews a channel queued before the bridge starts', async () => {
+    const connection = createConnection(window, { source: window });
+    clients.push({ close: connection.dispose });
+    const disconnect = connectBridge(window);
     stopBridge = startBridge(window, { fetch: fetchOk });
     flush();
-    host.iframe.dispatchEvent(new Event('load'));
-    expect(toViewer).toHaveLength(1);
-    await viewerCanCall(toViewer);
-    host.unmount();
+    await viewerCanCall(connection);
+    disconnect();
+    flush();
   });
 
-  it('bridge ready before mount (port arrives to a listening bridge): no re-handshake needed', async () => {
+  it('connects when the bridge was already listening', async () => {
     stopBridge = startBridge(window, { fetch: fetchOk });
-    flush(); // ready, nobody listening yet
-    const { host, toViewer } = mountWithViewerSpy();
-    host.iframe.dispatchEvent(new Event('load'));
     flush();
-    expect(toViewer).toHaveLength(1);
-    await viewerCanCall(toViewer);
-    host.unmount();
+    const connection = createConnection(window, { source: window });
+    clients.push({ close: connection.dispose });
+    const disconnect = connectBridge(window);
+    flush();
+    await viewerCanCall(connection);
+    disconnect();
+    flush();
+  });
+
+  it('ignores bridge-ready from another origin or window, and after disconnect', async () => {
+    const disconnect = connectBridge(window);
+    queue.length = 0;
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'pierre:bridge-ready' }, source: window, origin: 'https://evil.example' }));
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'pierre:bridge-ready' }, origin: window.location.origin }));
+    expect(queue).toEqual([]);
+    disconnect();
+    queue.length = 0;
+    deliver({ data: { type: 'pierre:bridge-ready' }, ports: [] });
+    expect(queue).toEqual([]);
   });
 });

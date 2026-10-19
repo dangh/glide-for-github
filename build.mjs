@@ -49,7 +49,7 @@ await Promise.all([
   // Extension pages: ESM with code splitting into dist/chunks/.
   build({
     ...common,
-    entryPoints: { viewer: r('src/viewer/main.tsx'), options: r('src/options/options.tsx') },
+    entryPoints: { options: r('src/options/options.tsx') },
     outdir: dist,
     format: 'esm',
     splitting: true,
@@ -59,7 +59,7 @@ await Promise.all([
   // Content script and MAIN-world bridge: self-contained IIFEs.
   build({
     ...common,
-    entryPoints: { content: r('src/content/index.ts'), bridge: r('src/page/main.ts') },
+    entryPoints: { bridge: r('src/page/main.ts'), 'worker-host': r('src/inpage/workerHost.ts') },
     outdir: dist,
     format: 'iife',
   }),
@@ -76,7 +76,7 @@ await Promise.all([
 await Promise.all([
   copyBranded(r('manifest.json'), resolve(dist, 'manifest.json'), jsonString),
   cp(r('src/content/content.css'), resolve(dist, 'content.css')),
-  copyBranded(r('src/viewer/viewer.html'), resolve(dist, 'viewer.html'), htmlText),
+  cp(r('src/inpage/worker-host.html'), resolve(dist, 'worker-host.html')),
   cp(r('src/viewer/viewer.css'), resolve(dist, 'viewer.css')),
   copyBranded(r('src/options/options.html'), resolve(dist, 'options.html'), htmlText),
   cp(r('src/options/options.css'), resolve(dist, 'options.css')),
@@ -85,6 +85,5 @@ await Promise.all([
   writeFile(resolve(dist, 'THIRD_PARTY_NOTICES.txt'), renderNotices(root)),
 ]);
 
-// This throwaway branch always builds the in-page experiment.
-const { buildInPageSpike } = await import('./scripts/inpage-spike/extension.mjs');
-await buildInPageSpike();
+const { buildInPage } = await import('./scripts/build-inpage.mjs');
+await buildInPage(common, root);

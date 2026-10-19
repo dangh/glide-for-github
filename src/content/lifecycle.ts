@@ -1,6 +1,7 @@
 import { filesRedirect, isGlideActive, parsePrUrl, prKey, showsGithubFiles } from '../shared/pr-url';
-import { findContentAnchor, mountViewer, type ViewerHost } from './host';
-import { fixedSettings, type SettingsSource } from './settings-source';
+import { findContentAnchor } from './host';
+import type { ScrollLayout } from '../shared/page-scroll';
+import { type SettingsSource } from './settings-source';
 import { hideFilesTab, injectTab, removeTab, setTabActive } from './tab';
 
 const DEBOUNCE_MS = 50;
@@ -13,12 +14,16 @@ export interface Lifecycle {
   stop(): void;
 }
 
-type MountedViewer = Pick<ViewerHost, 'layout' | 'refresh' | 'unmount'>;
-type MountViewer = (doc: Document, ref: NonNullable<ReturnType<typeof parsePrUrl>>, layout: ViewerHost['layout']) => MountedViewer;
+interface MountedViewer {
+  layout: ScrollLayout;
+  refresh(): boolean;
+  unmount(): void;
+}
+type MountViewer = (doc: Document, ref: NonNullable<ReturnType<typeof parsePrUrl>>, layout: ScrollLayout) => MountedViewer;
 
 type NavigationTarget = { addEventListener(type: string, listener: () => void): void; removeEventListener(type: string, listener: () => void): void };
 
-export function createLifecycle(win: Window & typeof globalThis = window, settings: SettingsSource = fixedSettings(), mount: MountViewer = mountViewer): Lifecycle {
+export function createLifecycle(win: Window & typeof globalThis, settings: SettingsSource, mount: MountViewer): Lifecycle {
   const doc = win.document;
   let mounted: { key: string; host: MountedViewer } | null = null;
   let observer: MutationObserver | null = null;

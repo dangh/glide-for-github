@@ -65,7 +65,7 @@ describe('stored content settings', () => {
     const source = storedSettings();
     storage.fail();
     await tick();
-    expect(source.get()).toEqual({ layout: 'frame', replaceFilesTab: false });
+    expect(source.get()).toEqual({ layout: 'page', replaceFilesTab: false });
   });
 
   it('a read that does not settle in time means the defaults; a late one still applies', async () => {
@@ -74,7 +74,7 @@ describe('stored content settings', () => {
     vi.advanceTimersByTime(READ_TIMEOUT_MS - 1);
     expect(source.get()).toBeUndefined();
     vi.advanceTimersByTime(1);
-    expect(source.get()).toEqual({ layout: 'frame', replaceFilesTab: false });
+    expect(source.get()).toEqual({ layout: 'page', replaceFilesTab: false });
 
     storage.read(PAGE);
     await tick();

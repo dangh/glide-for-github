@@ -24,7 +24,7 @@ async function setReplace(context: BrowserContext, replaceFilesTab: boolean | nu
 const filesTab = (page: Page) =>
   page.locator('nav a#prs-files-anchor-tab, nav a[href$="/changes"]:not([data-pierre-tab]), nav a[href$="/files"]:not([data-pierre-tab])').first();
 const glideTab = (page: Page) => page.locator('a[data-pierre-tab]');
-const viewerFrame = (page: Page) => page.locator('iframe[data-pierre-viewer]');
+const viewerHost = (page: Page) => page.locator('#glide-inpage-spike');
 const pathAndHash = (page: Page) => {
   const u = new URL(page.url());
   return u.pathname + u.search + u.hash;
@@ -123,7 +123,7 @@ test("on: loading Files changed directly opens Glide there; the Display menu's l
   // GitHub's page settles without Glide taking over again.
   await page.waitForTimeout(3_000);
   expect(pathAndHash(page)).toBe(`${base}/changes?glide=off`);
-  await expect(viewerFrame(page)).toHaveCount(0);
+  await expect(viewerHost(page)).toHaveCount(0);
 });
 
 test('on: a soft navigation (Back) to Files changed through GitHub\'s router opens Glide there', async ({ page, extContext }) => {
@@ -152,5 +152,5 @@ test("off: today's behavior, Files changed loads GitHub's page", async ({ page, 
   await expect(filesTab(page)).toBeVisible();
   await page.waitForTimeout(2_000);
   expect(new URL(page.url()).hash).toBe('');
-  await expect(viewerFrame(page)).toHaveCount(0);
+  await expect(viewerHost(page)).toHaveCount(0);
 });
