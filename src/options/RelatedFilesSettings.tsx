@@ -333,7 +333,8 @@ export function RelatedFilesSettingsForm({ style, update }: { style: RelatedStyl
       </p>
       {draft && (
         <>
-          <ol className="box-list related-rules">
+          <p className="muted rule-editor-hint">Click a pattern to edit, or use Tab. Valid changes save automatically.</p>
+          <ol className="box-list rule-editor-list related-rules">
             {draft.map((d, i) => (
               <RuleEditor
                 key={d.id}
