@@ -18,7 +18,7 @@ External rules setting textarea fonts to 90 pixels and toolbar heights to 999 pi
 
 On the real GitHub page, a page-context blob worker failed with a `worker-src` CSP violation. This does **not** prove that an isolated extension content script cannot start a worker. [Chrome documents separate CSP rules for isolated content scripts](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts#content_security_policy).
 
-The local harness successfully initialized two Pierre workers, highlighted visible content, and finished its runs with no worker failures or queued tasks. The extension prototype attempts a packaged `chrome-extension://` worker. That path has not been exercised in the collaborative browser, which does not expose an unpacked-extension loader. Do not count its main-thread fallback as worker success. If direct creation fails, an extension-origin iframe hosting the worker pool and forwarding its protocol over ports is a candidate; it was not implemented or tested here.
+The local harness successfully initialized two Pierre workers, highlighted visible content, and finished its runs with no worker failures or queued tasks. The extension prototype attempts a packaged `chrome-extension://` worker. A later repository e2e test exercised the actual unpacked extension and confirmed this direct worker path is blocked; see the packaging follow-up below. Do not count its main-thread fallback as worker success. If direct creation fails, an extension-origin iframe hosting the worker pool and forwarding its protocol over ports is a candidate; it was not implemented or tested here.
 
 ## Timing is inconclusive for production
 
@@ -30,7 +30,7 @@ The loop advances 120 pixels per frame through the first five files of the 500-f
 
 ## Remaining adoption gates
 
-- Run the unpacked extension on an authenticated GitHub PR. Check direct worker initialization and explicit fallback reporting, post/reply/edit/delete review comments, viewed toggles, and suggestion actions. None of those authenticated actions were attempted by this spike.
+- Check explicit worker fallback reporting, post/reply/edit/delete review comments, viewed toggles, and suggestion actions in the unpacked extension on an authenticated GitHub PR. Initial rendering is now tested; direct worker construction is confirmed blocked. None of those authenticated actions were attempted by this spike.
 - Exercise real keyboard shortcuts, menus, modal focus traps, Turbo navigation, and GitHub React layout replacements. The standalone prototype requires a PR URL ending in `#glide` at initial load, uses a full reload on hash changes, and does not implement the normal tab lifecycle.
 - Test a physical macOS trackpad at the top, bottom, and former page/list seam. Linux programmatic scrolling cannot verify macOS rubber-band feel.
 - Restore a production strategy for extremely tall lists. The adapter disables Pierre's scroll rebasing; the tested list is about 1.63 million pixels tall. Browser document-height limits still apply to larger inputs.
@@ -40,10 +40,18 @@ Compared with a full-height iframe, an in-page viewer permits native page-relati
 
 ## Reproduce
 
-From this worktree, run `node scripts/inpage-spike/build.mjs`. It creates a separately named **IN-PAGE SPIKE** extension in this worktree's `dist/`, plus the synthetic browser probe. `npm run build` restores the ordinary iframe build in the same worktree.
+From this worktree, run `node scripts/inpage-spike/build.mjs`. It creates a separately named **IN-PAGE SPIKE** extension in this worktree's `dist/`, plus the synthetic browser probe. `npm run build` and `node build.mjs` also build the in-page experiment on this branch. The iframe viewer assets are removed from the output so this branch cannot silently produce the old viewer.
 
 For the synthetic harness, serve the worktree with `python3 -m http.server 8134` and open `http://localhost:8134/research/inpage-spike/index.html`. The harness starts in page mode with workers. To compare paths, evaluate the contents of `scripts/inpage-spike/measure.js`, then call `await __spikeMeasure()`. `__spikeStart({mode:'page',count:500,workers:true})` and `__spikeStart({mode:'frame',count:500,workers:true})` select individual paths.
 
 To try the extension prototype, load this worktree's `dist/` as unpacked, then open a PR URL ending in `#glide`. This build is a feasibility artifact with the limitations above.
 
-Validation: spike build succeeds, TypeScript passes, and all 876 existing unit tests pass. These tests do not cover the unverified extension and platform gates above.
+Validation: spike build succeeds, TypeScript passes, and all 877 unit tests pass. These tests do not cover the unverified extension and platform gates above.
+
+Packaging correction: the original spike required a separate build command, so the normal build still produced the iframe version. Every build entry now produces the in-page spike. Reload the extension and then reload the GitHub page to discard content scripts and DOM from the previous extension build.
+
+The packaged-extension smoke test now passes in Chrome for Testing 155 on an authenticated public PR, using a temporary copy of the existing test profile. It asserts a visible real file header, a shadow root owned by the top document, and zero `iframe[data-pierre-viewer]` elements. This exposed and fixed another bootstrap problem: Chrome isolated content scripts have a null custom-element registry. `elements.js` now registers Pierre's two custom elements in MAIN at document start, while the viewer stays in the isolated world. This tests initial rendering only, not review writes or navigation recovery.
+
+The same extension run confirmed that direct `chrome-extension://.../pierre-worker.js` construction throws SecurityError from the GitHub origin. The current prototype falls back to main-thread highlighting. Worker routing remains a production gate, now confirmed rather than hypothetical.
+
+To rerun the packaged-extension check, set `PIERRE_SPIKE_PROFILE` to a signed-in Chrome profile directory and run `PIERRE_E2E_HEADLESS=1 npx playwright test tests/e2e/inpage-spike.spec.ts`. The test copies the profile into a temporary directory and deletes the copy afterward; it does not post comments or change viewed state.

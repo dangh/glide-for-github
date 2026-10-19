@@ -2,6 +2,7 @@
 import './windowScroll';
 import { createRoot } from 'react-dom/client';
 import { findContentAnchor } from '../content/host';
+import { injectTab, setTabActive } from '../content/tab';
 import { parsePrUrl, isGlideActive } from '../shared/pr-url';
 import { createRpcClient, type BridgeMethods } from '../shared/rpc';
 import { reachedBreakpoints } from '../shared/viewport';
@@ -17,11 +18,25 @@ import { session } from '../viewer/state/session';
 import { setInsetTop } from './windowScroll';
 
 const ref = parsePrUrl(location.href);
+// Register on every PR, including when Glide is opened after the initial page load.
+if (ref) {
+  injectTab(document, ref);
+  document.addEventListener('click', (event) => {
+    if (!(event.target instanceof Element) || !event.target.closest('a[data-pierre-tab]')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    location.assign(location.pathname + location.search + '#glide');
+    location.reload();
+  }, true);
+}
 if (ref && isGlideActive(location.href)) {
+  setTabActive(document, true);
   const anchor = findContentAnchor(document);
   if (!anchor) throw new Error('Spike: PR content anchor missing');
   const host = document.createElement('div');
   host.id = 'glide-inpage-spike';
+  host.dataset.glideRenderer = 'in-page';
+  if (window.top !== window) throw new Error('In-page spike must run in GitHub’s top document');
   const shadow = host.attachShadow({ mode: 'open' });
   const css = document.createElement('link');
   css.rel = 'stylesheet';
