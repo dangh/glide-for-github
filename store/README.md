@@ -133,5 +133,7 @@ If the same publisher account already publishes another extension from CI, reuse
 token and publisher ID, and add only the new `CWS_EXTENSION_ID`. Treat all five as sensitive: anyone holding the client
 secret or refresh token can publish a new version of the extension.
 
-Each release: bump `version` in `manifest.json` (and `package.json`), commit, tag `vX.Y.Z` with the same number and
-push the tag. CI fails the build if the tag and the manifest version differ.
+Each release: bump `version` in `manifest.json` (and `package.json` and `package-lock.json`), add the version's section
+at the top of `CHANGELOG.md` (`## X.Y.Z (YYYY-MM-DD)`; it becomes the GitHub release's notes, and the unit tests fail
+while the manifest's version has none), commit, tag `vX.Y.Z` with the same number and push the tag. CI fails the build
+if the tag and the manifest version differ.

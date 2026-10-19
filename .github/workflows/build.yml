@@ -2,8 +2,9 @@ name: Build and release
 
 # Every push to main and every pull request: type-check, test, build the extension and upload the zip
 # as a build artifact. A tag like v0.1.0 (it must equal manifest.json's version): also create a GitHub
-# release with the zip, and upload and publish it to the Chrome Web Store when the store secrets are set (as
-# secrets of the protected `chrome-web-store` environment; see store/README.md).
+# release with the zip and the tag's CHANGELOG.md section as its notes (generated notes when it has none), and
+# upload the zip to the Chrome Web Store and submit it for review when the store secrets are set (as secrets of the
+# protected `chrome-web-store` environment, whose reviewers approve the job; see store/README.md).
 # The runner image is pinned like the actions: moving to a newer Ubuntu is a reviewed change, not a surprise in a
 # release job.
 # The e2e tests are not run here: they need a signed-in GitHub profile (see README.md).
@@ -50,6 +51,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: extension
@@ -57,7 +61,14 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/glide-for-github.zip --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
+        run: |
+          if sh scripts/release-notes.sh "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"; then
+            notes=(--notes-file "$RUNNER_TEMP/notes.md")
+          else
+            echo "::notice::CHANGELOG.md has no section for $GITHUB_REF_NAME; using generated release notes."
+            notes=(--generate-notes)
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/glide-for-github.zip --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" "${notes[@]}"
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -98,7 +109,7 @@ jobs:
       - name: Install the pinned upload tool
         if: steps.store.outputs.configured == 'true'
         run: npm ci --ignore-scripts
-      - name: Upload and publish to the Chrome Web Store
+      - name: Upload to the Chrome Web Store and submit for review
         if: steps.store.outputs.configured == 'true'
         env:
           EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
@@ -106,6 +117,6 @@ jobs:
           CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
           REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
           PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
-        # With no command it uploads, then publishes. Reads EXTENSION_ID, CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN
+        # With no command it uploads, then publishes (submits the upload for store review). Reads EXTENSION_ID, CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN
         # and PUBLISHER_ID from the environment. --no-install: never download anything here.
         run: npx --no-install chrome-webstore-upload --source dist/glide-for-github.zip
