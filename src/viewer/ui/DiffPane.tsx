@@ -6,7 +6,7 @@
  * a change of style or rules goes through `setItems` the same way. Their `gapBefore` takes the gap out of a box
  * (`layout.gapBefore`, added to @pierre/diffs by patches/), and a new one relays out the list.
  */
-import type { DiffLineAnnotation, FileDiffLoadedFiles, FileDiffMetadata, LineAnnotation, SelectedLineRange } from '@pierre/diffs';
+import type { CodeViewWindowViewport, DiffLineAnnotation, FileDiffLoadedFiles, FileDiffMetadata, LineAnnotation, SelectedLineRange } from '@pierre/diffs';
 import { CodeView, type CodeViewHandle } from '@pierre/diffs/react';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { resolveFonts } from '../../shared/github-defaults';
@@ -104,11 +104,12 @@ export function renderAnnotation(annotation: DiffLineAnnotation<AnnotationMeta> 
 
 export interface DiffPaneProps {
   rpc: Rpc;
+  windowViewport?: CodeViewWindowViewport;
   /** Thread/composer annotation source (default: `createAnnotationSource()`, one per pane). */
   annotations?: AnnotationSource;
 }
 
-export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPaneProps) {
+export const DiffPane = memo(function DiffPane({ rpc, annotations, windowViewport }: DiffPaneProps) {
   const pr = usePr((s) => s.pr);
   const diffSettings = useSettings((s) => s.settings.diff);
   const colorMode = useSettings((s) => s.colorMode);
@@ -122,7 +123,8 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
 
   const related = useRelated();
   const buildOptions = useMemo(createDiffOptionsBuilder, []);
-  const options = buildOptions(diffSettings, colorMode, loadDiffFiles, INTERACTIONS, lineHeight, related.gapBefore);
+  const diffOptions = buildOptions(diffSettings, colorMode, loadDiffFiles, INTERACTIONS, lineHeight, related.gapBefore);
+  const options = useMemo(() => ({ ...diffOptions, windowViewport }), [diffOptions, windowViewport]);
 
   // Seeded once per PR; later changes go through `sync` → updateItem.
   const initialItems = useMemo<PierreItem[]>(() => (pr ? sync.seed(usePr.getState(), currentRelated().items) : []), [pr, sync]);
