@@ -218,7 +218,7 @@ test.describe('file groups', () => {
     const viewer = await openPierre(page, REACT, 'hash');
     await tab(viewer, 'Tests').click();
     try {
-      await page.setViewportSize({ width: 700, height: 900 });
+      await page.setViewportSize({ width: 600, height: 900 });
       const button = viewer.locator.getByTestId('file-groups-button');
       await expect(viewer.locator.getByRole('button', { name: 'File group: Tests 80' })).toBeVisible();
       await expect(button).toHaveAttribute('aria-haspopup', 'menu');
@@ -387,7 +387,7 @@ test.describe('file groups', () => {
     await expect.poll(async () => (await viewer.treeFiles()).sort()).toEqual(manifest.filter((p) => /md/i.test(p)).sort());
 
     // So does a pick from the narrow toolbar's menu.
-    await page.setViewportSize({ width: 700, height: 900 });
+    await page.setViewportSize({ width: 600, height: 900 });
     try {
       await viewer.locator.getByTestId('file-groups-button').click();
       await viewer.locator.getByRole('menuitemradio', { name: /^Docs \d+$/ }).click();
