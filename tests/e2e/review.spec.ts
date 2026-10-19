@@ -15,7 +15,7 @@
  *   force-pushed back to its pre-test head from a /tmp clone).
  * The token is used only inside the extension (Pierre's own code); the tests never read its value.
  */
-import type { BrowserContext, Frame, Locator, Page, Request, Route } from '@playwright/test';
+import type { BrowserContext, Locator, Page, Request, Route } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -131,8 +131,8 @@ async function githubPendingReview(
 const threadWith = (threads: GhThread[], text: string) => threads.find((t) => t.comments.some((c) => c.body.includes(text)));
 
 /** Whether an extension storage KEY exists (keys only; values are never read into the test). */
-async function hasStorageKey(frame: Frame, key: string): Promise<boolean> {
-  return frame.evaluate(async (k) => (await chrome.storage.local.getKeys()).includes(k), key);
+async function hasStorageKey(viewer: Viewer, key: string): Promise<boolean> {
+  return viewer.evaluate(async (k) => (await chrome.storage.local.getKeys()).includes(k), key);
 }
 
 /**
@@ -140,8 +140,8 @@ async function hasStorageKey(frame: Frame, key: string): Promise<boolean> {
  * the extension page: storage objects are copied there and never returned or logged. The previous `pierre.tokens`
  * is backed up to `pierre.e2e.activeBackup`; `restoreTokens` puts it back.
  */
-async function activateTokens(frame: Frame, key: string): Promise<void> {
-  const ok = await frame.evaluate(async (k) => {
+async function activateTokens(viewer: Viewer, key: string): Promise<void> {
+  const ok = await viewer.evaluate(async (k) => {
     const got = await chrome.storage.local.get(['pierre.tokens', k, 'pierre.e2e.activeBackup']);
     if (!got[k]) return false;
     if (!Object.hasOwn(got, 'pierre.e2e.activeBackup')) {
@@ -154,8 +154,8 @@ async function activateTokens(frame: Frame, key: string): Promise<void> {
   expect(ok, `${key} missing from the e2e profile`).toBe(true);
 }
 
-async function restoreTokens(frame: Frame): Promise<void> {
-  await frame.evaluate(async () => {
+async function restoreTokens(viewer: Viewer): Promise<void> {
+  await viewer.evaluate(async () => {
     const got = await chrome.storage.local.get('pierre.e2e.activeBackup');
     const backup = got['pierre.e2e.activeBackup'];
     if (typeof backup !== 'object' || backup === null || !('items' in backup)) return;
@@ -170,7 +170,7 @@ async function restoreTokens(frame: Frame): Promise<void> {
 /**
  * Resolves then unresolves `thread` in Pierre, checking GitHub's `isResolved` after each and that Pierre never
  * prompted nor showed an error. Returns the write paths taken, in order: `graphql:(un)resolveReviewThread`
- * (Pierre's token API, from the viewer iframe) and `session:(un)resolve_thread` (GitHub's page_data endpoint, sent
+ * (Pierre's token API, from the extension content script) and `session:(un)resolve_thread` (GitHub's page_data endpoint, sent
  * by the bridge in the github.com page).
  */
 async function resolveRoundTrip(page: Page, viewer: Viewer, thread: () => Locator, text: string): Promise<string[]> {
@@ -202,8 +202,8 @@ async function resolveRoundTrip(page: Page, viewer: Viewer, thread: () => Locato
   return seen;
 }
 
-async function tokenStored(frame: Frame): Promise<boolean> {
-  return frame.evaluate(async () => {
+async function tokenStored(viewer: Viewer): Promise<boolean> {
+  return viewer.evaluate(async () => {
     const tokens = (await chrome.storage.local.get('pierre.tokens'))['pierre.tokens'];
     return typeof tokens === 'object' && tokens !== null && Object.values(tokens).some((entry) =>
       typeof entry === 'object' && entry !== null && 'token' in entry && typeof entry.token === 'string' && entry.token.length > 0,
@@ -285,7 +285,7 @@ async function confirmedInViewer(viewer: Viewer, text: string) {
   await expect
     .poll(
       () =>
-        viewer.frame().evaluate(
+        viewer.evaluate(
           (t) => window.__pierre!.store.getState().threads.some((th) => !th.provisional && th.comments.some((c) => !c.provisional && c.body.includes(t))),
           text,
         ),
@@ -328,7 +328,7 @@ test.describe('threads and the inline composer', () => {
   test('typing keeps focus, caret and text while files load and re-render (read-only)', async ({ page }) => {
     const viewer = await openSandbox(page);
     // Idle viewer: no CodeView item is re-rendered while nothing changes.
-    const versions = () => viewer.frame().evaluate(() => {
+    const versions = () => viewer.evaluate(() => {
       const s = window.__pierre!.store.getState();
       return s.order.map((p) => window.__pierre!.session.codeView!.getItem(p)?.version ?? 0).join(',');
     });
@@ -342,19 +342,19 @@ test.describe('threads and the inline composer', () => {
     await expect(box).toBeFocused();
     await page.keyboard.type('hello world');
     // Caret after "hello", tag the node to prove it is the same element afterwards.
-    await viewer.frame().evaluate(() => {
-      const el = document.activeElement as HTMLTextAreaElement & { __probe?: number };
+    await viewer.evaluate((_, viewerRoot) => {
+      const el = viewerRoot.activeElement as HTMLTextAreaElement & { __probe?: number };
       el.__probe = 42;
       el.setSelectionRange(5, 5);
     });
     const same = () =>
-      viewer.frame().evaluate(() => {
-        const el = document.activeElement as HTMLTextAreaElement & { __probe?: number };
+      viewer.evaluate((_, viewerRoot) => {
+        const el = viewerRoot.activeElement as HTMLTextAreaElement & { __probe?: number };
         return { probe: el.__probe ?? null, tag: el.tagName, value: el.value, caret: el.selectionStart };
       });
 
     // 1. Every OTHER file's diff lands again (new diff objects → CodeView updateItem per file), as when a loader runs.
-    const updated = await viewer.frame().evaluate((path) => {
+    const updated = await viewer.evaluate((path) => {
       const s = window.__pierre!.store.getState();
       const others = s.order.filter((p) => p !== path && s.diffs.has(p));
       s.applyLoads(others.map((p) => ({ path: p, summary: s.files.get(p)!, load: s.load.get(p)!, diff: { ...s.diffs.get(p)! } })));
@@ -365,7 +365,7 @@ test.describe('threads and the inline composer', () => {
     expect(await same()).toEqual({ probe: 42, tag: 'TEXTAREA', value: 'hello world', caret: 5 });
 
     // 2. The composer's own file re-renders (its diff object replaced).
-    await viewer.frame().evaluate((path) => {
+    await viewer.evaluate((path) => {
       const s = window.__pierre!.store.getState();
       s.applyLoads([{ path, summary: s.files.get(path)!, load: s.load.get(path)!, diff: { ...s.diffs.get(path)! } }]);
     }, FILE);
@@ -378,12 +378,12 @@ test.describe('threads and the inline composer', () => {
 
     // 4. A real background reload of every diff (Hide whitespace refetches all files), while typing.
     const hide = viewer.locator.getByRole('button', { name: /whitespace/i }).first();
-    await viewer.frame().evaluate(() => (document.activeElement as HTMLElement).dataset.keep = '1');
+    await viewer.evaluate((_, viewerRoot) => (viewerRoot.activeElement as HTMLElement).dataset.keep = '1');
     await hide.click();
     await viewer.allFetched();
     // The toolbar click moved focus; the composer node itself must be the same, with its text.
-    const kept = await viewer.frame().evaluate(() => {
-      const el = document.querySelector<HTMLTextAreaElement & { __probe?: number }>('textarea[data-keep="1"]');
+    const kept = await viewer.evaluate((_, viewerRoot) => {
+      const el = viewerRoot.querySelector<HTMLTextAreaElement & { __probe?: number }>('textarea[data-keep="1"]');
       return el ? { probe: el.__probe ?? null, value: el.value, connected: el.isConnected } : null;
     });
     expect(kept).toEqual({ probe: 42, value: 'hello, world', connected: true });
@@ -398,10 +398,10 @@ test.describe('threads and the inline composer', () => {
   test('writes: comment, range + suggestion, file, reply, edit, react, resolve, delete, review (sandbox only)', async ({ page }) => {
     test.setTimeout(420_000);
     let viewer = await openSandbox(page);
-    test.skip(!(await tokenStored(viewer.frame())), 'e2e writes pending token: run `npm run e2e:token` once');
+    test.skip(!(await tokenStored(viewer)), 'e2e writes pending token: run `npm run e2e:token` once');
     expect(prUrl(SANDBOX)).toBe('https://github.com/dangh/pierre-sandbox/pull/1'); // never post anywhere else
     // A pending review left by an earlier (interrupted) run would change the composer's buttons: discard it.
-    const discarded = await viewer.frame().evaluate(() =>
+    const discarded = await viewer.evaluate(() =>
       window.__pierre!.review.withApi('clean up', async (api) => {
         const pending = await api.pendingReview();
         if (pending) await api.deleteReview(pending.nodeId);
@@ -432,7 +432,7 @@ test.describe('threads and the inline composer', () => {
         expect(t).toMatchObject({ path: FILE, line: 11, diffSide: 'RIGHT', subjectType: 'LINE' });
         expect([null, 11]).toContain(t!.startLine ?? null); // GitHub reports startLine = line for one line
         // Visually on GitHub's own Files changed page, opened at the file (GitHub virtualizes far-away files).
-        const digest = await viewer.frame().evaluate((p) => window.__pierre!.store.getState().files.get(p)!.digest, FILE);
+        const digest = await viewer.evaluate((p) => window.__pierre!.store.getState().files.get(p)!.digest, FILE);
         const gh = await page.context().newPage();
         await gh.goto(prUrl(SANDBOX, `/changes#diff-${digest}`), { waitUntil: 'domcontentloaded' });
         // GitHub collapses the thread into an avatar marker on the line (right side); open it to show the comment.
@@ -453,7 +453,7 @@ test.describe('threads and the inline composer', () => {
         const c = composer(viewer, `${FILE}:additions:15-17`);
         await expect(c).toBeVisible();
         await clickInList(c.getByRole('button', { name: 'Insert suggestion' }));
-        const lines = await viewer.frame().evaluate((path) => {
+        const lines = await viewer.evaluate((path) => {
           const d = window.__pierre!.store.getState().diffs.get(path)!;
           const h = d.hunks[0]!;
           return [15, 16, 17].map((n) => d.additionLines[h.additionLineIndex + n - h.additionStart]!.replace(/\n$/, ''));
@@ -465,7 +465,7 @@ test.describe('threads and the inline composer', () => {
         await clickInList(c.getByRole('button', { name: 'Add single comment' }));
         await expect(c).toHaveCount(0);
         // The line selection is released, so the next gutter "+" targets its own line.
-        expect(await viewer.frame().evaluate(() => window.__pierre!.session.codeView!.getSelectedLines())).toBeNull();
+        expect(await viewer.evaluate(() => window.__pierre!.session.codeView!.getSelectedLines())).toBeNull();
         await confirmedInViewer(viewer, range);
         expect(threadWith(await githubThreads(page), range)).toMatchObject({ path: FILE, line: 17, startLine: 15, diffSide: 'RIGHT', subjectType: 'LINE' });
       });
@@ -524,14 +524,14 @@ test.describe('threads and the inline composer', () => {
       await test.step('resolve and unresolve with a fine-grained token: GitHub refuses it, Pierre falls back to the session', async () => {
         console.log('[e2e] step: resolve/unresolve (fine-grained token → session fallback)');
         // The active token is the user's fine-grained one (or the saved fine-grained entries, when present).
-        const swap = await hasStorageKey(viewer.frame(), 'pierre.e2e.fineGrainedTokens');
-        if (swap) await activateTokens(viewer.frame(), 'pierre.e2e.fineGrainedTokens');
+        const swap = await hasStorageKey(viewer, 'pierre.e2e.fineGrainedTokens');
+        if (swap) await activateTokens(viewer, 'pierre.e2e.fineGrainedTokens');
         try {
           const paths = await resolveRoundTrip(page, viewer, thread, single);
           console.log(`[e2e] resolve paths: ${paths.join(' → ')}`);
           expect(paths).toEqual(['graphql:resolveReviewThread', 'session:resolve_thread', 'graphql:unresolveReviewThread', 'session:unresolve_thread']);
         } finally {
-          if (swap) await restoreTokens(viewer.frame());
+          if (swap) await restoreTokens(viewer);
         }
       });
 
@@ -552,7 +552,7 @@ test.describe('threads and the inline composer', () => {
         await page.keyboard.type(reviewBody);
         await clickInList(c.getByRole('button', { name: 'Start a review' }));
         await expect(c).toHaveCount(0);
-        await expect.poll(() => viewer.frame().evaluate(() => window.__pierre!.store.getState().pendingReview?.count ?? 0)).toBe(1);
+        await expect.poll(() => viewer.evaluate(() => window.__pierre!.store.getState().pendingReview?.count ?? 0)).toBe(1);
         const pendingOnGithub = await githubPendingReview(page);
         expect(pendingOnGithub?.id).toBeTruthy();
         expect(pendingOnGithub!.threads).toEqual([expect.objectContaining({ bodies: [reviewBody], state: 'pending', marker: 'R18', path: FILE })]);
@@ -566,7 +566,7 @@ test.describe('threads and the inline composer', () => {
         await clickInList(c2.getByRole('button', { name: 'Cancel' }));
 
         // What GitHub does with REST POST /pulls/{n}/comments while the viewer has a pending review.
-        const probe = await viewer.frame().evaluate(async (body) => {
+        const probe = await viewer.evaluate(async (body) => {
           const r = window.__pierre!.review;
           try {
             const res = await r.withApi('probe', (api) =>
@@ -586,7 +586,7 @@ test.describe('threads and the inline composer', () => {
         expect(probe.ok === false && probe.message).toContain('one pending review');
       });
     } finally {
-      await cleanup(page, viewer.frame());
+      await cleanup(page, viewer);
     }
   });
 });
@@ -595,13 +595,12 @@ test.describe('resolve via the API with a classic token', () => {
   test('resolve and unresolve go through GitHub\'s API, no session fallback (needs pierre.e2e.classicToken)', async ({ page }) => {
     test.setTimeout(240_000);
     const viewer = await openSandbox(page);
-    const frame = viewer.frame();
     test.skip(
-      !(await hasStorageKey(frame, 'pierre.e2e.classicToken')),
+      !(await hasStorageKey(viewer, 'pierre.e2e.classicToken')),
       'No classic token in the e2e profile (pierre.e2e.classicToken): save one with the controller\'s setup to test the API path',
     );
     const text = `${MARK} classic resolve`;
-    await activateTokens(frame, 'pierre.e2e.classicToken');
+    await activateTokens(viewer, 'pierre.e2e.classicToken');
     try {
       await plusOn(viewer, 13);
       const c = composer(viewer, `${FILE}:additions:-13`);
@@ -613,19 +612,19 @@ test.describe('resolve via the API with a classic token', () => {
       const paths = await resolveRoundTrip(page, viewer, () => fileItem(viewer).locator(`.thread[data-thread-id="${id}"]`), text);
       expect(paths).toEqual(['graphql:resolveReviewThread', 'graphql:unresolveReviewThread']);
     } finally {
-      await restoreTokens(frame);
-      await cleanup(page, frame);
+      await restoreTokens(viewer);
+      await cleanup(page, viewer);
     }
   });
 });
 
 /** Deletes every comment carrying an e2e marker and discards the viewer's pending review (sandbox only). */
-async function cleanup(page: Page, frame: Frame) {
+async function cleanup(page: Page, viewer: Viewer) {
   const leftovers = (await githubThreads(page))
     .flatMap((t) => t.comments)
     .filter((c) => c.body.startsWith(PREFIX) && c.state !== 'pending') // this run's and interrupted runs' leftovers
     .map((c) => c.databaseId);
-  await frame.evaluate(async (ids) => {
+  await viewer.evaluate(async (ids) => {
     const r = window.__pierre!.review;
     await r.withApi('clean up', async (api) => {
       const pending = await api.pendingReview();
@@ -690,8 +689,8 @@ async function githubViewed(page: Page): Promise<Record<string, boolean>> {
 }
 
 /** Runs `fn` with no token in Pierre (pierre.tokens backed up and emptied inside the extension page, then restored). */
-async function withoutTokens<T>(frame: Frame, fn: () => Promise<T>): Promise<T> {
-  await frame.evaluate(async () => {
+async function withoutTokens<T>(viewer: Viewer, fn: () => Promise<T>): Promise<T> {
+  await viewer.evaluate(async () => {
     const got = await chrome.storage.local.get(['pierre.tokens', 'pierre.e2e.activeBackup']);
     if (!Object.hasOwn(got, 'pierre.e2e.activeBackup')) {
       const items = Object.hasOwn(got, 'pierre.tokens') ? { 'pierre.tokens': got['pierre.tokens'] } : {};
@@ -702,7 +701,7 @@ async function withoutTokens<T>(frame: Frame, fn: () => Promise<T>): Promise<T> 
   try {
     return await fn();
   } finally {
-    await restoreTokens(frame);
+    await restoreTokens(viewer);
   }
 }
 
@@ -725,7 +724,7 @@ const header = (viewer: Viewer, path: string) => viewer.locator.locator(`.fh[dat
 const reviewButton = (viewer: Viewer) => viewer.locator.getByTestId('review-button');
 
 async function discardLeftoverReview(viewer: Viewer): Promise<boolean> {
-  return viewer.frame().evaluate(() =>
+  return viewer.evaluate(() =>
     window.__pierre!.review.withApi('clean up', async (api) => {
       const pending = await api.pendingReview();
       if (pending) await api.deleteReview(pending.nodeId);
@@ -738,7 +737,7 @@ test.describe('review submission (Task 10)', () => {
   test('two review comments submitted as Comment are one review on GitHub; discard removes the pending review; Approve / Request changes payloads', async ({ page }) => {
     test.setTimeout(420_000);
     let viewer = await openSandbox(page);
-    test.skip(!(await tokenStored(viewer.frame())), 'e2e writes pending token: run `npm run e2e:token` once');
+    test.skip(!(await tokenStored(viewer)), 'e2e writes pending token: run `npm run e2e:token` once');
     expect(prUrl(SANDBOX)).toBe('https://github.com/dangh/pierre-sandbox/pull/1'); // never post anywhere else
     if (await discardLeftoverReview(viewer)) viewer = await openSandbox(page);
 
@@ -816,7 +815,7 @@ test.describe('review submission (Task 10)', () => {
           return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data }) });
         };
         await page.context().route('https://api.github.com/graphql', handler);
-        const author = await viewer.frame().evaluate(() => {
+        const author = await viewer.evaluate(() => {
           const s = window.__pierre!.store.getState();
           const was = s.pr!.author;
           window.__pierre!.store.setState({ pr: { ...s.pr!, author: 'pierre-e2e-someone-else' } });
@@ -836,7 +835,7 @@ test.describe('review submission (Task 10)', () => {
           expect(sent.map((s) => s.op)).toEqual(['StartReview', 'SubmitReview', 'StartReview', 'SubmitReview']);
         } finally {
           await page.context().unroute('https://api.github.com/graphql', handler);
-          await viewer.frame().evaluate((a) => {
+          await viewer.evaluate((a) => {
             const s = window.__pierre!.store.getState();
             window.__pierre!.store.setState({ pr: { ...s.pr!, author: a } });
           }, author);
@@ -844,7 +843,7 @@ test.describe('review submission (Task 10)', () => {
         expect(await githubPendingReview(page)).toBeNull();
       });
     } finally {
-      await cleanup(page, viewer.frame());
+      await cleanup(page, viewer);
     }
   });
 });
@@ -868,7 +867,7 @@ test.describe('viewed sync (Task 10)', () => {
     };
     try {
       // Start from "not viewed" for the two files used.
-      await viewer.frame().evaluate(async (paths) => {
+      await viewer.evaluate(async (paths) => {
         for (const p of paths) await window.__pierre!.session.rpc!.call('unmarkViewed', 'dangh', 'pierre-sandbox', 1, p);
       }, [FILE, OTHER].filter((p) => initial[p]));
       if (initial[FILE] || initial[OTHER]) viewer = await openSandbox(page);
@@ -888,7 +887,7 @@ test.describe('viewed sync (Task 10)', () => {
 
       await test.step('token refused (GitHub\'s FORBIDDEN answer, simulated locally) → the GitHub session, no prompt', async () => {
         // Without a stored token the step above already went through the session; there is no token to refuse.
-        if (!(await tokenStored(viewer.frame()))) return;
+        if (!(await tokenStored(viewer))) return;
         // The stored fine-grained token IS accepted for markFileAsViewed (seen above), so GitHub's refusal of a token
         // ("Resource not accessible by personal access token") is played locally; the session write is real.
         const refuse = async (route: Route) => {
@@ -913,7 +912,7 @@ test.describe('viewed sync (Task 10)', () => {
       });
 
       await test.step('no token: GitHub session only (file_review), no prompt', async () => {
-        await withoutTokens(viewer.frame(), async () => {
+        await withoutTokens(viewer, async () => {
           writes.seen.length = 0;
           await setInPierre(FILE, true);
           await setInPierre(FILE, false);
@@ -922,7 +921,7 @@ test.describe('viewed sync (Task 10)', () => {
       });
 
       await test.step('GitHub → Pierre: a file marked on GitHub\'s Files changed is viewed in Pierre after reload', async () => {
-        const digest = await viewer.frame().evaluate((p) => window.__pierre!.store.getState().files.get(p)!.digest, OTHER);
+        const digest = await viewer.evaluate((p) => window.__pierre!.store.getState().files.get(p)!.digest, OTHER);
         const gh = await page.context().newPage();
         await gh.goto(prUrl(SANDBOX, `/changes#diff-${digest}`), { waitUntil: 'load' });
         const region = gh.getByRole('region', { name: /config\/settings\.json/ });
@@ -947,7 +946,7 @@ test.describe('viewed sync (Task 10)', () => {
       // Restore every file's viewed state (GitHub session, through Pierre's bridge).
       const now = await githubViewed(page);
       const diff = Object.keys(initial).filter((p) => now[p] !== initial[p]);
-      await viewer.frame().evaluate(async ({ diff, initial }) => {
+      await viewer.evaluate(async ({ diff, initial }) => {
         for (const p of diff) await window.__pierre!.session.rpc!.call(initial[p] ? 'markViewed' : 'unmarkViewed', 'dangh', 'pierre-sandbox', 1, p);
       }, { diff, initial });
       expect(await githubViewed(page)).toEqual(initial);
@@ -959,13 +958,13 @@ test.describe('apply suggestion (Task 10)', () => {
   test('commit one suggestion, then a batch of two: new commits on review-me with the suggested text, GitHub marks them applied; branch restored', async ({ page }) => {
     test.setTimeout(480_000);
     let viewer = await openSandbox(page);
-    test.skip(!(await tokenStored(viewer.frame())), 'needs a token to post the suggestion comments: run `npm run e2e:token` once');
+    test.skip(!(await tokenStored(viewer)), 'needs a token to post the suggestion comments: run `npm run e2e:token` once');
     expect(prUrl(SANDBOX)).toBe('https://github.com/dangh/pierre-sandbox/pull/1');
-    expect(await viewer.frame().evaluate(() => window.__pierre!.store.getState().pr!.viewer.canApplySuggestion)).toBe(true);
+    expect(await viewer.evaluate(() => window.__pierre!.store.getState().pr!.viewer.canApplySuggestion)).toBe(true);
     if (await discardLeftoverReview(viewer)) viewer = await openSandbox(page);
     const before = ghHead();
     console.log(`[e2e] ${BRANCH} head before: ${before}`);
-    expect(await viewer.frame().evaluate(() => window.__pierre!.store.getState().pr!.headOid)).toBe(before);
+    expect(await viewer.evaluate(() => window.__pierre!.store.getState().pr!.headOid)).toBe(before);
 
     // Suggestions on new-side lines of FILE (each replaces one line, so the others keep their line numbers).
     const lines = ghFileAt(before, FILE);
@@ -980,7 +979,7 @@ test.describe('apply suggestion (Task 10)', () => {
       expect
         .poll(
           () =>
-            viewer.frame().evaluate(async (list) => {
+            viewer.evaluate(async (list) => {
               await window.__pierre!.review.refreshThreads();
               const all = window.__pierre!.store.getState().threads.flatMap((t) => t.comments.map((c) => c.body));
               return list.every((b) => all.some((x) => x.startsWith(b)));
@@ -990,7 +989,7 @@ test.describe('apply suggestion (Task 10)', () => {
         .toBe(true);
 
     try {
-      await viewer.frame().evaluate(
+      await viewer.evaluate(
         async ({ items, head }) => {
           const r = window.__pierre!.review;
           await r.withApi('post e2e suggestions', async (api) => {
@@ -1021,7 +1020,7 @@ test.describe('apply suggestion (Task 10)', () => {
         expect(ghFileAt(afterOne, FILE)[a.line - 1]).toBe(a.text);
         await expect.poll(async () => threadWith(await githubThreads(page), a.body)?.isResolved, { timeout: 30_000 }).toBe(true);
         // Pierre reloaded the PR: the new head is shown.
-        await expect.poll(() => viewer.frame().evaluate(() => window.__pierre!.store.getState().pr!.headOid), { timeout: 30_000 }).toBe(afterOne);
+        await expect.poll(() => viewer.evaluate(() => window.__pierre!.store.getState().pr!.headOid), { timeout: 30_000 }).toBe(afterOne);
         console.log(`[e2e] ${BRANCH} after single: ${afterOne}`);
       });
 
@@ -1050,7 +1049,7 @@ test.describe('apply suggestion (Task 10)', () => {
         console.log(`[e2e] ${BRANCH} after batch: ${afterBatch}`);
       });
     } finally {
-      await cleanup(page, viewer.frame());
+      await cleanup(page, viewer);
       const observed = ghHead();
       if (observed !== before) restoreBranch(before, observed);
       await expect.poll(() => ghHead(), { timeout: 30_000 }).toBe(before);

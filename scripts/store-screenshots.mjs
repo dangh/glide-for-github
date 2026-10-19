@@ -9,6 +9,7 @@
  * appears in any visible text.
  */
 import { chromium } from '@playwright/test';
+import { evaluateInpage, waitForInpage, VIEWER_HOST } from './inpage-driver.mjs';
 import { mkdirSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -51,36 +52,32 @@ const context = await chromium.launchPersistentContext(join(root, '.e2e-profile'
 });
 const page = await context.newPage();
 
-const viewerFrame = () => page.frames().find((f) => f.url().startsWith('chrome-extension://') && f.url().includes('/viewer.html'));
-
-/** Hides avatars and fails when a login-like or secret-looking string is visible anywhere on the page or viewer. */
+/** Hides avatars in every open shadow tree and refuses visible login or token text. */
 async function sanitize(login) {
-  for (const f of [page.mainFrame(), viewerFrame()].filter(Boolean)) {
-    await f.addStyleTag({ content: HIDE_AVATARS }).catch(() => {});
-  }
-  const texts = await Promise.all([page.mainFrame(), viewerFrame()].filter(Boolean).map((f) => f.evaluate(() => document.body.innerText).catch(() => '')));
-  const all = texts.join('\n');
-  // Extra case-insensitive words that must not appear (comma-separated, e.g. an employer's name): STORE_SHOT_DENY.
-  const deny = (process.env.STORE_SHOT_DENY ?? '').split(',').filter(Boolean).map((w) => new RegExp(w, 'i'));
+  const all = await page.evaluate(css => {
+    const texts = [];
+    const scan = root => {
+      const style = document.createElement('style');
+      style.textContent = css;
+      (root instanceof Document ? root.head : root).append(style);
+      const container = root instanceof Document ? root.body : root;
+      for (const el of container.querySelectorAll('*')) {
+        if (el.shadowRoot) scan(el.shadowRoot);
+        if (el instanceof HTMLElement && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden') {
+          for (const child of el.childNodes) if (child.nodeType === Node.TEXT_NODE) texts.push(child.textContent ?? '');
+        }
+      }
+    };
+    scan(document);
+    return texts.join('\n');
+  }, HIDE_AVATARS);
+  const deny = (process.env.STORE_SHOT_DENY ?? '').split(',').filter(Boolean).map(w => new RegExp(w, 'i'));
   const bad = [new RegExp('ghp' + '_[A-Za-z0-9]'), new RegExp('github' + '_pat_'), ...deny, login ? new RegExp(`\\b${login}\\b`, 'i') : null].filter(Boolean);
   for (const re of bad) if (re.test(all)) throw new Error(`refusing to screenshot: ${re} is visible on the page`);
 }
 
-const viewer = page.frameLocator('iframe[data-pierre-viewer]');
-
-/** GitHub re-renders its layout once during load, remounting the iframe: wait until one frame has the PR and stays. */
-async function viewerReady() {
-  await page.waitForLoadState('load');
-  for (let i = 0; i < 6; i++) {
-    await viewer.locator('.fh').first().waitFor({ timeout: 60_000 });
-    const f = viewerFrame();
-    if (!f) continue;
-    const ready = await f.evaluate(() => window.__pierre?.store.getState().pr !== null).catch(() => false);
-    await page.waitForTimeout(1500);
-    if (ready && viewerFrame() === f && !f.isDetached()) return f;
-  }
-  throw new Error('viewer did not settle');
-}
+const viewer = page.locator(VIEWER_HOST);
+const viewerReady = () => waitForInpage(page);
 
 /** The signed-in login, only to make sure it is not on screen; never printed or stored. */
 async function signedInLogin() {
@@ -92,11 +89,11 @@ const login = await signedInLogin();
 if (!login) throw new Error('not signed in on the e2e profile');
 
 await page.goto(`${PR}#glide`, { waitUntil: 'domcontentloaded' });
-let frame = await viewerReady();
+await viewerReady();
 
 // The shots show the defaults, so the profile's synced settings and file groups are set aside (kept in memory, never
 // printed) and put back at the end.
-const id = new URL(viewerFrame().url()).host;
+const id = await evaluateInpage(page, () => chrome.runtime.id);
 const options = await context.newPage();
 await options.setViewportSize({ width: 1280, height: 800 });
 await options.goto(`chrome-extension://${id}/options.html`);
@@ -119,15 +116,15 @@ const openPr = async () => {
 
 try {
   await resetSync();
-  frame = await openPr();
+  await openPr();
 
   // 1. The Glide tab: file group tabs, file tree (expanded) and diffs.
-  await frame.evaluate(() => window.__pierre.settings.getState().update({ tree: { initialExpansion: 'open' } }));
+  await evaluateInpage(page, () => window.__pierre.settings.getState().update({ tree: { initialExpansion: 'open' } }));
   await page.waitForTimeout(1500);
   await shot('1-glide-tab.png');
 
   // 2. A comment composer open on a line, with a draft typed in and NOT submitted.
-  await frame.evaluate((p) => window.__pierre.session.scrollToFile?.(p), FILE);
+  await evaluateInpage(page, (p) => window.__pierre.session.scrollToFile?.(p), FILE);
   const item = viewer.locator(`diffs-container:has(.fh[data-path="${FILE}"])`);
   const cell = item.locator(`[data-column-number="${LINE}"][data-line-type="change-addition"]`).first();
   await cell.scrollIntoViewIfNeeded();
@@ -153,13 +150,13 @@ try {
   await viewer.locator('.composer').waitFor({ state: 'detached' });
 
   // 3. The Display menu.
-  frame = await openPr();
+  await openPr();
   await viewer.getByRole('button', { name: /Display/ }).click();
   await page.waitForTimeout(600);
   await shot('3-display-menu.png');
 
   // 5. The Tests file group: the tree and the diffs show only the pull request's test files.
-  frame = await openPr();
+  await openPr();
   await viewer.getByRole('tablist', { name: 'File groups' }).getByRole('tab', { name: /^Tests/ }).click();
   await page.waitForTimeout(2000);
   await page.mouse.move(640, 20);

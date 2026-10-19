@@ -25,11 +25,11 @@ const tabCounts = async (viewer: Viewer) =>
 
 /** What the diff list holds (CodeView items) and what the store says the open group shows. */
 const listState = (viewer: Viewer) =>
-  viewer.frame().evaluate(() => {
+  viewer.evaluate((_, viewerRoot) => {
     const p = window.__pierre!;
     const order = p.store.getState().order;
     const inList = order.filter((path) => p.session.codeView?.getItem(path) !== undefined);
-    return { inList, order, selected: document.querySelector('[role="tab"][aria-selected="true"]')?.textContent ?? null };
+    return { inList, order, selected: viewerRoot.querySelector('[role="tab"][aria-selected="true"]')?.textContent ?? null };
   });
 
 /**
@@ -37,8 +37,8 @@ const listState = (viewer: Viewer) =>
  * content box (inside the page gutters) and inside the window. `form` says which form the file groups show.
  */
 const toolbarLayout = (viewer: Viewer) =>
-  viewer.frame().evaluate(() => {
-    const bar = document.querySelector<HTMLElement>('.pierre-toolbar')!;
+  viewer.evaluate((_, viewerRoot) => {
+    const bar = viewerRoot.querySelector<HTMLElement>('.pierre-toolbar')!;
     const cs = getComputedStyle(bar);
     const box = bar.getBoundingClientRect();
     const left = Math.max(0, box.left + parseFloat(cs.paddingLeft));
@@ -80,7 +80,7 @@ const toolbarLayout = (viewer: Viewer) =>
         if (overlap > 1.5 && vertical > 1.5) problems.push(`${name(rects[i]!.el)} overlaps ${name(rects[j]!.el)} by ${Math.round(overlap)} px`);
       }
     }
-    const slot = document.querySelector('[data-testid="file-groups"]');
+    const slot = viewerRoot.querySelector('[data-testid="file-groups"]');
     return {
       problems,
       form: !slot ? 'none' : slot.hasAttribute('data-compact') ? 'menu' : 'tabs',
@@ -138,12 +138,12 @@ test.describe('file groups', () => {
 
   test('the tabs sit in the toolbar row, left of the viewed counter; there is no row of their own', async ({ page }) => {
     const viewer = await openPierre(page, REACT, 'hash');
-    const place = await viewer.frame().evaluate(() => {
-      const bar = document.querySelector('.pierre-toolbar')!;
-      const tabs = document.querySelector('[role="tablist"]')!;
-      const viewed = document.querySelector('[data-testid="viewed-counter"]')!.getBoundingClientRect();
+    const place = await viewer.evaluate((_, viewerRoot) => {
+      const bar = viewerRoot.querySelector('.pierre-toolbar')!;
+      const tabs = viewerRoot.querySelector('[role="tablist"]')!;
+      const viewed = viewerRoot.querySelector('[data-testid="viewed-counter"]')!.getBoundingClientRect();
       const r = tabs.getBoundingClientRect();
-      return { inBar: bar.contains(tabs), gap: Math.round(viewed.left - r.right), middle: Math.round(r.top + r.height / 2 - (viewed.top + viewed.height / 2)), height: Math.round(r.height), rows: document.querySelectorAll('.pierre-app > .file-groups').length };
+      return { inBar: bar.contains(tabs), gap: Math.round(viewed.left - r.right), middle: Math.round(r.top + r.height / 2 - (viewed.top + viewed.height / 2)), height: Math.round(r.height), rows: viewerRoot.querySelectorAll('.pierre-app > .file-groups').length };
     });
     await expect(tab(viewer, 'All')).toHaveAttribute('aria-controls', 'file-group-panel');
     await expect(viewer.locator.getByRole('tabpanel', { name: 'Changed files' })).toHaveAttribute('id', 'file-group-panel');
@@ -156,12 +156,12 @@ test.describe('file groups', () => {
       await setSettings(extContext, 'layout', { treePosition: tree });
       try {
         const viewer = await openPierre(page, REACT, 'hash');
-        const forms = await sweep(viewer, `frame, tree ${tree}`);
+        const forms = await sweep(viewer, `page, tree ${tree}`);
         expect(forms[320]).toBe('menu');
         // At 1100 px Split/Unified, Wrap and Hide whitespace make room (they are in the Display menu too).
         expect(forms[1100]).toBe('tabs');
         expect(forms[1600]).toBe('tabs');
-        const toggles = () => viewer.frame().evaluate(() => [...document.querySelectorAll('.diff-toggle')].some((el) => el.getClientRects().length > 0));
+        const toggles = () => viewer.evaluate((_, viewerRoot) => [...viewerRoot.querySelectorAll('.diff-toggle')].some((el) => el.getClientRects().length > 0));
         await page.setViewportSize({ width: 1100, height: 900 });
         await expect.poll(toggles).toBe(false);
         await page.setViewportSize({ width: 1600, height: 900 });
@@ -249,8 +249,8 @@ test.describe('file groups', () => {
       // An already-open menu follows the button when the window narrows.
       await viewer.locator.getByTestId('file-groups-button').click();
       await page.setViewportSize({ width: 320, height: 900 });
-      const inside = () => viewer.frame().evaluate(() => {
-        const r = document.querySelector('[role="menu"]')!.getBoundingClientRect();
+      const inside = () => viewer.evaluate((_, viewerRoot) => {
+        const r = viewerRoot.querySelector('[role="menu"]')!.getBoundingClientRect();
         return r.left >= 0 && r.right <= document.documentElement.clientWidth;
       });
       await expect.poll(inside).toBe(true);
@@ -267,7 +267,7 @@ test.describe('file groups', () => {
   });
 
   test('merged bar, before and after it sticks: tabs or menu, nothing cut off or overlapping from 320 px up', async ({ page, extContext }) => {
-    await setSettings(extContext, 'experiments', { pageScroll: true, mergedBar: true });
+    await setSettings(extContext, 'experiments', { mergedBar: true });
     try {
       const viewer = await openPierre(page, REACT, 'hash');
       const top = await sweep(viewer, 'merged, top', async () => {
@@ -275,8 +275,8 @@ test.describe('file groups', () => {
       });
       const stuck = await sweep(viewer, 'merged, stuck', async () => {
         // Past GitHub's header, so the viewer is stuck to the top of the window.
-        await page.evaluate(() => window.scrollTo(0, scrollY + document.querySelector('iframe[data-pierre-viewer]')!.getBoundingClientRect().top + 600));
-        await expect.poll(() => viewer.frame().evaluate(() => document.querySelector('.pierre-toolbar')!.hasAttribute('data-stuck'))).toBe(true);
+        await page.evaluate(() => window.scrollTo(0, scrollY + document.querySelector('#glide-inpage-spike')!.getBoundingClientRect().top + 600));
+        await expect.poll(() => viewer.evaluate((_, viewerRoot) => viewerRoot.querySelector('.pierre-toolbar')!.hasAttribute('data-stuck'))).toBe(true);
       });
       expect(top[320]).toBe('menu');
       expect(top[1100]).toBe('tabs');
@@ -293,7 +293,7 @@ test.describe('file groups', () => {
     page.on('console', (msg) => msg.type() === 'error' && errors.push(msg.text()));
     const viewer = await openPierre(page, REACT, 'hash');
     const viewedOf = (paths: readonly string[]) =>
-      viewer.frame().evaluate((ps) => ps.filter((p) => window.__pierre!.store.getState().viewed.has(p)).length, paths);
+      viewer.evaluate((ps) => ps.filter((p) => window.__pierre!.store.getState().viewed.has(p)).length, paths);
     const allViewed = await viewedOf(await viewer.order());
     expect((await viewer.viewedCounter()).replace(/\s+/g, ' ')).toMatch(new RegExp(`^${allViewed} / 167`));
 
@@ -305,7 +305,7 @@ test.describe('file groups', () => {
     expect(Date.now() - started).toBeLessThan(1500);
     await viewer.allFetched();
     expect(errors.filter((e) => /CodeView/.test(e))).toEqual([]);
-    await viewer.frame().evaluate(() => ((window as unknown as { __diffs: unknown }).__diffs = window.__pierre!.store.getState().diffs));
+    await viewer.evaluate(() => ((window as unknown as { __diffs: unknown }).__diffs = window.__pierre!.store.getState().diffs));
     expect(state.inList).toHaveLength(80);
     expect(state.inList.every((p) => /__tests__\/|\.test\.|fixtures\//.test(p))).toBe(true);
     expect(state.inList).toEqual(state.order.filter((p) => state.inList.includes(p)));
@@ -313,7 +313,7 @@ test.describe('file groups', () => {
     const tree = await viewer.treeFiles();
     expect(tree.sort()).toEqual([...state.inList].sort());
     // Every rendered diff header belongs to the group.
-    const headers = await viewer.frame().evaluate(() => [...document.querySelectorAll<HTMLElement>('.fh')].map((h) => h.dataset.path!));
+    const headers = await viewer.evaluate((_, viewerRoot) => [...viewerRoot.querySelectorAll<HTMLElement>('.fh')].map((h) => h.dataset.path!));
     expect(headers.length).toBeGreaterThan(0);
     expect(headers.every((h) => state.inList.includes(h))).toBe(true);
     // Like GitHub's counter with Sift: the open group's files, the whole PR in its tooltip.
@@ -322,8 +322,8 @@ test.describe('file groups', () => {
 
     // Loaded diffs stay loaded: the store's diffs are the very same map after switching back and forth.
     for (const name of ['Docs', 'Manifest', 'Source', 'All', 'Tests']) await tab(viewer, name).click();
-    expect(await viewer.frame().evaluate(() => (window as unknown as { __diffs: unknown }).__diffs === window.__pierre!.store.getState().diffs)).toBe(true);
-    expect(await viewer.frame().evaluate(() => [...window.__pierre!.store.getState().load.values()].some((l) => l.status === 'loading'))).toBe(false);
+    expect(await viewer.evaluate(() => (window as unknown as { __diffs: unknown }).__diffs === window.__pierre!.store.getState().diffs)).toBe(true);
+    expect(await viewer.evaluate(() => [...window.__pierre!.store.getState().load.values()].some((l) => l.status === 'loading'))).toBe(false);
     await page.mouse.move(700, 120);
     await page.screenshot({ path: `${SHOTS}/tests-light-tree-left.png` });
   });
@@ -334,7 +334,7 @@ test.describe('file groups', () => {
     const path = tests[Math.floor(tests.length / 2)]!;
     await viewer.scrollToFile(path);
     await expect.poll(async () => (await viewer.item(path))?.top ?? Infinity, { timeout: 10_000 }).toBeLessThan(60);
-    const listTop = () => viewer.frame().evaluate(() => document.querySelector('.pierre-diffs')!.scrollTop);
+    const listTop = () => viewer.evaluate(() => window.__pierre!.session.codeView!.getInstance()!.getScrollTop());
     expect(await listTop()).toBeGreaterThan(1000);
 
     await tab(viewer, 'Tests').click();
@@ -379,7 +379,7 @@ test.describe('file groups', () => {
     const path = (await listState(viewer)).inList[0]!;
     const header = viewer.locator.locator(`.fh[data-path="${path}"]`);
     await header.getByRole('button', { name: 'Collapse file' }).click();
-    const collapsed = () => viewer.frame().evaluate((p) => window.__pierre!.session.codeView?.getItem(p)?.collapsed, path);
+    const collapsed = () => viewer.evaluate((p) => window.__pierre!.session.codeView?.getItem(p)?.collapsed, path);
     await expect.poll(collapsed).toBe(true);
     await tab(viewer, 'All').click();
     await expect.poll(collapsed).toBe(true);
@@ -654,7 +654,7 @@ test.describe('file groups', () => {
   });
 
   test('with page scrolling and the merged bar, the tabs stay with the toolbar', async ({ page, extContext }) => {
-    await setSettings(extContext, 'experiments', { pageScroll: true, mergedBar: true });
+    await setSettings(extContext, 'experiments', { mergedBar: true });
     try {
       const viewer = await openPierre(page, REACT, 'hash');
       await expect(tab(viewer, 'All')).toBeVisible();
@@ -667,7 +667,7 @@ test.describe('file groups', () => {
         await page.waitForTimeout(25);
       }
       await page.waitForTimeout(800);
-      const box = await page.locator('iframe[data-pierre-viewer]').boundingBox();
+      const box = await viewer.locator.locator('.pierre-toolbar').boundingBox();
       const tabBox = await tab(viewer, 'Tests').boundingBox();
       expect(tabBox!.y).toBeGreaterThanOrEqual(box!.y);
       expect(tabBox!.y).toBeLessThan(200);
