@@ -668,10 +668,8 @@ body {
   grid-area: main;
 }
 
-/* Sized to its lines (RuleEditor's rows), so no resize handle. */
 .related-rule .related-patterns {
   grid-area: files;
-  resize: none;
 }
 
 .related-rule .row-actions {

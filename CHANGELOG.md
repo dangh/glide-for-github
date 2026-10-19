@@ -15,7 +15,8 @@ Newest first. Each release's GitHub notes are its section here (`scripts/release
 
 ### Changed
 
-- The options page has far fewer boxes. File groups and related-files rules share one outer border with horizontal dividers.
+- The options page follows GitHub’s settings layout, with section navigation, consistent controls and responsive spacing.
+  It also has far fewer boxes. File groups and related-files rules share one outer border with horizontal dividers.
   Names and patterns have subtly shaded fields and a clear focus outline,
   instead of a border around every field. Up, Down and Delete are small arrow and trash icons that name what they act
   on. Every textarea grows to fit its content, with at least four rows, even when unfocused.
