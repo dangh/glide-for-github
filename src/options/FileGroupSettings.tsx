@@ -3,7 +3,7 @@
  * saves each valid edit at once (debounced) to its own storage items (src/shared/file-groups-storage.ts).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ALL_GROUP, classify, compileGroups, groupsProblem, parseSiftImport, type FileGroup } from '../shared/file-groups';
+import { ALL_GROUP, classify, compileGroups, groupsProblem, parseSiftImport, type FileGroup, type SiftImport } from '../shared/file-groups';
 import { defaultGroups, loadFileGroups, onFileGroupsChange, saveFileGroups, sameGroups } from '../shared/file-groups-storage';
 import type { FileGroupSettings } from '../shared/settings';
 import type { Update } from '../viewer/ui/DisplaySettingsForm';
@@ -65,7 +65,7 @@ function GroupEditor({ draft, index, count, onChange, onMove, onDelete }: {
   );
 }
 
-function SiftImport({ onImport }: { onImport(groups: FileGroup[]): void }) {
+function SiftImportForm({ onImport }: { onImport(imported: SiftImport): void }) {
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const run = () => {
@@ -82,7 +82,8 @@ function SiftImport({ onImport }: { onImport(groups: FileGroup[]): void }) {
         Sift has no export button. On Sift's options page, open the developer tools console and run{' '}
         <code>copy(JSON.stringify(await chrome.storage.sync.get('config')))</code>, then paste the result here (nothing
         copied means Sift still has its default tabs, which Glide's defaults match). Or paste tabs as text: a line with
-        the tab's name in brackets, like <code>[Tests]</code>, then its patterns. Importing replaces the groups below.
+        the tab's name in brackets, like <code>[Tests]</code>, then its patterns. Importing replaces the groups below, and
+        Sift's tab to open on and its hide-empty switch replace the ones above.
       </p>
       <textarea className="group-patterns" aria-label="Sift settings to import" spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} />
       <div className="options-actions">
@@ -135,8 +136,9 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
         setStatus({ kind: 'saved' });
         // The default group follows a rename, and All replaces it once it is deleted.
         const current = settingsRef.current.defaultGroup;
-        const was = previous.find((d) => d.label.trim().toLowerCase() === current.toLowerCase());
-        if (current === ALL_GROUP || !was) return;
+        const named = (d: DraftGroup) => d.label.trim().toLowerCase() === current.toLowerCase();
+        const was = previous.find(named);
+        if (current === ALL_GROUP || !was || next.some(named)) return;
         const now = next.find((d) => d.id === was.id);
         const label = now ? now.label.trim() : ALL_GROUP;
         if (label !== current) update({ fileGroups: { defaultGroup: label } });
@@ -293,7 +295,13 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
             )}
           </div>
           <PathProbe groups={groups} />
-          <SiftImport onImport={(imported) => edit(toDraft(imported))} />
+          <SiftImportForm
+            onImport={({ groups: imported, defaultGroup, hideEmpty }) => {
+              edit(toDraft(imported));
+              const patch = { ...(defaultGroup === undefined ? {} : { defaultGroup }), ...(hideEmpty === undefined ? {} : { hideEmpty }) };
+              if (Object.keys(patch).length > 0) update({ fileGroups: patch });
+            }}
+          />
         </>
       )}
     </div>

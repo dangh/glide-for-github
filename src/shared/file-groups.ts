@@ -300,15 +300,26 @@ function parseJson(text: string): unknown {
   }
 }
 
+/** What an import from Sift brings: its tabs, and its tab to open on and hide-empty switch when its config has them. */
+export interface SiftImport {
+  groups: FileGroup[];
+  /** Sift's `defaultTab` ('' = All) when it names one of the groups. */
+  defaultGroup?: string;
+  /** Sift's `hideEmptyTabs`. */
+  hideEmpty?: boolean;
+}
+
 /**
  * Groups pasted from Sift for GitHub. Sift has no export, so this takes what its storage holds: the JSON of its
- * `config` item (`{ tabs: [{ label, patterns }] }`, also wrapped as `{ config: … }` or as the bare `tabs` list), or
- * plain text, one block per tab: a `[Label]` line, then that tab's patterns.
+ * `config` item (`{ tabs: [{ label, patterns }], defaultTab, hideEmptyTabs }`, also wrapped as `{ config: … }` or as
+ * the bare `tabs` list), or plain text, one block per tab: a `[Label]` line, then that tab's patterns. An old config's
+ * catch-all tab (`fallbackLabel`) becomes a group excluding every other, as Sift itself reads it.
  */
-export function parseSiftImport(text: string): FileGroup[] | { error: string } {
+export function parseSiftImport(text: string): SiftImport | { error: string } {
   const trimmed = text.trim();
   if (!trimmed) return { error: 'Paste Sift settings first.' };
   let groups: FileGroup[];
+  const extra: Omit<SiftImport, 'groups'> = {};
   // "[Tests]" starts a text block, not a JSON list.
   const json = parseJson(trimmed);
   if (trimmed.startsWith('{') && json === undefined) return { error: 'That is not valid JSON.' };
@@ -318,6 +329,18 @@ export function parseSiftImport(text: string): FileGroup[] | { error: string } {
     if (!Array.isArray(tabs)) return { error: 'No tabs found: expected Sift\'s "config" with a "tabs" list.' };
     groups = tabs.map(parseGroup).filter((g): g is FileGroup => g !== null);
     if (groups.length !== tabs.length) return { error: 'Some tabs have no label or patterns.' };
+    if (isRecord(config)) {
+      if (typeof config.fallbackLabel === 'string' && config.fallbackLabel.trim()) {
+        groups.push({ label: config.fallbackLabel.trim(), patterns: groups.map((g) => `!${g.label}`) });
+      }
+      if (typeof config.defaultTab === 'string') {
+        const key = config.defaultTab.trim().toLowerCase();
+        const named = groups.find((g) => g.label.toLowerCase() === key);
+        if (!key) extra.defaultGroup = ALL_GROUP;
+        else if (named) extra.defaultGroup = named.label;
+      }
+      if (typeof config.hideEmptyTabs === 'boolean') extra.hideEmpty = config.hideEmptyTabs;
+    }
   } else {
     groups = [];
     let current: FileGroup | null = null;
@@ -331,5 +354,5 @@ export function parseSiftImport(text: string): FileGroup[] | { error: string } {
   }
   if (groups.length === 0) return { error: 'No tabs found.' };
   const problem = groupsProblem(groups);
-  return problem ? { error: problem } : groups;
+  return problem ? { error: problem } : { groups, ...extra };
 }

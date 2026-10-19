@@ -540,6 +540,35 @@ test.describe('file groups', () => {
     }
   });
 
+  test("importing Sift's settings brings its tabs, its tab to open on and its hide-empty switch", async ({ extContext }) => {
+    const options = await extensionPage(extContext);
+    try {
+      const section = options.locator('section', { has: options.getByRole('heading', { name: 'File groups' }) });
+      // What Sift's console line copies: its "config" item, here with a custom tab and an old catch-all tab.
+      const config = {
+        defaultTab: 'Tests',
+        hideEmptyTabs: false,
+        tabs: [
+          { label: 'Tests', patterns: ['*.test.*'] },
+          { label: 'Docs', patterns: ['*.md'] },
+        ],
+        fallbackLabel: 'Rest',
+        experiments: { onDemandDiffs: true, backgroundLoad: true, parallelLoad: true },
+      };
+      await section.getByText('Import from Sift for GitHub').click();
+      await section.getByRole('textbox', { name: 'Sift settings to import' }).fill(JSON.stringify({ config }));
+      await section.getByRole('button', { name: 'Import' }).click();
+      await expect(section.getByRole('status')).toHaveText('Saved');
+      await expect(section.getByTestId('group-card')).toHaveCount(3);
+      await expect(section.getByRole('textbox', { name: 'Patterns of Rest' })).toHaveValue('!Tests\n!Docs');
+      await expect(section.getByRole('combobox', { name: 'Open pull requests on' })).toHaveValue('Tests');
+      await expect(section.getByRole('checkbox', { name: /Hide groups with no files/ })).not.toBeChecked();
+    } finally {
+      await options.close();
+      await writeGlideSync(extContext, {});
+    }
+  });
+
   test('an edit made just before the options page closes is saved', async ({ extContext }) => {
     const options = await extensionPage(extContext);
     try {
