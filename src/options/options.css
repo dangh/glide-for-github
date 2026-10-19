@@ -566,6 +566,10 @@ body {
   border-radius: 0;
 }
 
+.rule-editor-list > li + li {
+  border-top: 0;
+}
+
 .rule-editor-hint {
   font-size: 12px;
 }
@@ -573,13 +577,6 @@ body {
 .rule-editor-list .group-label,
 .rule-editor-list .group-patterns {
   border-color: transparent;
-  background: transparent;
-}
-
-.rule-editor-list .group-label:hover,
-.rule-editor-list .group-patterns:hover,
-.rule-editor-list .group-label:placeholder-shown,
-.rule-editor-list .group-patterns:placeholder-shown {
   background: var(--pierre-bg-subtle);
 }
 
