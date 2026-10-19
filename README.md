@@ -115,10 +115,13 @@ extension icon, then **Options**).
   images in comments) and `raw.githubusercontent.com` (GitHub's file-content host, reached by redirect from github.com,
   used to expand unchanged context). The Preview tab of the comment box posts your draft text to github.com's `/preview`
   so GitHub can render it. No third parties; it has no server of its own, no analytics and loads no remote code.
-- Your token is stored in `chrome.storage.local`, on this device only, with the GitHub username it belongs to. It is sent only to `api.github.com`, only from
-  the extension's own pages, never to the github.com page, and the options page never displays it.
-- Display settings are stored in `chrome.storage.sync`, so Chrome can sync them between your signed-in browsers. They
-  contain no tokens and no pull request data.
+- Your token is stored in `chrome.storage.local`, on this device only, with the GitHub username it belongs to. It is
+  sent only to `api.github.com`, only from the extension's own pages, never to the github.com page, and the options
+  page never displays it.
+- Settings and file groups are stored in `chrome.storage.sync` (each file group is its own item), so Chrome can sync
+  them between your signed-in browsers. They contain no tokens and no pull request data.
+- The Sift import only parses the text you paste; Glide reads nothing from Sift. The full list of what Glide stores,
+  including what it keeps in the tab's `sessionStorage`, is in the [privacy policy](store/PRIVACY.md).
 
 ## Private GitHub endpoints: please read
 

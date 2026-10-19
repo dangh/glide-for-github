@@ -14,10 +14,16 @@ github.com, which redirects to `raw.githubusercontent.com`, GitHub's file-conten
   kept in `chrome.storage.local`, on your device only, never synced, together with the GitHub username the token
   belongs to (shown in the options page) and the owner it is for. The options page lists tokens by owner and
   never shows their values; you can remove them there at any time.
-- Your display settings (layout, themes and so on) in `chrome.storage.sync`, which Chrome may sync between your
-  signed-in browsers. They contain no tokens and no pull request data.
-- Unsent comment drafts and a pending suggestion batch, in the browser tab's `sessionStorage`. They are discarded
-  when the tab closes.
+- Your settings (layout, themes and so on) in `chrome.storage.sync`, which Chrome may sync between your signed-in
+  browsers. Your file groups (each group's name and patterns) are there too, one item per group. They contain no
+  tokens and no pull request data.
+- In the browser tab's `sessionStorage`, discarded when the tab closes: unsent comment drafts, a pending suggestion
+  batch and a random key that stops a retried suggestion commit from being applied twice, the file group you picked on
+  each pull request (so a reload reopens it), and, with "Scroll with the page" on, your place in the diff list (a file
+  path and an offset) so a reload returns there.
+
+**Importing from Sift for GitHub.** The options page can import file groups from Sift for GitHub. It only parses the
+text you paste into it; Glide reads nothing from Sift, its storage or its pages.
 
 **What it sends, and where.** Only to GitHub:
 - `github.com`: requests with your signed-in session for the pull request you are viewing, including file contents

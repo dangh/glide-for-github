@@ -67,8 +67,8 @@ Review GitHub pull requests with fast diffs and a file tree, next to Files chang
 features, in a tab next to Files changed.
 
 **Permission justifications:**
-- `storage`: saves the user's display settings (`chrome.storage.sync`) and, if the user adds one, their GitHub token and
-  the username it belongs to (`chrome.storage.local`, never synced).
+- `storage`: saves the user's settings and file groups (`chrome.storage.sync`, one item per file group) and, if the
+  user adds one, their GitHub token and the username it belongs to (`chrome.storage.local`, never synced).
 - Host permission `https://github.com/*`: content scripts on pull request pages add the Glide tab and mount the
   viewer, and the extension makes same-origin requests with the user's own GitHub session to read the pull request's
   diffs and threads and to apply suggestions, resolve threads and mark files viewed. It also posts the draft text of
