@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Takes the Chrome Web Store screenshots (1280x800) into store/screenshots/, headed, from react/react#37778 (public)
- * and the options page. Needs `npm run build` (dist/) and the logged-in e2e profile (see playwright.config.ts), and a
+ * and the options page, all on the default settings and file groups (the profile's own are put back afterwards). Needs `npm run build` (dist/) and the logged-in e2e profile (see playwright.config.ts), and a
  * display: `DISPLAY=:0 WAYLAND_DISPLAY= node scripts/store-screenshots.mjs [out-dir]`.
  *
  * Read-only on GitHub: it opens a comment composer and types into it but never submits. Avatars are hidden, and the
@@ -93,11 +93,16 @@ if (!login) throw new Error('not signed in on the e2e profile');
 
 await page.goto(`${PR}#glide`, { waitUntil: 'domcontentloaded' });
 let frame = await viewerReady();
-await frame.evaluate(() =>
-  window.__pierre.settings.getState().update({ diff: { diffStyle: 'split' }, tree: { initialExpansion: 'closed' }, review: { hideWhitespace: false } }),
-);
-await page.waitForTimeout(1500);
-frame = viewerFrame();
+
+// The shots show the defaults, so the profile's synced settings and file groups are set aside (kept in memory, never
+// printed) and put back at the end.
+const id = new URL(viewerFrame().url()).host;
+const options = await context.newPage();
+await options.setViewportSize({ width: 1280, height: 800 });
+await options.goto(`chrome-extension://${id}/options.html`);
+const savedSync = await options.evaluate(() => chrome.storage.sync.get(null));
+const resetSync = () => options.evaluate(() => chrome.storage.sync.clear());
+
 const FILE = 'compiler/apps/playground/components/Header.tsx';
 const LINE = 113;
 const shot = async (name) => {
@@ -105,58 +110,84 @@ const shot = async (name) => {
   await page.screenshot({ path: join(out, name) });
   console.log('wrote', name);
 };
+const openPr = async () => {
+  await page.bringToFront();
+  await page.goto(`${PR}#glide`, { waitUntil: 'domcontentloaded' });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  return viewerReady();
+};
 
-// 1. The Glide tab: file tree (expanded) and diffs.
-await frame.evaluate(() => window.__pierre.settings.getState().update({ tree: { initialExpansion: 'open' } }));
-await page.waitForTimeout(1500);
-await shot('1-glide-tab.png');
+try {
+  await resetSync();
+  frame = await openPr();
 
-// 2. A comment composer open on a line, with a draft typed in and NOT submitted.
-await frame.evaluate((p) => window.__pierre.session.scrollToFile?.(p), FILE);
-const item = viewer.locator(`diffs-container:has(.fh[data-path="${FILE}"])`);
-const cell = item.locator(`code[data-additions] [data-column-number="${LINE}"]`);
-await cell.scrollIntoViewIfNeeded();
-await page.waitForTimeout(800);
-for (let i = 0; i < 10; i++) {
-  try {
-    await cell.hover({ timeout: 2_000 });
-    await item.locator('[data-utility-button]').click({ timeout: 2_000 });
-    break;
-  } catch (e) {
-    if (i === 9) throw e;
-    await page.waitForTimeout(500);
+  // 1. The Glide tab: file group tabs, file tree (expanded) and diffs.
+  await frame.evaluate(() => window.__pierre.settings.getState().update({ tree: { initialExpansion: 'open' } }));
+  await page.waitForTimeout(1500);
+  await shot('1-glide-tab.png');
+
+  // 2. A comment composer open on a line, with a draft typed in and NOT submitted.
+  await frame.evaluate((p) => window.__pierre.session.scrollToFile?.(p), FILE);
+  const item = viewer.locator(`diffs-container:has(.fh[data-path="${FILE}"])`);
+  const cell = item.locator(`[data-column-number="${LINE}"][data-line-type="change-addition"]`).first();
+  await cell.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(800);
+  for (let i = 0; i < 10; i++) {
+    try {
+      await cell.hover({ timeout: 2_000 });
+      await item.locator('[data-utility-button]').click({ timeout: 2_000 });
+      break;
+    } catch (e) {
+      if (i === 9) throw e;
+      await page.waitForTimeout(500);
+    }
   }
+  const box = viewer.locator('.composer textarea').first();
+  await box.waitFor({ timeout: 15_000 });
+  await box.fill('Nice cleanup. Should the old facebook/react URL keep redirecting here?');
+  await page.mouse.move(640, 20); // park the pointer outside the diff so no hover chrome is drawn
+  await page.waitForTimeout(500);
+  await shot('2-inline-thread.png');
+  // Cancel discards the draft: nothing was posted.
+  await viewer.locator('.composer').getByRole('button', { name: 'Cancel' }).click();
+  await viewer.locator('.composer').waitFor({ state: 'detached' });
+
+  // 3. The Display menu.
+  frame = await openPr();
+  await viewer.getByRole('button', { name: /Display/ }).click();
+  await page.waitForTimeout(600);
+  await shot('3-display-menu.png');
+
+  // 5. The Tests file group: the tree and the diffs show only the pull request's test files.
+  frame = await openPr();
+  await viewer.getByRole('tablist', { name: 'File groups' }).getByRole('tab', { name: /^Tests/ }).click();
+  await page.waitForTimeout(2000);
+  await page.mouse.move(640, 20);
+  await shot('5-file-groups.png');
+
+  // 4. The options page, on the defaults: its header (icon, version) and File groups. The sections above File groups
+  // are left out: the Display ones are in shot 3, and the saved-token list names the owners the profile holds tokens for.
+  await resetSync();
+  await options.bringToFront();
+  await options.reload();
+  await options.getByRole('heading', { name: 'GitHub tokens' }).waitFor();
+  await options.getByRole('heading', { name: 'File groups' }).waitFor();
+  await options.evaluate(() => {
+    const groups = document.getElementById('file-groups-heading').closest('section');
+    for (const section of document.querySelectorAll('main > section')) {
+      if (section === groups) break;
+      section.remove();
+    }
+  });
+  await options.waitForTimeout(800);
+  await options.screenshot({ path: join(out, '4-options.png') });
+  console.log('wrote 4-options.png');
+} finally {
+  await resetSync();
+  await options.evaluate((items) => chrome.storage.sync.set(items), savedSync);
+  const restored = await options.evaluate(() => chrome.storage.sync.get(null));
+  const canonical = (items) => JSON.stringify(Object.entries(items).sort(([a], [b]) => a.localeCompare(b)));
+  await context.close();
+  if (canonical(restored) !== canonical(savedSync)) throw new Error('the profile\'s synced settings were not restored');
+  console.log('restored the profile\'s synced settings');
 }
-const box = viewer.locator('.composer textarea').first();
-await box.waitFor({ timeout: 15_000 });
-await box.fill('Nice cleanup. Should the old facebook/react URL keep redirecting here?');
-await page.mouse.move(640, 20); // park the pointer outside the diff so no hover chrome is drawn
-await page.waitForTimeout(500);
-await shot('2-inline-thread.png');
-// Cancel discards the draft: nothing was posted.
-await viewer.locator('.composer').getByRole('button', { name: 'Cancel' }).click();
-await viewer.locator('.composer').waitFor({ state: 'detached' });
-
-// 3. The Display menu.
-await page.goto(`${PR}#glide`, { waitUntil: 'domcontentloaded' });
-await page.reload({ waitUntil: 'domcontentloaded' });
-frame = await viewerReady();
-await viewer.getByRole('button', { name: /Display/ }).click();
-await page.waitForTimeout(600);
-await shot('3-display-menu.png');
-
-// 4. The options page. The saved-token list is hidden: it names the owners the profile holds tokens for.
-const id = new URL(viewerFrame().url()).host;
-const options = await context.newPage();
-await options.setViewportSize({ width: 1280, height: 800 });
-await options.goto(`chrome-extension://${id}/options.html`);
-await options.getByRole('heading', { name: 'GitHub tokens' }).waitFor();
-await options.evaluate(() => {
-  const heading = [...document.querySelectorAll('h2')].find((h) => h.textContent.includes('GitHub tokens'));
-  heading?.closest('section')?.remove();
-});
-await options.waitForTimeout(800);
-await options.screenshot({ path: join(out, '4-options.png') });
-console.log('wrote 4-options.png');
-
-await context.close();

@@ -12,14 +12,18 @@ Everything needed to list and publish Glide for GitHub. Icons and promo tiles ar
 | `screenshots/2-inline-thread.png` | Screenshot | 1280x800 |
 | `screenshots/3-display-menu.png` | Screenshot | 1280x800 |
 | `screenshots/4-options.png` | Screenshot | 1280x800 |
+| `screenshots/5-file-groups.png` | Screenshot | 1280x800 |
 | `promo/small-tile.png` | Small promo tile | 440x280 |
 | `promo/marquee.png` | Marquee promo tile | 1400x560 |
 | `promo/social-preview.png` | GitHub repo social preview (Settings > Social preview) | 1280x640 |
 
 Screenshots are taken by `scripts/store-screenshots.mjs` (headed, on the logged-in e2e profile) from a public PR
 (react/react#37778), with avatars hidden; the script refuses to write one if the signed-in login or a token-looking
-string is visible. The inline thread screenshot shows a comment composer with a draft typed in and then cancelled:
-nothing was posted. The options screenshot omits the saved-token list.
+string is visible. Every shot uses the default settings and file groups: the script sets the profile's own aside and
+restores them afterwards. The inline thread screenshot shows a comment composer with a draft typed in and then
+cancelled: nothing was posted. The file groups screenshot has the Tests group open. The options screenshot shows the
+page's header and its File groups section; the sections above it are left out (the Display ones are in the Display
+menu screenshot, and the saved-token list names the profile's token owners).
 
 ## Listing
 
