@@ -74,6 +74,8 @@
  *   github.replaceFilesTab    boolean, false: GitHub's Files changed tab is hidden and its page opens Glide instead
  *   fileGroups.*              enabled (true), defaultGroup ('' = All; else a group label), hideEmpty (true): the file
  *                             group tabs (./file-groups.ts). The groups themselves are stored apart (./file-groups-storage.ts).
+ *   relatedFiles.style        'nested' (default) | 'box' | 'rail' | 'off': how companion files (lock files, …) show with
+ *                             their main file (./related-files.ts). The rules are stored apart (./related-files-storage.ts).
  *
  * EXCLUDED, with reasons:
  *   preferredHighlighter        not a user option: toDiffOptions always sets 'shiki-js' (global no-WASM constraint)
@@ -200,6 +202,14 @@ export interface FileGroupSettings {
   hideEmpty: boolean;
 }
 
+/** How companion files show with their main file: folded under it, in one box, or under a group line with a rail. */
+export const RELATED_STYLES = ['nested', 'box', 'rail', 'off'] as const;
+export type RelatedStyle = (typeof RELATED_STYLES)[number];
+
+export interface RelatedFilesSettings {
+  style: RelatedStyle;
+}
+
 export interface DisplaySettings {
   diff: DiffSettings;
   tree: TreeSettings;
@@ -209,10 +219,11 @@ export interface DisplaySettings {
   experiments: ExperimentSettings;
   github: GithubSettings;
   fileGroups: FileGroupSettings;
+  relatedFiles: RelatedFilesSettings;
 }
 
 /** The sections of `DisplaySettings`, in storage order. */
-export const SETTINGS_SECTIONS = ['diff', 'tree', 'fonts', 'layout', 'review', 'experiments', 'github', 'fileGroups'] as const;
+export const SETTINGS_SECTIONS = ['diff', 'tree', 'fonts', 'layout', 'review', 'experiments', 'github', 'fileGroups', 'relatedFiles'] as const;
 
 export type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] };
 
@@ -369,6 +380,7 @@ export const DEFAULT_SETTINGS: DisplaySettings = deepFreeze({
   experiments: { pageScroll: false, mergedBar: false },
   github: { replaceFilesTab: false },
   fileGroups: { enabled: true, defaultGroup: ALL_GROUP, hideEmpty: true },
+  relatedFiles: { style: 'nested' },
 });
 
 // ---------------------------------------------------------------------------------------------------------
@@ -455,6 +467,8 @@ const FILE_GROUPS_SCHEMA: Schema<FileGroupSettings> = {
   hideEmpty: isBool,
 };
 
+const RELATED_FILES_SCHEMA: Schema<RelatedFilesSettings> = { style: oneOf(RELATED_STYLES) };
+
 const SCHEMAS = {
   diff: DIFF_SCHEMA,
   tree: TREE_SCHEMA,
@@ -464,6 +478,7 @@ const SCHEMAS = {
   experiments: EXPERIMENTS_SCHEMA,
   github: GITHUB_SCHEMA,
   fileGroups: FILE_GROUPS_SCHEMA,
+  relatedFiles: RELATED_FILES_SCHEMA,
 } as const;
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -513,6 +528,7 @@ function resolve(raw: unknown): DisplaySettings {
     experiments: { ...DEFAULT_SETTINGS.experiments, ...o.experiments },
     github: { ...DEFAULT_SETTINGS.github, ...o.github },
     fileGroups: { ...DEFAULT_SETTINGS.fileGroups, ...o.fileGroups },
+    relatedFiles: { ...DEFAULT_SETTINGS.relatedFiles, ...o.relatedFiles },
   };
 }
 

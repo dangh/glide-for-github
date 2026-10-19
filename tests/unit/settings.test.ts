@@ -118,6 +118,7 @@ describe('DEFAULT_SETTINGS', () => {
       experiments: { pageScroll: false, mergedBar: false },
       github: { replaceFilesTab: false },
       fileGroups: { enabled: true, defaultGroup: '', hideEmpty: true },
+      relatedFiles: { style: 'nested' },
     } satisfies DisplaySettings);
   });
 
@@ -235,6 +236,18 @@ describe('fileGroups', () => {
   });
 });
 
+describe('relatedFiles', () => {
+  it('nests companion files by default; any of the four styles can be stored; anything else falls back', async () => {
+    expect((await loadSettings()).relatedFiles).toEqual({ style: 'nested' });
+    for (const style of ['nested', 'box', 'rail', 'off'] as const) {
+      fake.data[SETTINGS_STORAGE_KEY] = { relatedFiles: { style } };
+      expect((await loadSettings()).relatedFiles.style).toBe(style);
+    }
+    fake.data[SETTINGS_STORAGE_KEY] = { relatedFiles: { style: 'tabs' } };
+    expect((await loadSettings()).relatedFiles.style).toBe('nested');
+  });
+});
+
 describe('github', () => {
   it('replaces Files changed only when stored as true, read the same by the content script', async () => {
     for (const stored of [undefined, { github: { replaceFilesTab: 'yes' } }, { github: { replaceFilesTab: 1, extra: true } }]) {
@@ -281,7 +294,7 @@ describe('loadSettings', () => {
       review: { hideWhitespace: true, other: 1 },
     };
     const s = await loadSettings();
-    expect(Object.keys(s).sort()).toEqual(['diff', 'experiments', 'fileGroups', 'fonts', 'github', 'layout', 'review', 'tree']);
+    expect(Object.keys(s).sort()).toEqual(['diff', 'experiments', 'fileGroups', 'fonts', 'github', 'layout', 'relatedFiles', 'review', 'tree']);
     expect(Object.keys(s.diff).sort()).toEqual(Object.keys(DEFAULT_SETTINGS.diff).sort());
     expect(Object.keys(s.tree).sort()).toEqual(Object.keys(DEFAULT_SETTINGS.tree).sort());
     expect(Object.keys(s.review)).toEqual(['hideWhitespace']);

@@ -20,7 +20,7 @@ export interface GroupsStorage {
   subscribe(listener: (changedKeys: string[]) => void): () => void;
 }
 
-function chromeSync(): GroupsStorage {
+export function chromeSync(): GroupsStorage {
   const area = chrome.storage.sync;
   return {
     get: (keys) => area.get(keys),
