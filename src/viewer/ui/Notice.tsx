@@ -1,9 +1,10 @@
-/** Transient notices (bottom toast), the "PR updated" banner (Task 11) and the full-pane error. */
-import { memo, useEffect } from 'react';
+/** Transient notices (bottom toast), GitHub's Refresh button for a pull request that was pushed to, and the full-pane error. */
+import { memo, useEffect, useState } from 'react';
 import { BRAND } from '../../shared/brand';
 import { reloadPr } from '../state/load';
 import { errorMessage } from '../state/review';
 import { usePr } from '../state/store';
+import { SyncIcon } from './icons';
 
 /** Soft reload (keeps the suggestion batch and drafts); a failure is shown as a notice. */
 export function reloadPullRequest(): Promise<void> {
@@ -14,7 +15,6 @@ const INFO_TIMEOUT_MS = 6000;
 
 export const Notice = memo(function Notice() {
   const notice = usePr((s) => s.notice);
-  const headMoved = usePr((s) => s.headMoved);
 
   useEffect(() => {
     if (notice?.kind !== 'info') return;
@@ -24,25 +24,40 @@ export const Notice = memo(function Notice() {
     return () => clearTimeout(t);
   }, [notice]);
 
+  if (!notice) return null;
   return (
-    <>
-      {headMoved && (
-        <div className="banner" role="status">
-          This pull request was updated.{' '}
-          <button className="fh-link" onClick={() => void reloadPullRequest()}>
-            Reload
-          </button>
-        </div>
-      )}
-      {notice && (
-        <div className={`toast toast-${notice.kind}`} role={notice.kind === 'error' ? 'alert' : 'status'}>
-          <span>{notice.message}</span>
-          <button className="toast-close" aria-label="Dismiss" onClick={() => usePr.getState().setNotice(null)}>
-            ×
-          </button>
-        </div>
-      )}
-    </>
+    <div className={`toast toast-${notice.kind}`} role={notice.kind === 'error' ? 'alert' : 'status'}>
+      <span>{notice.message}</span>
+      <button className="toast-close" aria-label="Dismiss" onClick={() => usePr.getState().setNotice(null)}>
+        ×
+      </button>
+    </div>
+  );
+});
+
+/**
+ * GitHub's Refresh button on its Files changed toolbar, shown once the pull request was pushed to (`headMoved`): sync
+ * icon and "Refresh" (the icon alone below GitHub's md viewport), busy while the soft reload runs, gone after it.
+ */
+export const RefreshButton = memo(function RefreshButton() {
+  const updated = usePr((s) => s.headMoved);
+  const [busy, setBusy] = useState(false);
+  if (!updated) return null;
+  return (
+    <button
+      type="button"
+      className="refresh-button"
+      aria-label="Refresh"
+      data-busy={busy || undefined}
+      disabled={busy}
+      onClick={() => {
+        setBusy(true);
+        void reloadPullRequest().finally(() => setBusy(false));
+      }}
+    >
+      <SyncIcon />
+      <span className="refresh-label">Refresh</span>
+    </button>
   );
 });
 

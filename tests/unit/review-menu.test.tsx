@@ -14,7 +14,7 @@ import { FileHeader } from '../../src/viewer/ui/FileHeader';
 import { ReviewMenu } from '../../src/viewer/ui/ReviewMenu';
 import { Thread } from '../../src/viewer/ui/Thread';
 import { TokenPromptHost } from '../../src/viewer/ui/TokenPrompt';
-import { Notice } from '../../src/viewer/ui/Notice';
+import { Notice, RefreshButton } from '../../src/viewer/ui/Notice';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -366,13 +366,16 @@ describe('apply suggestion', () => {
     expect(usePr.getState().suggestionBatch).toHaveLength(2); // a soft reload never drops the batch
   });
 
-  it('the "pull request was updated" banner reloads softly (PR data via the bridge), keeping the batch', async () => {
+  it("GitHub's Refresh button, shown once the pull request was pushed to, reloads softly (PR data via the bridge), keeping the batch", async () => {
     usePr.getState().setThreads([thread('1')]);
     const calls = fakeRpc(async () => ({}));
     usePr.getState().addToBatch({ commentId: 10, suggestionIndex: 0, path: 'src/a.ts', url: 'https://github.com/dangh/pierre-sandbox/pull/1#discussion_r10' });
-    usePr.getState().setHeadMoved(true);
-    await render(<Notice />);
-    await click(button('Reload')!);
+    await render(<RefreshButton />);
+    expect(button('Refresh')).toBeUndefined();
+    await act(async () => usePr.getState().setHeadMoved(true));
+    const refresh = document.querySelector<HTMLButtonElement>('button[aria-label="Refresh"]')!;
+    expect(refresh.textContent).toBe('Refresh');
+    await click(refresh);
     await settle();
     expect(calls.some((c) => c[0] === 'get' && c[1] === '/dangh/pierre-sandbox/pull/1/changes')).toBe(true);
     expect(usePr.getState().suggestionBatch).toHaveLength(1);

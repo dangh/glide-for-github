@@ -2,7 +2,7 @@
  * Comment drafts (new thread, reply, edit, review summary) survive a real page or iframe reload: they are kept per PR
  * in `sessionStorage` (`prKey` + the draft's `DraftKey`, like the suggestion batch in batch.ts) and restored when the
  * PR is set. Drafts with no text are not stored (a just-opened composer is not worth restoring). The soft reload
- * ("This pull request was updated. Reload") never loses drafts anyway: they stay in the store.
+ * (the toolbar's Refresh button) never loses drafts anyway: they stay in the store.
  */
 import { prKey, type PrRef } from '../../shared/pr-url';
 import { sessionStore } from './batch';

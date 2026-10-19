@@ -215,9 +215,53 @@ function fileReviewRequest(viewed: boolean, owner: unknown, repo: unknown, numbe
   };
 }
 
+/** How long one `waitForGitUpdate` waits before answering false (below the RPC timeout). */
+export const GIT_UPDATE_WAIT_MS = 25_000;
+/** Cap on GitHub's own per-message `wait` (its jitter before refetching, ~0.4 s seen). */
+const MAX_GITHUB_WAIT_MS = 5_000;
+
+/** A pull request's alive channel, subscribed GitHub's way, and the `waitForGitUpdate` calls waiting on it. */
+interface Subscription {
+  el: HTMLElement;
+  waiting: Set<() => void>;
+}
+
 export function createBridgeImpl(deps: BridgeDeps = {}): RpcImpl<BridgeMethods> {
   const doc = () => deps.doc ?? document;
   const origin = () => doc().location.origin;
+  const subscriptions = new Map<string, Promise<Subscription>>();
+
+  /**
+   * GitHub's live updates (R§1.5): `page_data/header` names the PR's alive channel (`aliveChannel`), and GitHub's page
+   * script subscribes any `.js-socket-channel[data-channel]` element to it, dispatching `socket:message` on it.
+   * `event_updates.git_updated` is the event GitHub's Files changed page shows its Refresh button for (a push);
+   * comments only send `timeline_updated`.
+   */
+  async function subscribe(prPath: string): Promise<Subscription> {
+    const header = (await getJson(`${prPath}/page_data/header`)) as { aliveChannel?: unknown } | null;
+    const channel = header?.aliveChannel;
+    if (typeof channel !== 'string' || channel === '') throw { status: 0, code: 'unsupported', message: 'GitHub sent no live update channel' } satisfies BridgeErrorPayload;
+    const sub: Subscription = { el: doc().createElement('div'), waiting: new Set() };
+    sub.el.className = 'js-socket-channel';
+    sub.el.hidden = true;
+    sub.el.dataset.channel = channel;
+    sub.el.addEventListener('socket:message', (event) => {
+      const data = (event as CustomEvent<{ data?: { event_updates?: { git_updated?: unknown }; wait?: unknown } } | null>).detail?.data;
+      if (!data?.event_updates?.git_updated) return;
+      const wait = typeof data.wait === 'number' ? Math.min(Math.max(data.wait, 0), MAX_GITHUB_WAIT_MS) : 0;
+      setTimeout(() => {
+        for (const wake of [...sub.waiting]) wake();
+      }, wait);
+    });
+    return sub;
+  }
+
+  async function getJson(path: string): Promise<Json> {
+    const headers = { ...githubHeaders(doc()), Accept: 'application/json' };
+    const res = await send(deps, origin() + path, { method: 'GET', headers, credentials: 'same-origin' });
+    if (!res.ok) throw await errorFrom(res);
+    return readJson(res);
+  }
 
   return {
     async get(path, query, opts) {
@@ -272,6 +316,31 @@ export function createBridgeImpl(deps: BridgeDeps = {}): RpcImpl<BridgeMethods> 
 
     async unmarkViewed(owner, repo, number, path) {
       return postJson(fileReviewRequest(false, owner, repo, number, path), 'DELETE');
+    },
+
+    async waitForGitUpdate(owner, repo, number) {
+      if (!isName(owner) || !isName(repo) || !isPosInt(number)) throw badRequest('Invalid pull request');
+      const prPath = `/${owner}/${repo}/pull/${number}`;
+      let pending = subscriptions.get(prPath);
+      if (!pending) {
+        pending = subscribe(prPath);
+        subscriptions.set(prPath, pending);
+        // A failed subscription is not cached: the next call tries again.
+        pending.catch(() => subscriptions.delete(prPath));
+      }
+      const sub = await pending;
+      // GitHub may replace the body on a navigation; the element must be in the document to stay subscribed.
+      if (!sub.el.isConnected) doc().body.append(sub.el);
+      return new Promise<boolean>((resolve) => {
+        const done = (updated: boolean) => {
+          clearTimeout(timer);
+          sub.waiting.delete(wake);
+          resolve(updated);
+        };
+        const wake = () => done(true);
+        const timer = setTimeout(() => done(false), GIT_UPDATE_WAIT_MS);
+        sub.waiting.add(wake);
+      });
     },
   };
 

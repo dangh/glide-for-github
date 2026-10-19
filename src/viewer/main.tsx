@@ -6,7 +6,7 @@ import { reachedBreakpoints, type Breakpoint } from '../shared/viewport';
 import { App } from './App';
 import { ignoreBenignErrors } from './benignErrors';
 import { createConnection, parsePrParam, watchPort } from './connection';
-import { createPageScrollView, type PageScrollView } from './pageScroll';
+import { createPageScrollView, trackHiddenBottom, type PageScrollView } from './pageScroll';
 import { initBatchPersistence } from './state/batch';
 import { initDraftPersistence } from './state/drafts';
 import { initFileGroups, useFileGroups } from './state/fileGroups';
@@ -35,6 +35,7 @@ if (!prRef) {
   if (layout !== 'frame') {
     document.documentElement.dataset.scrollLayout = layout;
     pageScroll = session.pageScroll = createPageScrollView(window, layout, restoreKey(prKey(prRef)));
+    trackHiddenBottom(window);
   }
   // viewer.css follows GitHub's viewport; until the page reports it, the iframe's width is the best guess.
   const showViewport = (reached: Breakpoint[]) => (document.documentElement.dataset.viewport = reached.join(' '));
