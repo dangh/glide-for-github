@@ -119,6 +119,13 @@ describe('related files: lock files', () => {
 });
 
 describe('related files: validation', () => {
+  it('rejects invalid character ranges without throwing while editing or probing', () => {
+    const rules = [{ main: '[z-a].json', companions: ['x.lock'] }];
+    expect(rulesProblem(rules)).toMatch(/Rule 1/);
+    expect(relate(['a.json', 'x.lock'], rules)).toEqual({});
+    expect(relate(['a.json', 'x.lock'], [{ main: 'a.json', companions: ['[z-a].lock'] }])).toEqual({});
+  });
+
   it('accepts the defaults', () => {
     expect(rulesProblem(DEFAULT_RELATED_RULES)).toBeNull();
   });

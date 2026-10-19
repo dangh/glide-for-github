@@ -6,7 +6,17 @@
  * (`compilePattern`: `*`, `?`, `[set]`, case-insensitive) and never name a folder: a companion sits beside its main
  * file. `${basename}` in a companion pattern is the main file's name without its extension.
  */
-import { compilePattern, type Matcher } from './file-groups';
+import { compilePattern as compileGlob, type Matcher } from './file-groups';
+
+// Incomplete or invalid character ranges are ordinary input while a rule is being edited.
+function compilePattern(pattern: string): Matcher | null {
+  try {
+    return compileGlob(pattern);
+  } catch (err) {
+    if (err instanceof SyntaxError) return null;
+    throw err;
+  }
+}
 
 export interface RelatedRule {
   main: string;
