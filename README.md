@@ -75,7 +75,9 @@ you pick another group there.
 
 ## Install
 
-**From the Chrome Web Store:** coming soon (listing link to be added once the first version is published).
+[Add to Chrome from the Chrome Web Store](https://chromewebstore.google.com/detail/dhbdoblfgppilljakljokgbpkjeiomka).
+
+Or install it by hand:
 
 **From a release (unpacked):** download `glide-for-github.zip` from the
 [latest release](https://github.com/dangh/glide-for-github/releases/latest), unzip it into a folder, open
@@ -136,8 +138,9 @@ token, and so do resolve and viewed whenever the token is allowed to.
 
 ## Performance
 
-Measured with `npm run perf` (see `PERF.md` for the method, every run and the raw spread): Chrome for Testing 155,
-headed, logged in, median of 3 runs.
+Measured on 0.1.0 (build `0b752fe`, 2026-10-17; the same extension code is `8647784` in this repository's history)
+with `npm run perf` (see `PERF.md` for the method, every run and the raw spread): Chrome for Testing 155, headed,
+logged in, median of 3 runs. Later versions have not been re-measured.
 
 | Metric | Result | Budget |
 | --- | --- | --- |
@@ -157,14 +160,18 @@ npm test             # unit tests (vitest)
 npm run typecheck
 npm run zip          # build and write glide-for-github.zip
 npm run e2e          # headed Playwright tests against real GitHub, see playwright.config.ts for setup
+npm run e2e:headless # the same tests, headless
+npm run e2e:token    # once: save a GitHub token in the e2e profile for the write tests
 npm run perf         # performance budget, see PERF.md
 ```
 
 The end-to-end tests need the logged-in browser profile described in `playwright.config.ts`.
 
 CI (`.github/workflows/build.yml`) type-checks, tests and zips every push and pull request. A `v*` tag that matches
-`manifest.json`'s version also creates a GitHub release and, when the store secrets are set, publishes to the Chrome Web
-Store. See [store/README.md](store/README.md) for the store listing and release steps.
+`manifest.json`'s version also creates a GitHub release, with that version's section of [CHANGELOG.md](CHANGELOG.md)
+as its notes. Then, when the store secrets are set, the publish job waits for an approval in the `chrome-web-store`
+environment and uploads the zip to the Chrome Web Store, submitting it for review. See
+[store/README.md](store/README.md) for the store listing and release steps.
 
 ## Credits and license
 

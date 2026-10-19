@@ -1,10 +1,10 @@
 # Performance
 
-Pierre for GitHub is measured against this budget (Task 12), on two public pull requests:
+Glide for GitHub is measured against this budget (Task 12), on two public pull requests:
 
 | Metric | Budget |
 | --- | --- |
-| Whole PR loaded, from navigation to `…/pull/N#pierre` | ≤ 6.5 s on react/react#37778 (167 files), ≤ 22 s on microsoft/vscode#151512 (898 files) |
+| Whole PR loaded, from navigation to `…/pull/N#glide` | ≤ 6.5 s on react/react#37778 (167 files), ≤ 22 s on microsoft/vscode#151512 (898 files) |
 | Steady scroll of the diffs, top to bottom at 3,000 px/s | no long task > 50 ms in the viewer |
 | Typing in a comment box (300 characters) | p95 keystroke → next animation frame < 16 ms (input-to-paint) |
 
@@ -14,6 +14,11 @@ logged-in e2e profile (`scripts/e2e-profile.sh`, see `playwright.config.ts`). It
 every write request is blocked while it types. Raw results go to `perf-results/` (git-ignored).
 
 ## Results (2026-10-17, final build `0b752fe`)
+
+These results were measured on 0.1.0, before the extension was renamed from Pierre for GitHub to Glide for GitHub
+and before its tab moved from `#pierre` to `#glide`, so this section and the ones below still say "Pierre" for the
+extension. Build `0b752fe` is a pre-publication copy of `8647784` in this repository's history, with the same extension
+code. Later versions have not been re-measured.
 
 Chrome for Testing 155, headed on the dev VM's VNC desktop (animation frames every ~13.3 ms, i.e. ~75 Hz), logged
 in, over that VM's own connection to github.com. Three runs per PR, each in a fresh tab of the same browser profile.
