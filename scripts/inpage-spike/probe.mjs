@@ -1,6 +1,5 @@
 /** Rerunnable synthetic probe. Run the bundle with DevTools/evaluate on a PR page or local harness. */
-import '../../src/inpage/windowScroll';
-import { setInsetTop, scrollWindowToTop } from '../../src/inpage/windowScroll';
+import { setInsetTop, scrollWindowToTop, windowViewport } from '../../src/inpage/windowScroll';
 import { CodeView, parseDiffFromFile } from '@pierre/diffs';
 import { WorkerPoolManager } from '@pierre/diffs/worker';
 
@@ -37,9 +36,7 @@ window.__spikeStart = async ({ mode = 'page', count = 500, workers = false } = {
     await pool.initialize();
   }
   setInsetTop(() => 56);
-  const view = new CodeView({ theme: { light: 'github-light', dark: 'github-dark' }, themeType: 'light', diffStyle: 'split', stickyHeaders: true, pointerEventsOnScroll: true, layout: { paddingTop: 8, paddingBottom: 8, gap: 16 }, renderCustomHeader(item) { const el = document.createElement('div'); el.className = 'header'; el.textContent = item.name; return el; } }, pool);
-  // The baseline uses the original element scroller methods, saved before installing the window adapter.
-  if (mode === 'frame') Object.assign(view, window.__spikeOriginal);
+  const view = new CodeView({ windowViewport: mode === 'page' ? windowViewport : undefined, theme: { light: 'github-light', dark: 'github-dark' }, themeType: 'light', diffStyle: 'split', stickyHeaders: true, pointerEventsOnScroll: true, layout: { paddingTop: 8, paddingBottom: 8, gap: 16 }, renderCustomHeader(item) { const el = document.createElement('div'); el.className = 'header'; el.textContent = item.name; return el; } }, pool);
   const oldLines = Array.from({length: 160}, (_, i) => `export const value${i}: number = ${i};\n`).join('');
   const newLines = oldLines.replaceAll(': number', ': string').replace(/= (\d+);/g, '= "$1";');
   const items = Array.from({length: count}, (_, i) => ({type:'diff', id:`src/file-${i}.ts`, fileDiff:parseDiffFromFile({name:`src/file-${i}.ts`,contents:oldLines,cacheKey:`old-${i}`},{name:`src/file-${i}.ts`,contents:newLines,cacheKey:`new-${i}`})}));
