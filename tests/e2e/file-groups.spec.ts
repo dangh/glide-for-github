@@ -418,6 +418,40 @@ test.describe('file groups', () => {
     await expect(row).toHaveAttribute('aria-expanded', 'false');
     await tab(viewer, 'All').click();
     await expect(row).toHaveAttribute('aria-expanded', 'false');
+    await row.click();
+    await expect(row).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test('a merged folder row keeps its open state in groups that merge the chain differently', async ({ page }) => {
+    const viewer = await openPierre(page, REACT, 'hash');
+    const folder = (path: string) => viewer.locator.locator(`file-tree-container [data-item-type="folder"][data-item-path="${path}"]`);
+    // All shows compiler/crates/ as its own row; Source merges crates/react_compiler/src/entrypoint into one row.
+    const crates = folder('compiler/crates/');
+    const merged = folder('compiler/crates/react_compiler/src/entrypoint/');
+    await expect(crates).toHaveAttribute('aria-expanded', 'true');
+    await crates.click();
+    await expect(crates).toHaveAttribute('aria-expanded', 'false');
+    await tab(viewer, 'Source').click();
+    await expect(merged).toContainText('crates');
+    await expect(merged).toHaveAttribute('aria-expanded', 'false');
+
+    // Opened in Source, it is open in All: crates/ and the row under it.
+    await merged.click();
+    await expect(merged).toHaveAttribute('aria-expanded', 'true');
+    await tab(viewer, 'All').click();
+    await expect(crates).toHaveAttribute('aria-expanded', 'true');
+    await expect(merged).toHaveAttribute('aria-expanded', 'true');
+
+    // Closed in Source, everything under crates/ is closed in All too.
+    await tab(viewer, 'Source').click();
+    await merged.click();
+    await expect(merged).toHaveAttribute('aria-expanded', 'false');
+    await tab(viewer, 'All').click();
+    await expect(crates).toHaveAttribute('aria-expanded', 'false');
+    await crates.click();
+    await expect(merged).toHaveAttribute('aria-expanded', 'false');
+    await merged.click();
+    await expect(merged).toHaveAttribute('aria-expanded', 'true');
   });
 
   test('keyboard: arrow keys, Home and End move between tabs and open them', async ({ page }) => {
