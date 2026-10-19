@@ -12,6 +12,8 @@ vi.mock('../../src/shared/file-groups-storage', async (original) => ({
   onFileGroupsChange: () => () => undefined,
   saveFileGroups: vi.fn(() => new Promise<void>(() => undefined)),
 }));
+// jsdom has no layout observer; textarea sizing is covered in the browser tests.
+vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let root: Root;
 let container: HTMLDivElement;

@@ -1,8 +1,5 @@
-/** What the options page's editable lists (file groups, related-files rules) share: their rows' actions and textarea sizing. */
+/** What the options page's editable lists (file groups, related-files rules) share: their rows' actions. */
 import { ArrowDownIcon, ArrowUpIcon, TrashIcon } from '../viewer/ui/icons';
-
-/** A textarea's rows for `text`, one per line, within `min` and `max`. */
-export const textRows = (text: string, min: number, max: number) => Math.min(max, Math.max(min, text.split('\n').length));
 
 /** GitHub's borderless icon buttons for a row: move up, move down, delete. */
 export function RowActions({ name, index, count, onMove, onDelete }: {

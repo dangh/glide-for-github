@@ -14,6 +14,8 @@ vi.mock('../../src/shared/related-files-storage', async (original) => ({
   loadRelatedRules: storage.load,
   onRelatedRulesChange: (cb: typeof storage.change) => { storage.change = cb; return () => undefined; },
 }));
+// jsdom has no layout observer; textarea sizing is covered in the browser tests.
+vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 it('keeps a newer storage change when the initial options read resolves late', async () => {

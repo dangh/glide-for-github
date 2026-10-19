@@ -7,7 +7,8 @@ import { ALL_GROUP, classify, compileGroups, groupsProblem, parseSiftImport, typ
 import { defaultGroups, loadFileGroups, onFileGroupsChange, saveFileGroups, sameGroups } from '../shared/file-groups-storage';
 import type { FileGroupSettings } from '../shared/settings';
 import type { Update } from '../viewer/ui/DisplaySettingsForm';
-import { RowActions, textRows } from './ListRow';
+import { RowActions } from './ListRow';
+import { AutoSizeTextarea } from './AutoSizeTextarea';
 
 const SAVE_DELAY_MS = 400;
 
@@ -47,11 +48,11 @@ function GroupEditor({ draft, index, count, onChange, onMove, onDelete }: {
         />
         <RowActions name={name} index={index} count={count} onMove={onMove} onDelete={onDelete} />
       </div>
-      <textarea
+      <AutoSizeTextarea
         className="group-patterns"
         aria-label={`Patterns of ${name}`}
         spellCheck={false}
-        rows={textRows(draft.text, 2, 6)}
+        placeholder="One pattern per line"
         value={draft.text}
         onChange={(e) => onChange({ ...draft, text: e.target.value })}
       />
@@ -79,7 +80,7 @@ function SiftImportForm({ onImport }: { onImport(imported: SiftImport): void }) 
         the tab's name in brackets, like <code>[Tests]</code>, then its patterns. Importing replaces the groups below, and
         Sift's tab to open on and its hide-empty switch replace the ones above.
       </p>
-      <textarea className="group-patterns" aria-label="Sift settings to import" spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} />
+      <AutoSizeTextarea className="group-patterns" aria-label="Sift settings to import" spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} />
       <div className="options-actions">
         <button type="button" className="btn" onClick={run}>
           Import
@@ -268,7 +269,8 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
       </p>
       {draft && (
         <>
-          <ol className="box-list">
+          <p className="muted rule-editor-hint">Click a name or pattern to edit, or use Tab. Valid changes save automatically.</p>
+          <ol className="box-list rule-editor-list">
             {draft.map((d, i) => (
               <GroupEditor
                 key={d.id}

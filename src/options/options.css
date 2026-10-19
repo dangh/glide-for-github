@@ -11,16 +11,18 @@ body {
 }
 
 .options {
-  max-width: 1180px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 24px 24px 64px;
+  padding: 32px 32px 64px;
 }
 
 .options-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 0 0 16px;
+  margin: 0 0 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--pierre-border);
 }
 
 /* icons/icon.svg keeps the store's 16 px padding in its 128 px canvas: show the tile only. */
@@ -30,7 +32,8 @@ body {
 }
 
 .options h1 {
-  font-size: 24px;
+  font-size: 20px;
+  font-weight: 600;
   margin: 0;
 }
 
@@ -52,14 +55,55 @@ body {
   text-decoration: underline;
 }
 
+.options-layout {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+}
+
+.options-nav {
+  position: sticky;
+  top: 24px;
+  display: grid;
+  gap: 4px;
+}
+
+.options-nav h2 {
+  margin: 0 0 4px;
+  padding: 4px 8px;
+  color: var(--pierre-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.options-nav a {
+  display: block;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.options-nav a:hover {
+  background: var(--pierre-bg-subtle);
+}
+
+.options-content {
+  min-width: 0;
+}
+
 .options-section {
-  margin: 0 0 32px;
+  margin: 0 0 40px;
 }
 
 .options-section h2 {
-  font-size: 18px;
-  margin: 0 0 4px;
-  padding-bottom: 6px;
+  scroll-margin-top: 24px;
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.5;
+  margin: 0 0 8px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--pierre-border);
 }
 
@@ -68,7 +112,7 @@ body {
   margin: 4px 0 12px;
 }
 
-/* GitHub's Box list: one bordered container per list, its rows split by dividers (tokens, file groups, related-files rules). */
+/* Lists share GitHub’s bordered Box treatment. */
 .box-list {
   list-style: none;
   margin: 0 0 12px;
@@ -129,7 +173,7 @@ body {
 
 .token-row {
   display: grid;
-  grid-template-columns: minmax(160px, 2fr) 1fr 110px auto;
+  grid-template-columns: minmax(140px, 2fr) minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 12px;
 }
@@ -170,13 +214,77 @@ body {
 
 .options-display {
   display: grid;
-  grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
-  gap: 32px;
+  grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
+  gap: 24px;
   align-items: start;
 }
 
 .options-display .settings-form {
   width: auto;
+  min-width: 0;
+  padding: 0;
+}
+
+.options-display .settings-form fieldset {
+  min-width: 0;
+  margin: 0 0 24px;
+  padding: 8px 0 0;
+}
+
+.options-display .settings-form legend {
+  font-size: 16px;
+}
+
+.options .field {
+  min-width: 0;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.options .field select,
+.options .field input[type='number'],
+.options .field input[type='text'] {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  background: var(--pierre-bg-subtle);
+}
+
+.options .field select {
+  flex: 0 0 176px;
+}
+
+.options .field input[type='number'] {
+  width: 96px;
+  flex: none;
+}
+
+.options .field-check {
+  min-height: 32px;
+}
+
+.options input[type='checkbox'],
+.options input[type='radio'] {
+  accent-color: var(--pierre-accent);
+}
+
+.options :is(.btn, .btn-primary, .btn-danger) {
+  min-height: 32px;
+  height: auto;
+  padding: 5px 12px;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.options .btn:hover:not(:disabled) {
+  background: light-dark(#eff2f5, #212830);
+}
+
+.options :is(a, button, input, select, summary):focus-visible {
+  outline: 2px solid var(--pierre-accent);
+  outline-offset: 2px;
 }
 
 .options-sample {
@@ -201,12 +309,72 @@ body {
   overflow: auto;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .options-display {
     grid-template-columns: 1fr;
   }
   .options-sample {
     position: static;
+  }
+}
+
+@media (max-width: 760px) {
+  .options-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .options-nav {
+    position: static;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--pierre-border);
+  }
+
+  .options-nav h2 {
+    grid-column: 1 / -1;
+  }
+
+  .token-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .token-owner {
+    grid-column: 1 / -1;
+    overflow-wrap: anywhere;
+  }
+
+  .token-kind {
+    grid-column: 1;
+  }
+
+  .token-actions {
+    grid-column: 2;
+    grid-row: 2 / 4;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 420px) {
+  .options-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .options-title {
+    flex-wrap: wrap;
+    gap: 0 8px;
+  }
+
+  .options .field:not(.field-check) {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .options .field select {
+    flex: auto;
+    width: 100%;
   }
 }
 
@@ -283,7 +451,8 @@ body {
   background: var(--pierre-bg);
   color: inherit;
   font: 12px/18px var(--pierre-mono);
-  resize: vertical;
+  resize: none;
+  overflow-y: hidden;
 }
 
 .group-error {
@@ -312,7 +481,6 @@ body {
 }
 
 .group-import .group-patterns {
-  height: 120px;
   margin-bottom: 8px;
 }
 
@@ -500,10 +668,8 @@ body {
   grid-area: main;
 }
 
-/* Sized to its lines (RuleEditor's rows), so no resize handle. */
 .related-rule .related-patterns {
   grid-area: files;
-  resize: none;
 }
 
 .related-rule .row-actions {
@@ -539,7 +705,6 @@ body {
 
 /* A path per line, never wrapped mid-name: a long one scrolls sideways instead. */
 .related-probe-input .group-patterns {
-  height: 160px;
   white-space: pre;
   overflow-wrap: normal;
   overflow-x: auto;
@@ -557,5 +722,49 @@ body {
 
   .related-probe-result ul {
     margin-top: 0;
+  }
+}
+
+/* Subtle fields inside a single bordered list, with dividers between rules. */
+.rule-editor-hint {
+  font-size: 12px;
+}
+
+.rule-editor-list .group-label,
+.rule-editor-list .group-patterns {
+  border-color: transparent;
+  background: var(--pierre-bg-subtle);
+}
+
+.rule-editor-list .group-label:focus,
+.rule-editor-list .group-patterns:focus {
+  background: var(--pierre-bg);
+  outline: 2px solid var(--pierre-accent);
+  outline-offset: -1px;
+}
+
+.related-rules .group-label {
+  font-family: var(--pierre-mono);
+  font-size: 12px;
+}
+
+.options-actions,
+.group-probe {
+  flex-wrap: wrap;
+}
+
+.group-probe .field input[type='text'] {
+  max-width: 100%;
+}
+
+@media (max-width: 540px) {
+  .options {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .related-rule .related-patterns {
+    margin-left: 8px;
+    width: calc(100% - 8px);
   }
 }

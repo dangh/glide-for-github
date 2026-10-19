@@ -8,7 +8,8 @@ import { BASENAME, relateFiles, rulesProblem, type RelatedRule } from '../shared
 import { defaultRules, loadRelatedRules, onRelatedRulesChange, saveRelatedRules, sameRules } from '../shared/related-files-storage';
 import { RELATED_STYLES, type RelatedStyle } from '../shared/settings';
 import { RELATED_STYLE_LABELS, type Update } from '../viewer/ui/DisplaySettingsForm';
-import { RowActions, textRows } from './ListRow';
+import { RowActions } from './ListRow';
+import { AutoSizeTextarea } from './AutoSizeTextarea';
 
 const SAVE_DELAY_MS = 400;
 
@@ -136,12 +137,11 @@ function RuleEditor({ draft, index, count, onChange, onMove, onDelete }: {
       <span className="related-rule-arrow" aria-hidden="true">
         ←
       </span>
-      <textarea
+      <AutoSizeTextarea
         className="group-patterns related-patterns"
         aria-label={`Related files of ${name}`}
         placeholder="package-lock.json"
         spellCheck={false}
-        rows={textRows(draft.text, 1, 6)}
         value={draft.text}
         onChange={(e) => onChange({ ...draft, text: e.target.value })}
       />
@@ -163,7 +163,7 @@ function PathsProbe({ rules }: { rules: readonly RelatedRule[] }) {
     <div className="related-probe">
       <label className="field field-text related-probe-input">
         <span>Try paths, one per line</span>
-        <textarea className="group-patterns" spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} />
+        <AutoSizeTextarea className="group-patterns" spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} />
       </label>
       <div data-testid="related-probe-result" className="related-probe-result">
         {result.companions.size === 0 ? (
@@ -288,7 +288,8 @@ export function RelatedFilesSettingsForm({ style, update }: { style: RelatedStyl
       </p>
       {draft && (
         <>
-          <ol className="box-list related-rules">
+          <p className="muted rule-editor-hint">Click a pattern to edit, or use Tab. Valid changes save automatically.</p>
+          <ol className="box-list rule-editor-list related-rules">
             {draft.map((d, i) => (
               <RuleEditor
                 key={d.id}
