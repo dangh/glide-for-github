@@ -10,6 +10,7 @@
  * It persists across e2e runs because scripts/e2e-profile.sh keeps .e2e-profile's extension storage.
  */
 import { chromium } from '@playwright/test';
+import { evaluateInpage, waitForInpage, VIEWER_HOST } from './inpage-driver.mjs';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -43,20 +44,16 @@ function chromePath() {
  * (`window.__pierre.review.withApi`), which asks for a token when none is stored. Not awaited (it settles when the
  * prompt is saved or cancelled).
  */
-async function openPrompt(frame) {
-  await frame.evaluate(() => {
+async function openPrompt(page) {
+  await evaluateInpage(page, () => {
     void window.__pierre.review.withApi('set up the e2e tests', async () => undefined).catch(() => undefined);
   });
 }
 
-const viewerFrame = (page) => page.frames().find((f) => f.url().startsWith('chrome-extension://') && f.url().includes('/viewer.html'));
-
 /** Whether the token key exists (keys only; the value is never read). */
 async function tokenStored(page) {
-  const frame = viewerFrame(page);
-  if (!frame) return false;
   try {
-    return await frame.evaluate(async (key) => (await chrome.storage.local.getKeys()).includes(key), KEY);
+    return await evaluateInpage(page, async (key) => (await chrome.storage.local.getKeys()).includes(key), KEY);
   } catch {
     return false;
   }
@@ -76,16 +73,13 @@ async function main() {
     const page = context.pages()[0] ?? (await context.newPage());
     await page.goto(URL, { waitUntil: 'domcontentloaded' });
     const deadline = Date.now() + TIMEOUT_MS;
-    while (!viewerFrame(page) && Date.now() < deadline) await page.waitForTimeout(500);
-    const frame = viewerFrame(page);
-    if (!frame) throw new Error('Glide viewer did not open');
-    await frame.waitForSelector('.fh', { timeout: 60_000 });
+    await waitForInpage(page);
 
     if (await tokenStored(page)) {
       console.log('token-setup: a token is already stored; nothing to do.');
       return;
     }
-    await openPrompt(frame);
+    await openPrompt(page);
     console.log('token-setup: paste a GitHub token into the "Connect Glide to GitHub" prompt and press Save (waiting up to 10 minutes).');
     while (Date.now() < deadline) {
       if (await tokenStored(page)) {
@@ -93,8 +87,7 @@ async function main() {
         return;
       }
       // The prompt was cancelled: open it again.
-      const f = viewerFrame(page);
-      if (f && (await f.locator('[role="dialog"]').count()) === 0) await openPrompt(f).catch(() => undefined);
+      if ((await page.locator(VIEWER_HOST).locator('[role="dialog"]').count()) === 0) await openPrompt(page).catch(() => undefined);
       await page.waitForTimeout(1000);
     }
     console.error('token-setup: timed out after 10 minutes without a saved token.');

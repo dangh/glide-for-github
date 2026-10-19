@@ -139,29 +139,29 @@ test.describe('options page', () => {
     await viewer.allFetched();
     const path = 'config/settings.json';
     await viewer.scrollToFile(path);
-    const original = await viewer.frame().evaluate(() => window.__pierre!.settings.getState().settings.diff.diffStyle);
+    const original = await viewer.evaluate(() => window.__pierre!.settings.getState().settings.diff.diffStyle);
     const other = original === 'split' ? 'unified' : 'split';
     // 'default' is GitHub's layout: unified ('single').
     const typeOf = (style: string) => (style === 'split' ? 'split' : 'single');
     await expect.poll(async () => (await viewer.item(path))?.diffType).toBe(typeOf(original));
 
-    // The extension id from the options page's path-derived id must match the viewer frame's.
-    expect(viewer.frame().url()).toContain(`chrome-extension://${extensionId()}/`);
+    // Inspection runs in the extension's content-script world on the GitHub page.
+    expect(await viewer.evaluate(() => chrome.runtime.id)).toBe(extensionId());
 
-    const marker = await viewer.frame().evaluate(() => ((window as unknown as { __marker: number }).__marker = 7));
+    const marker = await viewer.evaluate(() => ((window as unknown as { __marker: number }).__marker = 7));
     expect(marker).toBe(7);
     const options = await openOptions(extContext);
     const layout = field(options, 'Layout');
     try {
       await layout.selectOption(other);
-      await expect.poll(() => viewer.frame().evaluate(() => window.__pierre!.settings.getState().settings.diff.diffStyle), { timeout: 15_000 }).toBe(other);
+      await expect.poll(() => viewer.evaluate(() => window.__pierre!.settings.getState().settings.diff.diffStyle), { timeout: 15_000 }).toBe(other);
       await viewer.scrollToFile(path);
       await expect.poll(async () => (await viewer.item(path))?.diffType, { timeout: 15_000 }).toBe(typeOf(other));
       // Same document: the viewer was not reloaded.
-      expect(await viewer.frame().evaluate(() => (window as unknown as { __marker?: number }).__marker)).toBe(7);
+      expect(await viewer.evaluate(() => (window as unknown as { __marker?: number }).__marker)).toBe(7);
     } finally {
       await layout.selectOption(original);
-      await expect.poll(() => viewer.frame().evaluate(() => window.__pierre!.settings.getState().settings.diff.diffStyle), { timeout: 15_000 }).toBe(original);
+      await expect.poll(() => viewer.evaluate(() => window.__pierre!.settings.getState().settings.diff.diffStyle), { timeout: 15_000 }).toBe(original);
       await options.close();
     }
   });

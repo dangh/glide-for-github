@@ -1,441 +1,222 @@
-/**
- * The page-scrolling experiments (src/shared/page-scroll.ts), read-only, on react/react#37778 (167 files). Each test
- * sets the experiments in chrome.storage.sync from an extension page; afterAll removes them again.
- */
+/** Native document scrolling, sticky chrome, restoration, and merged-toolbar navigation. */
 import type { Page } from '@playwright/test';
 import { expect, extensionId, ON_SCREEN, openPierre, placement, prUrl, REACT, setExperiments, test, Viewer } from './fixtures';
 
-test.describe.configure({ mode: 'serial' });
+const SHOTS = 'test-results/page-scroll';
 
-const SHOTS = '.superpowers/scroll-flags';
+const positions = (viewer: Viewer) => viewer.evaluate((_, root) => {
+  const diffs = root.querySelector<HTMLElement>('.pierre-diffs')!;
+  const toolbar = root.querySelector('.pierre-toolbar')!.getBoundingClientRect();
+  const host = root.host.getBoundingClientRect();
+  const native = [...document.querySelectorAll<HTMLElement>('header [data-component="PageHeader"]')]
+    .filter(h => ['sticky', 'fixed'].includes(getComputedStyle(h).position));
+  return {
+    y: scrollY, atBottom: scrollY + innerHeight >= document.scrollingElement!.scrollHeight - 1,
+    scrollable: document.scrollingElement!.scrollHeight - innerHeight,
+    listTop: diffs.scrollTop, overflow: getComputedStyle(diffs).overflowY,
+    hostBottom: host.bottom, hostLeft: host.left,
+    bodyLeft: root.querySelector('.pierre-body')!.getBoundingClientRect().left,
+    treeToggleLeft: root.querySelector('[data-testid="tree-toggle"]')!.getBoundingClientRect().left,
+    toolbar: { top: toolbar.top, bottom: toolbar.bottom, left: toolbar.left, right: toolbar.right },
+    treeTop: root.querySelector('.pierre-tree-pane')!.getBoundingClientRect().top,
+    stuckHeader: [...root.querySelectorAll('.fh')].some(h => Math.abs(h.getBoundingClientRect().top - toolbar.bottom) <= 2),
+    native: native.map(h => ({ display: getComputedStyle(h).display, bottom: h.getBoundingClientRect().bottom })),
+    footer: getComputedStyle(document.querySelector('footer[role="contentinfo"]')!).display,
+    title: root.querySelector<HTMLElement>('[data-testid="pr-title"]')?.innerText ?? null,
+    height: innerHeight, width: document.documentElement.clientWidth,
+  };
+});
 
-/** Page and list positions: everything the sync must keep consistent. */
-async function positions(page: Page, viewer: Viewer) {
-  const outer = await page.evaluate(() => {
-    const wrapper = document.querySelector<HTMLElement>('[data-glide-scroll]');
-    const iframe = document.querySelector<HTMLElement>('iframe[data-pierre-viewer]')!;
-    const headers = [...document.querySelectorAll<HTMLElement>('header [data-component="PageHeader"]')];
-    const title = headers.find((h) => getComputedStyle(h).position === 'static');
-    const sticky = headers.find((h) => getComputedStyle(h).position !== 'static');
-    return {
-      scrollY: scrollY,
-      atBottom: scrollY + innerHeight >= document.scrollingElement!.scrollHeight - 1,
-      docScrollable: document.scrollingElement!.scrollHeight - innerHeight,
-      wrapperTop: wrapper ? wrapper.getBoundingClientRect().top : null,
-      iframeTop: iframe.getBoundingClientRect().top,
-      iframeBottom: iframe.getBoundingClientRect().bottom,
-      innerHeight,
-      titleBottom: title ? title.getBoundingClientRect().bottom : null,
-      sticky: sticky ? { display: getComputedStyle(sticky).display, height: sticky.getBoundingClientRect().height, style: sticky.getAttribute('style') } : null,
-      footerDisplay: (() => { const f = document.querySelector('footer[role="contentinfo"]'); return f ? getComputedStyle(f).display : null; })(),
-      wrapperBottom: wrapper ? wrapper.getBoundingClientRect().bottom : null,
-      overscrollY: getComputedStyle(document.documentElement).overscrollBehaviorY,
-    };
-  });
-  const inner = await viewer.frame().evaluate(() => {
-    const root = document.querySelector<HTMLElement>('.pierre-diffs')!;
-    const rootTop = root.getBoundingClientRect().top;
-    const stuckHeader = [...document.querySelectorAll<HTMLElement>('.fh')].some((h) => Math.abs(h.getBoundingClientRect().top - rootTop) <= 2);
-    return {
-      listTop: root.scrollTop,
-      overflowY: getComputedStyle(root).overflowY,
-      scrollbar: getComputedStyle(root).scrollbarWidth,
-      layout: document.documentElement.dataset.scrollLayout ?? null,
-      treeTop: document.querySelector('.pierre-tree-pane')!.getBoundingClientRect().top,
-      stuckHeader,
-      title: document.querySelector<HTMLElement>('[data-testid="pr-title"]')?.innerText ?? null,
-    };
-  });
-  return { ...outer, ...inner };
-}
-
-/** Mouse-wheel steps over the diff list, like a user scrolling. */
 async function wheel(page: Page, dy: number, steps: number) {
   await page.mouse.move(900, 650);
   for (let i = 0; i < steps; i++) {
     await page.mouse.wheel(0, dy);
     await page.waitForTimeout(25);
   }
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(500);
 }
 
-/**
- * macOS Chrome rubber-bands a page flicked past its end; Linux Chrome does not, so this models it after Chromium's
- * ElasticOverscrollControllerExponential. While the bounce animates (kStateMomentumAnimated) the stretch follows
- * s(t) = (s0 + 0.31 v0 t) e^(-12.5 t) whatever else moves the page, and ReconcileStretchAndScroll scrolls the page back
- * to its end by up to s(t), before the main thread sees its next scroll event. A root with `overscroll-behavior-y: none`
- * does not stretch. Returns whether the page bounces.
- */
-function bounceAtEnd(page: Page, s0 = 30, v0 = 2000) {
-  return page.evaluate(([s0, v0]) => {
-    if (getComputedStyle(document.documentElement).overscrollBehaviorY === 'none') return false;
-    const start = performance.now();
-    const reconcile = () => {
-      const t = (performance.now() - start) / 1000;
-      const stretch = Math.round((s0 + 0.31 * v0 * t) * Math.exp(-12.5 * t));
-      if (stretch < 1) return removeEventListener('scroll', reconcile, { capture: true });
-      const back = Math.min(stretch, document.scrollingElement!.scrollHeight - innerHeight - scrollY);
-      if (back >= 1) scrollBy({ top: back, behavior: 'instant' });
-    };
-    addEventListener('scroll', reconcile, { capture: true });
-    return true;
-  }, [s0, v0]);
-}
-
-/**
- * macOS Chrome also rubber-bands a scroller that is not the root (kOverscrollEffectOnNonRootScrollers, on by default):
- * the scroller a gesture latched to, once a wheel step finds it at its top. This models it for the list as above: a
- * wheel step up that finds the list at its top, scrollable (`overflow-y: auto`) and with `overscroll-behavior-y` other
- * than none (which drops the overscroll, cc::InputHandler::ScrollUpdate) starts the stretch; from then on, every frame
- * and before the viewer sees a list scroll, ReconcileStretchAndScroll scrolls the list back to its top by up to s(t).
- * The flick in the test began mid-list, so on a trackpad Chrome latched all of it to the list.
- */
-function bounceAtTop(viewer: Viewer, s0 = 30, v0 = 2000) {
-  return viewer.frame().evaluate(([s0, v0]) => {
-    const root = document.querySelector<HTMLElement>('.pierre-diffs')!;
-    let start: number | null = null;
-    const stretch = () => {
-      const t = (performance.now() - start!) / 1000;
-      return Math.round((s0 + 0.31 * v0 * t) * Math.exp(-12.5 * t));
-    };
-    const reconcile = () => {
-      if (start === null) return;
-      const s = stretch();
-      if (s < 1) return removeEventListener('scroll', reconcile, { capture: true });
-      if (root.scrollTop > 0) root.scrollTop -= Math.min(s, root.scrollTop);
-    };
-    const frame = () => {
-      reconcile();
-      if (start === null || stretch() >= 1) requestAnimationFrame(frame);
-    };
-    addEventListener('wheel', (e) => {
-      const style = getComputedStyle(root);
-      if (start === null && e.deltaY < 0 && root.scrollTop <= 0.5 && style.overflowY === 'auto' && style.overscrollBehaviorY !== 'none') {
-        start = performance.now();
-      }
-    }, { capture: true, passive: true });
-    addEventListener('scroll', reconcile, { capture: true });
-    requestAnimationFrame(frame);
-  }, [s0, v0]);
-}
-
-/**
- * Every position the list and the page take while `run` scrolls (at each scroll event, before the viewer or the page
- * reacts to it, and each frame), and how far each moved up along the way.
- */
-async function upwardMoves(page: Page, viewer: Viewer, run: () => Promise<void>) {
-  const record = (inFrame: boolean) => {
-    const w = window as unknown as { glideTops: number[] | null };
-    const root = document.querySelector<HTMLElement>('.pierre-diffs');
-    const top = () => (inFrame ? root!.scrollTop : scrollY);
-    w.glideTops = [top()];
-    const push = () => w.glideTops?.push(top());
-    addEventListener('scroll', push, { capture: true });
-    const frame = () => {
-      if (!w.glideTops) return removeEventListener('scroll', push, { capture: true });
-      push();
-      requestAnimationFrame(frame);
-    };
-    requestAnimationFrame(frame);
-  };
-  const collect = () => {
-    const w = window as unknown as { glideTops: number[] | null };
-    const tops = w.glideTops!;
-    w.glideTops = null;
-    return tops;
-  };
-  await page.evaluate(record, false);
-  await viewer.frame().evaluate(record, true);
-  await run();
-  const [pageTops, listTops] = [await page.evaluate(collect), await viewer.frame().evaluate(collect)];
-  const ups = (tops: number[]) => tops.slice(1).map((t, i) => tops[i]! - t).filter((d) => d > 0.5);
-  return { pageDown: pageTops.at(-1)! - pageTops[0]!, page: ups(pageTops), list: ups(listTops) };
-}
-
-/** How far the list moved down, frame by frame, while `run` scrolls it up. */
-async function downwardMoves(viewer: Viewer, run: () => Promise<void>) {
-  await viewer.frame().evaluate(() => {
-    const root = document.querySelector<HTMLElement>('.pierre-diffs')!;
-    const w = window as unknown as { glideTops: number[] | null };
-    w.glideTops = [root.scrollTop];
-    const frame = () => {
-      if (!w.glideTops) return;
-      w.glideTops.push(root.scrollTop);
-      requestAnimationFrame(frame);
-    };
-    requestAnimationFrame(frame);
+/** Record the real document during a reversal; the viewer must never become a second scroller. */
+async function reversal(viewer: Viewer, direction: 1 | -1, run: () => Promise<void>) {
+  await viewer.evaluate(() => {
+    const state = { positions: [scrollY], running: true };
+    Object.assign(window, { __scrollProbe: state });
+    const tick = () => { if (state.running) { state.positions.push(scrollY); requestAnimationFrame(tick); } };
+    requestAnimationFrame(tick);
   });
   await run();
-  const tops = await viewer.frame().evaluate(() => {
-    const w = window as unknown as { glideTops: number[] | null };
-    const tops = w.glideTops!;
-    w.glideTops = null;
-    return tops;
+  const samples = await viewer.evaluate(() => {
+    const state = (window as unknown as { __scrollProbe: { positions: number[]; running: boolean } }).__scrollProbe;
+    state.running = false;
+    return state.positions;
   });
-  return { up: tops[0]! - tops.at(-1)!, down: tops.slice(1).map((t, i) => t - tops[i]!).filter((d) => d > 0.5) };
+  expect(direction * (samples.at(-1)! - samples[0]!)).toBeGreaterThan(500);
+  expect(samples.slice(1).filter((y, i) => direction * (y - samples[i]!) < -0.5)).toEqual([]);
+  expect((await positions(viewer)).listTop).toBe(0);
 }
 
 test.afterAll(async ({ extContext }) => setExperiments(extContext, null));
 
-test('options page: an Experimental group whose merged bar needs page scrolling', async ({ extContext }) => {
+test('options: merging the sticky header is an independent saved choice', async ({ extContext }) => {
   await setExperiments(extContext, null);
   const page = await extContext.newPage();
-  await page.goto(`chrome-extension://${extensionId()}/options.html`);
-  const stored = () => page.evaluate(async () => ((await chrome.storage.sync.get('pierre.settings'))['pierre.settings'] as { experiments?: unknown } | undefined)?.experiments ?? null);
-  await expect(page.getByRole('heading', { name: 'Experimental' })).toBeVisible();
-  const pageScroll = page.getByRole('checkbox', { name: /^Scroll with the page/ });
-  const mergedBar = page.getByRole('checkbox', { name: /^Merge GitHub's sticky header/ });
-  await expect(pageScroll).not.toBeChecked();
-  await expect(mergedBar).toBeDisabled();
-
-  await pageScroll.check();
-  await expect(mergedBar).toBeEnabled();
-  await expect.poll(stored).toEqual({ pageScroll: true });
-  await mergedBar.check();
-  await expect.poll(stored).toEqual({ pageScroll: true, mergedBar: true });
-  await pageScroll.uncheck();
-  await expect(mergedBar).toBeDisabled();
-  await expect.poll(stored).toEqual({ pageScroll: false, mergedBar: true });
-  await page.close();
+  try {
+    await page.goto(`chrome-extension://${extensionId()}/options.html`);
+    const merged = page.getByRole('checkbox', { name: /^Merge GitHub's sticky header/ });
+    const stored = () => page.evaluate(async () => ((await chrome.storage.sync.get('pierre.settings'))['pierre.settings'] as { experiments?: unknown } | undefined)?.experiments ?? null);
+    await expect(page.getByRole('checkbox', { name: /^Scroll with the page/ })).toHaveCount(0);
+    await expect(merged).toBeEnabled();
+    await expect(merged).not.toBeChecked();
+    await merged.check();
+    await expect.poll(stored).toEqual({ mergedBar: true });
+    await merged.uncheck();
+    await expect.poll(stored).toEqual({ mergedBar: false });
+  } finally { await page.close(); }
 });
 
-test("both off: today's layout, and turning page scrolling on switches an open tab", async ({ page, extContext }) => {
+test('page scrolling is always native; changing the merged bar updates an open tab', async ({ page, extContext }) => {
   await setExperiments(extContext, null, page);
   const viewer = await openPierre(page, REACT);
-  const off = await positions(page, viewer);
-  expect(off.wrapperTop).toBeNull();
-  expect(off.layout).toBeNull();
-  expect(off.overflowY).toBe('auto');
-  expect(off.scrollbar).not.toBe('none');
-  expect(Math.abs(off.iframeBottom - off.innerHeight)).toBeLessThanOrEqual(1);
-  expect(off.overscrollY).toBe('auto');
-  await page.screenshot({ path: `${SHOTS}/off.png` });
-
-  await setExperiments(extContext, { pageScroll: true, mergedBar: false }, page);
-  await expect.poll(() => page.locator('[data-glide-scroll="page"] iframe[data-pierre-viewer]').count()).toBe(1);
-  await new Viewer(page).ready();
-});
-
-test("page scrolling: GitHub's header scrolls away, the tree and file headers stay sticky, page and list stay in sync", async ({ page, extContext }) => {
-  await setExperiments(extContext, { pageScroll: true, mergedBar: false }, page);
-  const viewer = await openPierre(page, REACT);
-  const top = await positions(page, viewer);
-  expect(top.layout).toBe('page');
-  expect(top.scrollbar).toBe('none');
-  expect(top.docScrollable).toBeGreaterThan(10_000);
-  expect(top.scrollY).toBe(0);
-  expect(top.listTop).toBe(0);
-  await page.screenshot({ path: `${SHOTS}/page-top.png` });
-
+  expect((await positions(viewer)).overflow).toBe('visible');
+  await viewer.evaluate(() => { Object.assign(window, { __layoutMarker: 42 }); });
   await wheel(page, 200, 12);
-  const down = await positions(page, viewer);
-  expect(down.titleBottom).toBeLessThan(0);
-  // GitHub's sticky header shows, and the viewer sticks right below it.
-  expect(down.sticky?.display).not.toBe('none');
-  expect(down.sticky?.height).toBeGreaterThan(0);
-  expect(Math.abs(down.iframeTop - down.sticky!.height)).toBeLessThanOrEqual(1);
-  expect(down.listTop).toBeGreaterThan(1000);
-  expect(Math.abs(down.listTop - (down.sticky!.height - down.wrapperTop!))).toBeLessThanOrEqual(1);
-  expect(down.treeTop).toBe(top.treeTop);
-  expect(down.stuckHeader).toBe(true);
-  expect(down.overflowY).toBe('auto');
-  await page.screenshot({ path: `${SHOTS}/page-stuck.png` });
-
-  // A tree click scrolls the list and the page along with it.
-  const path = (await viewer.order())[100]!;
-  const search = viewer.locator.locator('file-tree-container').getByPlaceholder('Search…');
-  await search.fill(path.split('/').at(-1)!);
-  await viewer.locator.locator(`file-tree-container [data-item-path="${path}"]`).click();
-  await expect.poll(async () => Math.abs((await viewer.item(path))?.top ?? Infinity), { timeout: 10_000 }).toBeLessThan(60);
-  await page.waitForTimeout(500);
-  const clicked = await positions(page, viewer);
-  expect(clicked.listTop).toBeGreaterThan(down.listTop);
-  expect(Math.abs(clicked.listTop - (clicked.sticky!.height - clicked.wrapperTop!))).toBeLessThanOrEqual(1);
-  await search.fill('');
-
-  // One upward wheel sequence that starts in the list brings GitHub's header back.
-  await wheel(page, -800, 60);
-  const back = await positions(page, viewer);
-  expect(back.scrollY).toBe(0);
-  expect(back.listTop).toBe(0);
-  expect(back.sticky?.display).toBe('none');
-
-  // Like GitHub's own Files changed page, the page ends with the diffs: GitHub's footer is hidden.
-  await viewer.scrollToFile((await viewer.order()).at(-1)!);
-  await page.waitForTimeout(1000);
-  await wheel(page, 300, 10);
-  const end = await positions(page, viewer);
-  expect(end.atBottom).toBe(true);
-  expect(end.footerDisplay).toBe('none');
-  expect(Math.abs(end.wrapperBottom! - end.innerHeight)).toBeLessThanOrEqual(1);
-  await page.screenshot({ path: `${SHOTS}/page-end.png` });
+  await setExperiments(extContext, { mergedBar: true }, page);
+  await expect(viewer.locator.getByTestId('pr-title')).toBeVisible();
+  await setExperiments(extContext, { mergedBar: false }, page);
+  await viewer.ready();
+  await expect(viewer.locator.getByTestId('pr-title')).toHaveCount(0);
+  expect(await viewer.evaluate(() => (window as unknown as { __layoutMarker: number }).__layoutMarker)).toBe(42);
+  expect((await positions(viewer)).listTop).toBe(0);
 });
 
-test('page scrolling: flicking past the end and straight back up does not pull the list back down', async ({ page, extContext }) => {
-  await setExperiments(extContext, { pageScroll: true, mergedBar: false }, page);
+for (const mergedBar of [false, true]) {
+  test(`${mergedBar ? 'merged' : 'page'}: sticky headers, tree jump, scroll to top and end`, async ({ page, extContext }) => {
+    await setExperiments(extContext, { mergedBar }, page);
+    const viewer = await openPierre(page, REACT);
+    const top = await positions(viewer);
+    expect(top.scrollable).toBeGreaterThan(10_000);
+    expect(top.listTop).toBe(0);
+    await wheel(page, 200, 12);
+    const down = await positions(viewer);
+    expect(down.y).toBeGreaterThan(1000);
+    expect(down.treeTop).toBe(down.toolbar.bottom);
+    expect(down.stuckHeader).toBe(true);
+    expect(down.listTop).toBe(0);
+    expect(down.overflow).toBe('visible');
+    if (mergedBar) {
+      expect(down.toolbar.top).toBe(0);
+      expect(down.native.every(h => h.display === 'none')).toBe(true);
+    } else {
+      const visible = down.native.filter(h => h.display !== 'none');
+      expect(down.toolbar.top).toBe(Math.max(0, ...visible.map(h => h.bottom)));
+    }
+    const path = (await viewer.order())[100]!;
+    const search = viewer.locator.locator('file-tree-container').getByPlaceholder('Search…');
+    await search.fill(path.split('/').at(-1)!);
+    await viewer.locator.locator(`file-tree-container [data-item-path="${path}"]`).click();
+    await expect.poll(async () => Math.abs((await viewer.item(path))?.top ?? Infinity)).toBeLessThan(60);
+    expect((await positions(viewer)).y).toBeGreaterThan(down.y);
+    await search.fill('');
+    await wheel(page, -800, 60);
+    await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+    await viewer.scrollToFile((await viewer.order()).at(-1)!);
+    await wheel(page, 300, 10);
+    const end = await positions(viewer);
+    expect(end.atBottom).toBe(true);
+    expect(end.footer).toBe('none');
+    expect(Math.abs(end.hostBottom - end.height)).toBeLessThanOrEqual(1);
+  });
+}
+
+test('flicking past the end and immediately up does not pull the page back down', async ({ page, extContext }) => {
+  await setExperiments(extContext, { mergedBar: false }, page);
   const viewer = await openPierre(page, REACT);
   await viewer.scrollToFile((await viewer.order()).at(-1)!);
-  await page.waitForTimeout(1000);
   await wheel(page, 300, 10);
-  // Up and back first: Pierre measures the files above the end, which moves the list without moving the diffs.
   await wheel(page, -300, 10);
   await wheel(page, 300, 30);
-  expect((await positions(page, viewer)).atBottom).toBe(true);
-
+  expect((await positions(viewer)).atBottom).toBe(true);
   await page.mouse.wheel(0, 600);
   await page.waitForTimeout(50);
-  const cdp = await page.context().newCDPSession(page);
-  const moves = await downwardMoves(viewer, async () => {
-    await bounceAtEnd(page);
-    // A trackpad flick: decaying deltas at half the display's frame rate (a 120 Hz MacBook Pro screen).
-    for (let i = 0; i < 30; i++) {
-      void cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 900, y: 650, deltaX: 0, deltaY: -Math.max(1, Math.round(90 * 0.92 ** i)) });
-      await page.waitForTimeout(33);
-    }
-    await page.waitForTimeout(500);
-  });
-  expect(moves.up).toBeGreaterThan(500);
-  expect(moves.down).toEqual([]);
+  await reversal(viewer, -1, () => wheel(page, -90, 30));
 });
 
-test('page scrolling: flicking past the top and straight back down is not pulled back up', async ({ page, extContext }) => {
-  await setExperiments(extContext, { pageScroll: true, mergedBar: false }, page);
+test('flicking past the top and immediately down does not pull the page back up', async ({ page, extContext }) => {
+  await setExperiments(extContext, { mergedBar: false }, page);
   const viewer = await openPierre(page, REACT);
   await wheel(page, 200, 3);
-  const start = await positions(page, viewer);
-  expect(start.listTop).toBeGreaterThan(300);
-
-  const cdp = await page.context().newCDPSession(page);
-  // Trackpad flicks as above: up past the list's top, then straight back down while the list would still bounce.
-  // DevTools sends each wheel event as a gesture of its own (phase began, then ended), so Chrome latches each anew, as
-  // it does for a new swipe; the viewer sees one gesture, as it does on a trackpad.
-  const flick = async (sign: number, steps: number) => {
-    for (let i = 0; i < steps; i++) {
-      void cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 900, y: 650, deltaX: 0, deltaY: sign * Math.max(1, Math.round(90 * 0.92 ** i)) });
-      await page.waitForTimeout(33);
-    }
-  };
-  await bounceAtTop(viewer);
-  await flick(-1, 8);
-  const top = await positions(page, viewer);
-  expect(top.listTop).toBe(0);
-  expect(top.scrollY).toBeLessThan(start.scrollY - start.listTop);
-
-  const moves = await upwardMoves(page, viewer, async () => {
-    await flick(1, 30);
-    await page.waitForTimeout(500);
-  });
-  expect(moves.pageDown).toBeGreaterThan(500);
-  expect({ page: moves.page, list: moves.list }).toEqual({ page: [], list: [] });
+  await wheel(page, -200, 10);
+  expect((await positions(viewer)).y).toBe(0);
+  await reversal(viewer, 1, () => wheel(page, 90, 30));
 });
 
-test('page scrolling: a reload comes back to the same file', async ({ page, extContext }) => {
-  await setExperiments(extContext, { pageScroll: true, mergedBar: false }, page);
+test('a reload restores the same file', async ({ page, extContext }) => {
+  await setExperiments(extContext, { mergedBar: false }, page);
   let viewer = await openPierre(page, REACT, 'hash');
   const path = (await viewer.order())[80]!;
   await viewer.scrollToFile(path);
-  await expect.poll(async () => Math.abs((await viewer.item(path))?.top ?? Infinity), { timeout: 10_000 }).toBeLessThan(60);
+  await expect.poll(async () => Math.abs((await viewer.item(path))?.top ?? Infinity)).toBeLessThan(60);
   await page.waitForTimeout(500);
-
   viewer = await openPierre(page, REACT, 'hash');
-  await expect.poll(async () => Math.abs((await viewer.item(path))?.top ?? Infinity), { timeout: 15_000 }).toBeLessThan(60);
-  const restored = await positions(page, viewer);
-  expect(Math.abs(restored.listTop - ((restored.sticky?.height ?? 0) - restored.wrapperTop!))).toBeLessThanOrEqual(1);
+  await expect.poll(async () => Math.abs((await viewer.item(path))?.top ?? Infinity)).toBeLessThan(60);
+  expect((await positions(viewer)).listTop).toBe(0);
 });
 
-test('page scrolling, with and without the merged bar: a toast is on screen before the iframe sticks, and after', async ({ page, extContext }) => {
-  for (const experiments of [
-    { pageScroll: true, mergedBar: false },
-    { pageScroll: true, mergedBar: true },
-  ]) {
-    await setExperiments(extContext, experiments, page);
+test('a toast stays on top before and after the toolbar sticks in both modes', async ({ page, extContext }) => {
+  for (const mergedBar of [false, true]) {
+    await setExperiments(extContext, { mergedBar }, page);
     const viewer = await openPierre(page, REACT);
-    await viewer.frame().evaluate(() => window.__pierre!.store.getState().setNotice({ kind: 'error', message: 'Could not reload the pull request.' }));
-    const toast = () => placement(page, viewer, '.toast');
-    await expect.poll(toast, { message: `${JSON.stringify(experiments)}: page at the top` }).toEqual(ON_SCREEN);
-    await wheel(page, 50, 2);
-    await expect.poll(toast, { message: `${JSON.stringify(experiments)}: GitHub's header half away` }).toEqual(ON_SCREEN);
-    await wheel(page, 200, 12);
-    await expect.poll(toast, { message: `${JSON.stringify(experiments)}: stuck` }).toEqual(ON_SCREEN);
+    await viewer.evaluate(() => window.__pierre!.store.getState().setNotice({ kind: 'error', message: 'Could not reload the pull request.' }));
+    for (const [dy, steps] of [[0, 0], [50, 2], [200, 12]]) {
+      await wheel(page, dy!, steps!);
+      await expect.poll(() => placement(page, viewer, '.toast')).toEqual(ON_SCREEN);
+    }
   }
 });
 
-test("merged bar: GitHub's sticky header is hidden, Glide's toolbar shows the title, leaving the tab restores it", async ({ page, extContext }) => {
-  await setExperiments(extContext, { pageScroll: true, mergedBar: true }, page);
+test('merged title, toolbar gutters, and leaving Glide restore GitHub chrome', async ({ page, extContext }) => {
+  await setExperiments(extContext, { mergedBar: true }, page);
   const viewer = await openPierre(page, REACT);
   const githubTitle = await page.locator('header [data-component="PageHeader"] [data-component="TitleArea"]').first().innerText();
-  expect((await positions(page, viewer)).title).toBeNull(); // GitHub's own title is on screen
-  // Like GitHub's Files changed toolbar: the diff toggles live in the Display menu, the gear ends the bar.
   await expect(viewer.locator.getByRole('button', { name: 'Split', exact: true })).toHaveCount(0);
   await expect(viewer.locator.getByRole('button', { name: 'Hide whitespace', exact: true })).toHaveCount(0);
   await expect(viewer.locator.locator('.pierre-toolbar > :last-child [data-testid="display-menu"]')).toHaveCount(1);
   await expect(viewer.locator.getByTestId('review-button')).toHaveText('Submit review');
-  const edges = () =>
-    Promise.all([
-      page.evaluate(() => {
-        const wrapper = document.querySelector('[data-glide-scroll]')!.getBoundingClientRect();
-        const iframe = document.querySelector('iframe[data-pierre-viewer]')!.getBoundingClientRect();
-        return { gutter: wrapper.left, iframeLeft: iframe.left, iframeWidth: iframe.width, viewport: document.documentElement.clientWidth };
-      }),
-      viewer.frame().evaluate(() => {
-        const box = (sel: string) => document.querySelector(sel)!.getBoundingClientRect();
-        return { toolbar: { left: box('.pierre-toolbar').left, width: box('.pierre-toolbar').width }, bodyLeft: box('.pierre-body').left, treeToggleLeft: box('[data-testid="tree-toggle"]').left };
-      }),
-    ]).then(([outer, inner]) => ({ ...outer, ...inner }));
-  // The iframe spans the viewport; before it sticks the bar and the diffs keep GitHub's page gutters.
-  const atTop = await edges();
-  expect(atTop.gutter).toBeGreaterThan(0);
-  expect(atTop.iframeLeft).toBe(0);
-  expect(atTop.iframeWidth).toBe(atTop.viewport);
-  expect(atTop.toolbar.left).toBe(atTop.gutter);
-  expect(atTop.bodyLeft).toBe(atTop.gutter);
-
+  const top = await positions(viewer);
+  expect(top.title).toBeNull();
+  expect(top.hostLeft).toBeGreaterThan(0);
+  expect(top.toolbar.left).toBe(top.hostLeft);
+  expect(top.bodyLeft).toBe(top.hostLeft);
   await wheel(page, 200, 12);
-  const down = await positions(page, viewer);
-  expect(down.titleBottom).toBeLessThan(0);
-  expect(down.sticky?.display).toBe('none');
-  expect(down.iframeTop).toBe(0);
+  const down = await positions(viewer);
+  expect(down.toolbar).toMatchObject({ top: 0, left: 0, right: down.width });
   expect(down.title).toContain('#37778');
   expect(down.title).toContain('Merged');
-  // GitHub's sticky title is plain text: the backticks GitHub's page title renders as code stay.
-  const titleText = await viewer.locator.locator('.pr-title-text').innerText();
-  expect(titleText).toBe(await viewer.frame().evaluate(() => window.__pierre!.store.getState().pr!.title));
-  expect(titleText).toContain('`');
-  expect(githubTitle.replace(/\s+/g, ' ')).toContain(titleText.replaceAll('`', '').replace(/\s+/g, ' '));
+  expect(down.bodyLeft).toBe(down.hostLeft);
+  expect(down.treeToggleLeft).toBe(down.hostLeft);
+  const title = await viewer.locator.locator('.pr-title-text').innerText();
+  expect(title).toBe(await viewer.evaluate(() => window.__pierre!.store.getState().pr!.title));
+  expect(title).toContain('`');
+  expect(githubTitle.replace(/\s+/g, ' ')).toContain(title.replaceAll('`', '').replace(/\s+/g, ' '));
   await expect(viewer.locator.locator('.pr-state-merged svg')).toHaveCount(1);
   await expect(viewer.locator.locator('.pr-summary-row [data-testid="range-picker"]')).toHaveText('All commits');
   await expect(viewer.locator.getByTestId('pr-branches')).toContainText(/merged 4 commits into\s*main\s*from\s*sebbie\/foundation/);
-  // Stuck, the bar spans the viewport like GitHub's, its controls and the diffs still inside the gutters.
-  const stuck = await edges();
-  expect(stuck.toolbar).toEqual({ left: 0, width: stuck.viewport });
-  expect(stuck.treeToggleLeft).toBe(stuck.gutter);
-  expect(stuck.bodyLeft).toBe(stuck.gutter);
-  await page.screenshot({ path: `${SHOTS}/merged-stuck.png` });
-
-  // Like GitHub's sticky title, clicking it goes back to the top of the page (the list with it), keeping #glide.
   await viewer.locator.locator('.pr-title-text').click();
-  await expect.poll(async () => (await positions(page, viewer)).scrollY).toBe(0);
-  await expect.poll(async () => (await positions(page, viewer)).listTop).toBe(0);
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
   expect(page.url()).toContain('#glide');
-
-  // Leaving Glide (back to Conversation) shows GitHub's header again.
   await page.goBack();
-  await expect(page.locator('iframe[data-pierre-viewer]')).toHaveCount(0);
+  await expect(viewer.locator).toHaveCount(0);
   await page.evaluate(() => window.scrollTo(0, 2000));
-  await expect
-    .poll(() => page.evaluate(() => {
-      const sticky = [...document.querySelectorAll<HTMLElement>('header [data-component="PageHeader"]')].find((h) => getComputedStyle(h).position !== 'static');
-      return sticky ? { style: sticky.getAttribute('style'), display: getComputedStyle(sticky).display } : null;
-    }))
-    .toEqual({ style: null, display: 'flex' });
+  await expect.poll(() => page.evaluate(() => [...document.querySelectorAll<HTMLElement>('header [data-component="PageHeader"]')]
+    .filter(h => ['sticky', 'fixed'].includes(getComputedStyle(h).position)).map(h => getComputedStyle(h).display)))
+    .toEqual(['flex']);
   expect(page.url()).toBe(prUrl(REACT));
 });
-
 /** A merged public stack (github/gh-stack's own Stack #530): #529 is 4th of 5, #528 below it. */
 const STACKED = { owner: 'github', repo: 'gh-stack', number: 529 };
 
 test("merged bar: a stacked PR shows GitHub's stack button once stuck; its menu opens another PR of the stack in Glide", async ({ page, extContext }) => {
-  await setExperiments(extContext, { pageScroll: true, mergedBar: true }, page);
+  await setExperiments(extContext, { mergedBar: true }, page);
   const viewer = await openPierre(page, STACKED, 'hash');
   // GitHub's own header carries the button while it is on screen; Glide's bar adds its compact one once stuck.
   await expect(page.locator('button[aria-label="Navigate pull request stack, position 4 of 5"]').first()).toHaveText('4/5');

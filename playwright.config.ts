@@ -3,7 +3,7 @@
  *
  * Login: `scripts/e2e-profile.sh` copies the agent-browser GitHub profile (~/.agent-browser/profiles/github,
  * user dangh) to `.e2e-profile/` (git-ignored). Cookies survive the copy (verified 2026-10-17 with Chrome
- * for Testing 155), so the tests use Playwright's `launchPersistentContext` on that copy; no agent-browser
+ * for Testing 155), and tests clone it again into a disposable profile before `launchPersistentContext`; no agent-browser
  * session is involved while the tests run.
  *
  * Run:
@@ -13,6 +13,7 @@
  *   npm run e2e:headless                       # same, headless (CI)
  *   npm run e2e:token                          # once: paste a GitHub token into Glide's prompt (write tests)
  * Env: PIERRE_E2E_CHROME (Chrome for Testing binary; default: newest ~/.agent-browser/browsers/chrome-*),
+ *      PIERRE_SPIKE_PROFILE (optional signed-in source profile; always cloned),
  *      PIERRE_E2E_HEADLESS=1 (headless; the default is headed on $DISPLAY or :0, with WAYLAND_DISPLAY cleared).
  *
  * `npm run perf` runs tests/e2e/perf.spec.ts only (the performance budget on public PRs, read-only; see that file).

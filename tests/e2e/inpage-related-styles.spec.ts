@@ -9,7 +9,7 @@ for (const retired of ['box', 'rail']) {
     await options.evaluate(async style => {
       await chrome.storage.sync.set({ 'pierre.settings': {
         relatedFiles: { style }, fileGroups: { enabled: false },
-        experiments: { pageScroll: true, mergedBar: true },
+        experiments: { mergedBar: true },
       } });
     }, retired);
     await options.reload();

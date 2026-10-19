@@ -16,15 +16,15 @@ const UNIFIED = 'single';
 
 /** Back to the defaults (GitHub's look): removes every stored display override; open viewers follow the change. */
 async function resetSettings(viewer: Viewer) {
-  await viewer.frame().evaluate(() => chrome.storage.sync.remove('pierre.settings'));
+  await viewer.evaluate(() => chrome.storage.sync.remove('pierre.settings'));
   await expect
-    .poll(() => viewer.frame().evaluate(() => window.__pierre!.settings.getState().settings.diff.diffStyle))
+    .poll(() => viewer.evaluate(() => window.__pierre!.settings.getState().settings.diff.diffStyle))
     .toBe('default');
 }
 
 /** Text of every rendered diff item (their shadow roots), joined. */
 const diffText = (viewer: Viewer) =>
-  viewer.frame().evaluate(() => [...document.querySelectorAll('diffs-container')].map((c) => c.shadowRoot?.textContent ?? '').join('\n'));
+  viewer.evaluate((_, viewerRoot) => [...viewerRoot.querySelectorAll('diffs-container')].map((c) => c.shadowRoot?.textContent ?? '').join('\n'));
 
 /**
  * The first "N unmodified lines" expander row of a file: its gap size and a click on its expand button (not "Expand
@@ -34,8 +34,8 @@ const diffText = (viewer: Viewer) =>
  */
 async function expander(viewer: Viewer, path: string) {
   const find = () =>
-    viewer.frame().evaluate((p) => {
-      const header = [...document.querySelectorAll<HTMLElement>('.fh')].find((e) => e.dataset.path === p);
+    viewer.evaluate((p, viewerRoot) => {
+      const header = [...viewerRoot.querySelectorAll<HTMLElement>('.fh')].find((e) => e.dataset.path === p);
       const root = header?.closest('diffs-container')?.shadowRoot;
       const row = [...(root?.querySelectorAll('[data-gutter] > [data-separator="line-info-basic"]') ?? [])].find((r) => /\d+ unmodified line/.test(r.textContent ?? ''));
       const button = row?.querySelector('[data-expand-button]:not([data-expand-all-button])');
@@ -43,15 +43,14 @@ async function expander(viewer: Viewer, path: string) {
       const r = button.getBoundingClientRect();
       return { gap: Number(/(\d+) unmodified/.exec(row.textContent!)![1]), x: r.x + r.width / 2, y: r.y + r.height / 2 };
     }, path);
-  await viewer.frame().evaluate(() => void (document.querySelector('.pierre-diffs')!.scrollTop -= 120));
+  await viewer.page.evaluate(() => window.scrollBy(0, -120));
   await expect.poll(async () => (await find()) !== null, { timeout: 15_000 }).toBe(true);
   const found = (await find())!;
   return {
     gap: found.gap,
     click: async () => {
-      const frame = (await viewer.page.locator('iframe[data-pierre-viewer]').boundingBox())!;
       // Pierre's interaction layer acts on a pointer that has moved onto the row first (as a user's would).
-      await viewer.page.mouse.move(frame.x + found.x, frame.y + found.y);
+      await viewer.page.mouse.move(found.x, found.y);
       await viewer.page.waitForTimeout(300);
       await viewer.page.mouse.down();
       await viewer.page.mouse.up();
@@ -61,17 +60,16 @@ async function expander(viewer: Viewer, path: string) {
 
 /** The tree's visible git status lane: number of rows that show one, and the letters shown. */
 const gitLane = (viewer: Viewer) =>
-  viewer.frame().evaluate(() => {
-    const root = document.querySelector('file-tree-container')?.shadowRoot;
+  viewer.evaluate((_, viewerRoot) => {
+    const root = viewerRoot.querySelector('file-tree-container')?.shadowRoot;
     const lanes = [...(root?.querySelectorAll<HTMLElement>('[data-item-section="git"]') ?? [])].filter((l) => getComputedStyle(l).display !== 'none');
     return { rows: lanes.length, letters: lanes.map((l) => l.textContent?.trim() ?? '').filter((t) => /^[AMDR]$/.test(t)) };
   });
 
 /** One row of screen pixels at viewer coordinates, as '#rrggbb', read from a real screenshot. */
 async function pixelRow(viewer: Viewer, x: number, y: number, width: number): Promise<string[]> {
-  const frame = (await viewer.page.locator('iframe[data-pierre-viewer]').boundingBox())!;
-  const png = await viewer.page.screenshot({ clip: { x: frame.x + x, y: frame.y + y, width, height: 1 } });
-  return viewer.frame().evaluate(async (b64) => {
+  const png = await viewer.page.screenshot({ clip: { x, y, width, height: 1 } });
+  return viewer.evaluate(async (b64) => {
     const img = await createImageBitmap(new Blob([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))]));
     const g = new OffscreenCanvas(img.width, 1).getContext('2d')!;
     g.drawImage(img, 0, 0);
@@ -174,7 +172,7 @@ test.describe('sandbox PR', () => {
       },
     );
     const viewer = await openPierre(page, SANDBOX, 'hash');
-    headOid = await viewer.frame().evaluate(() => window.__pierre!.store.getState().pr!.headOid);
+    headOid = await viewer.evaluate(() => window.__pierre!.store.getState().pr!.headOid);
     await viewer.allFetched();
     await viewer.scrollToFile(TOO_LARGE);
     const big = viewer.locator.locator(`.fh[data-path="${TOO_LARGE}"]`);
@@ -195,11 +193,11 @@ test.describe('sandbox PR', () => {
     await expect.poll(async () => (await viewer.item(path))?.diffType).toBe(UNIFIED);
     await expect(viewer.locator.getByRole('button', { name: 'Unified', exact: true })).toHaveAttribute('aria-pressed', 'true');
 
-    await viewer.frame().evaluate(() => ((window as unknown as { __marker: number }).__marker = 42));
+    await viewer.evaluate(() => ((window as unknown as { __marker: number }).__marker = 42));
     await viewer.locator.getByRole('button', { name: 'Split', exact: true }).click();
     await expect.poll(async () => (await viewer.item(path))?.diffType).toBe('split');
     // Same document: no reload happened.
-    expect(await viewer.frame().evaluate(() => (window as unknown as { __marker?: number }).__marker)).toBe(42);
+    expect(await viewer.evaluate(() => (window as unknown as { __marker?: number }).__marker)).toBe(42);
 
     await page.reload({ waitUntil: 'domcontentloaded' });
     const again = new Viewer(page);
@@ -230,21 +228,21 @@ test.describe('sandbox PR', () => {
     await expect.poll(async () => (await viewer.item(GAP))!.lines - before, { timeout: 15_000 }).toBe(Math.min(gapRow.gap, 20));
     expect(await diffText(viewer)).not.toMatch(/@@/);
     // An explicit choice still shows @@ hunk headers (the check above is not vacuous).
-    await viewer.frame().evaluate(() => window.__pierre!.settings.getState().update({ diff: { hunkSeparators: 'metadata' } }));
+    await viewer.evaluate(() => window.__pierre!.settings.getState().update({ diff: { hunkSeparators: 'metadata' } }));
     await expect.poll(() => diffText(viewer), { timeout: 15_000 }).toMatch(/@@ -\d+/);
-    await viewer.frame().evaluate(() => window.__pierre!.settings.getState().update({ diff: { hunkSeparators: 'default' } }));
+    await viewer.evaluate(() => window.__pierre!.settings.getState().update({ diff: { hunkSeparators: 'default' } }));
     await expect.poll(() => diffText(viewer), { timeout: 15_000 }).not.toMatch(/@@/);
 
     // No git status lane (letters) in the tree by default; the option turns it on.
     expect(await gitLane(viewer)).toEqual({ rows: 0, letters: [] });
-    await viewer.frame().evaluate(() => window.__pierre!.settings.getState().update({ tree: { showGitStatus: true } }));
+    await viewer.evaluate(() => window.__pierre!.settings.getState().update({ tree: { showGitStatus: true } }));
     await expect.poll(async () => (await gitLane(viewer)).letters.length, { timeout: 15_000 }).toBeGreaterThan(0);
-    await viewer.frame().evaluate(() => window.__pierre!.settings.getState().update({ tree: { showGitStatus: false } }));
+    await viewer.evaluate(() => window.__pierre!.settings.getState().update({ tree: { showGitStatus: false } }));
     await expect.poll(async () => (await gitLane(viewer)).rows, { timeout: 15_000 }).toBe(0);
 
     // GitHub's colors and fonts, octicon tree icons, the file box header without a status letter.
-    const look = await viewer.frame().evaluate(() => {
-      const root = [...document.querySelectorAll('diffs-container')].map((c) => c.shadowRoot!).find((r) => r.querySelector('[data-line][data-line-type="change-addition"]'));
+    const look = await viewer.evaluate((_, viewerRoot) => {
+      const root = [...viewerRoot.querySelectorAll('diffs-container')].map((c) => c.shadowRoot!).find((r) => r.querySelector('[data-line][data-line-type="change-addition"]'));
       const added = root?.querySelector('[data-line][data-line-type="change-addition"]');
       // Any CSS color (lab(), hex with alpha) as 8-bit RGBA, through a canvas.
       const ctx = document.createElement('canvas').getContext('2d')!;
@@ -254,14 +252,14 @@ test.describe('sandbox PR', () => {
         ctx.fillRect(0, 0, 1, 1);
         return [...ctx.getImageData(0, 0, 1, 1).data];
       };
-      const tree = document.querySelector('file-tree-container')!.shadowRoot!;
+      const tree = viewerRoot.querySelector('file-tree-container')!.shadowRoot!;
       return {
         added: added ? rgba(getComputedStyle(added).backgroundColor) : null,
         // GitHub's addition line color, light and dark (src/shared/github-defaults.ts).
         expected: [rgba('#dafbe1'), rgba('#2ea04326')],
         codeFont: added ? getComputedStyle(added).fontFamily : null,
         codeSize: added ? getComputedStyle(added).fontSize : null,
-        uiFont: getComputedStyle(document.querySelector('.pierre-toolbar')!).fontFamily,
+        uiFont: getComputedStyle(viewerRoot.querySelector('.pierre-toolbar')!).fontFamily,
         fileIcons: [...tree.querySelectorAll('[data-item-type="file"] use')].map((u) => u.getAttribute('href')).slice(0, 3),
         // GitHub's status icons: file-added in fgColor-success, file-diff in fgColor-muted.
         statusIcons: Object.fromEntries(
@@ -271,8 +269,8 @@ test.describe('sandbox PR', () => {
           ]),
         ),
         statusColors: { added: [rgba('#1a7f37'), rgba('#3fb950')], modified: [rgba('#59636e'), rgba('#9198a1')] },
-        badge: getComputedStyle(document.querySelector('.fh-badge')!).display,
-        header: document.documentElement.dataset.fileHeader,
+        badge: getComputedStyle(viewerRoot.querySelector('.fh-badge')!).display,
+        header: (viewerRoot.host as HTMLElement).dataset.fileHeader,
       };
     });
     const close = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]!) <= 2);
@@ -299,13 +297,13 @@ test.describe('sandbox PR', () => {
     await resetSettings(viewer);
     await viewer.allFetched();
     // 'scroll' is the path where CodeView estimates rows from itemMetrics instead of measuring them.
-    await viewer.frame().evaluate(() => window.__pierre!.settings.getState().update({ fonts: { codeFontSize: 24 }, diff: { overflow: 'scroll' } }));
+    await viewer.evaluate(() => window.__pierre!.settings.getState().update({ fonts: { codeFontSize: 24 }, diff: { overflow: 'scroll' } }));
     const path = 'src/util/math.ts';
     await viewer.scrollToFile(path);
     await expect.poll(async () => (await viewer.item(path))?.lines ?? 0, { timeout: 15_000 }).toBeGreaterThan(3);
     await page.waitForTimeout(500);
-    const layout = await viewer.frame().evaluate(() => {
-      const items = [...document.querySelectorAll('diffs-container')].map((c) => ({ c, r: c.getBoundingClientRect() })).sort((a, b) => a.r.top - b.r.top);
+    const layout = await viewer.evaluate((_, viewerRoot) => {
+      const items = [...viewerRoot.querySelectorAll('diffs-container')].map((c) => ({ c, r: c.getBoundingClientRect() })).sort((a, b) => a.r.top - b.r.top);
       const problems: string[] = [];
       for (let i = 1; i < items.length; i++) {
         if (items[i]!.r.top < items[i - 1]!.r.bottom - 0.5) problems.push(`file ${i} overlaps the one above`);
@@ -329,7 +327,7 @@ test.describe('sandbox PR', () => {
     expect(layout.fontSize).toBe('24px');
     expect(layout.rows).toBeGreaterThan(3);
     expect(layout.problems).toEqual([]);
-    expect(await viewer.frame().evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--diffs-line-height').trim())).toBe('40px');
+    expect(await viewer.evaluate(() => getComputedStyle(document.querySelector('#glide-inpage-spike')!).getPropertyValue('--diffs-line-height').trim())).toBe('40px');
     await resetSettings(viewer);
   });
 
@@ -337,9 +335,9 @@ test.describe('sandbox PR', () => {
     const viewer = await openPierre(page, SANDBOX, 'hash');
     await resetSettings(viewer);
     const sides = () =>
-      viewer.frame().evaluate(() => ({
-        tree: document.querySelector('.pierre-tree-pane')!.getBoundingClientRect().x,
-        main: document.querySelector('.pierre-main')!.getBoundingClientRect().x,
+      viewer.evaluate((_, viewerRoot) => ({
+        tree: viewerRoot.querySelector('.pierre-tree-pane')!.getBoundingClientRect().x,
+        main: viewerRoot.querySelector('.pierre-main')!.getBoundingClientRect().x,
       }));
     expect((await sides()).tree).toBeLessThan((await sides()).main);
     await viewer.locator.getByTestId('display-menu').click();
@@ -347,8 +345,8 @@ test.describe('sandbox PR', () => {
     await expect.poll(async () => { const s = await sides(); return s.tree > s.main; }).toBe(true);
     // DOM order matches the screen (keyboard focus goes diffs first, then the tree).
     expect(
-      await viewer.frame().evaluate(
-        () => (document.querySelector('.pierre-main')!.compareDocumentPosition(document.querySelector('.pierre-tree-pane')!) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+      await viewer.evaluate(
+        (_, viewerRoot) => (viewerRoot.querySelector('.pierre-main')!.compareDocumentPosition(viewerRoot.querySelector('.pierre-tree-pane')!) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
       ),
     ).toBe(true);
     await page.keyboard.press('Escape');
@@ -365,10 +363,10 @@ test.describe('sandbox PR', () => {
     const viewer = await openPierre(page, SANDBOX, 'hash');
     await resetSettings(viewer);
     const toolbar = () =>
-      viewer.frame().evaluate(() => {
-        const shown = (s: string) => (document.querySelector(s)?.getClientRects().length ?? 0) > 0;
-        const review = document.querySelector<HTMLElement>('[data-testid="review-button"]')!;
-        const gear = document.querySelector('[data-testid="display-menu"]')!.getBoundingClientRect();
+      viewer.evaluate((_, viewerRoot) => {
+        const shown = (s: string) => (viewerRoot.querySelector(s)?.getClientRects().length ?? 0) > 0;
+        const review = viewerRoot.querySelector<HTMLElement>('[data-testid="review-button"]')!;
+        const gear = viewerRoot.querySelector('[data-testid="display-menu"]')!.getBoundingClientRect();
         return {
           toggles: shown('.diff-toggle'),
           range: shown('[data-testid="range-picker"]'),
@@ -393,16 +391,16 @@ test.describe('sandbox PR', () => {
     await resetSettings(viewer);
     const toggle = () => viewer.locator.getByTestId('tree-toggle');
     const layout = () =>
-      viewer.frame().evaluate(() => ({
-        treeShown: getComputedStyle(document.querySelector('.pierre-tree-pane')!).display !== 'none',
-        firstBoxX: document.querySelector('diffs-container')!.getBoundingClientRect().x,
-        toolbarX: document.querySelector('.pierre-toolbar')!.getBoundingClientRect().x,
+      viewer.evaluate((_, viewerRoot) => ({
+        treeShown: getComputedStyle(viewerRoot.querySelector('.pierre-tree-pane')!).display !== 'none',
+        firstBoxX: viewerRoot.querySelector('diffs-container')!.getBoundingClientRect().x,
+        toolbarX: viewerRoot.querySelector('.pierre-toolbar')!.getBoundingClientRect().x,
       }));
     /** Where the button sits in the toolbar, and whether its icon is mirrored. */
     const side = () =>
-      viewer.frame().evaluate(() => {
-        const button = document.querySelector('[data-testid="tree-toggle"]')!;
-        const toolbar = document.querySelector('.pierre-toolbar')!;
+      viewer.evaluate((_, viewerRoot) => {
+        const button = viewerRoot.querySelector('[data-testid="tree-toggle"]')!;
+        const toolbar = viewerRoot.querySelector('.pierre-toolbar')!;
         const b = button.getBoundingClientRect();
         const t = toolbar.getBoundingClientRect();
         return {
@@ -453,11 +451,11 @@ test.describe('sandbox PR', () => {
     // Focus inside the menu (a select, a text field) keeps it open.
     await viewer.locator.locator('label.field', { hasText: 'Code font' }).first().locator('input').click();
     await expect(panel).toBeVisible();
-    // A click on GitHub's page (outside the iframe): the PR title (plain text, no link).
+    // A click on GitHub's page (outside the viewer): the PR title (plain text, no link).
     const title = page.locator('h1:visible').first();
     const box = (await title.boundingBox())!;
-    const frameBox = (await page.locator('iframe[data-pierre-viewer]').boundingBox())!;
-    expect(box.y + box.height).toBeLessThan(frameBox.y);
+    const hostBox = (await viewer.locator.boundingBox())!;
+    expect(box.y + box.height).toBeLessThan(hostBox.y);
     await page.mouse.click(box.x + 4, box.y + box.height / 2);
     await expect(panel).toBeHidden();
   });
@@ -559,11 +557,11 @@ test.describe('react/react#37778 (read-only)', () => {
     // Line 7 is changed on both sides, and expander rows run above and below it.
     const FILE = '.github/PULL_REQUEST_TEMPLATE.md';
     for (const overflow of ['wrap', 'scroll'] as const) {
-      await viewer.frame().evaluate((o) => window.__pierre!.settings.getState().update({ diff: { diffStyle: 'split', overflow: o } }), overflow);
+      await viewer.evaluate((o) => window.__pierre!.settings.getState().update({ diff: { diffStyle: 'split', overflow: o } }), overflow);
       await viewer.scrollToFile(FILE);
       const edge = () =>
-        viewer.frame().evaluate((p) => {
-          const header = [...document.querySelectorAll<HTMLElement>('.fh')].find((e) => e.dataset.path === p);
+        viewer.evaluate((p, viewerRoot) => {
+          const header = [...viewerRoot.querySelectorAll<HTMLElement>('.fh')].find((e) => e.dataset.path === p);
           const root = header?.closest('diffs-container')?.shadowRoot;
           const del = root?.querySelector('[data-deletions] [data-content] [data-line-type="change-deletion"]');
           if (!root || !del) return null;
@@ -615,7 +613,7 @@ test.describe('react/react#37778 (read-only)', () => {
     await expect.poll(() => viewer.viewedCounter()).toBe(`${github.viewed} / ${github.total} viewed`);
     await viewer.allFetched(90_000);
     const allLoadedMs = Date.now() - started;
-    const stats = await viewer.frame().evaluate(() => window.__pierreStats);
+    const stats = await viewer.evaluate(() => window.__pierreStats);
     test.info().annotations.push({
       type: 'timing',
       description: `after navigation: first header ${firstHeaderMs} ms, all files loaded ${allLoadedMs} ms; loader: first diff ${Math.round(stats!.firstDiffAt! - stats!.startedAt)} ms, all ${Math.round(stats!.doneAt! - stats!.startedAt)} ms, ${stats!.requests} requests`,

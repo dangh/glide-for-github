@@ -21,7 +21,7 @@ test('in-page menus fit, modals cover the toolbar, and reload restores the file 
     await options.goto(`chrome-extension://${extensionId()}/options.html`);
     await options.evaluate(async () => {
       const saved = (await chrome.storage.sync.get('pierre.settings'))['pierre.settings'];
-      await chrome.storage.sync.set({ 'pierre.settings': { ...(typeof saved === 'object' && saved !== null ? saved : {}), experiments: { pageScroll: true, mergedBar: true } } });
+      await chrome.storage.sync.set({ 'pierre.settings': { ...(typeof saved === 'object' && saved !== null ? saved : {}), experiments: { mergedBar: true } } });
     });
     await options.close();
     const page = await context.newPage();
