@@ -76,7 +76,7 @@ The loop advanced 120 pixels per frame through the first five files; separate ju
 
 ## Adoption checks, 2026-10-20
 
-The current implementation passes 911 unit tests, TypeScript, the build, twelve packaged-extension browser scenarios, and the separate document-height stress test. The browser scenarios include the eight original layout/worker/regression cases plus saved-state recovery, native navigation, full-body replacement, and authenticated writes. The height test’s upward-scroll step was corrected to cross the actual paging threshold; that case passed on rerun. The navigation tests use the persistent sandbox fixture rather than depending on this implementation PR remaining open.
+The current implementation passes 907 unit tests, TypeScript, the build, twelve packaged-extension browser scenarios, and the separate document-height stress test. The browser scenarios include the eight original layout/worker/regression cases plus saved-state recovery, native navigation, full-body replacement, and authenticated writes. The height test’s upward-scroll step was corrected to cross the actual paging threshold; that case passed on rerun. The navigation tests use the persistent sandbox fixture rather than depending on this implementation PR remaining open.
 
 ### Saved state
 

@@ -17,7 +17,7 @@ export const ALL_GROUP = '';
 export const GROUP_LABEL_MAX = 60;
 export const GROUPS_MAX = 20;
 
-/** Default tabs based on Sift, with tool-config coverage extended for Glide. */
+/** Sift's default tabs, unchanged. */
 export const DEFAULT_FILE_GROUPS: readonly FileGroup[] = Object.freeze([
   { label: 'Source', patterns: ["# Everything the other tabs don't claim.", '!Manifest', '!Tests', '!Docs', '!Infra', '!Artifacts'] },
   {
@@ -83,7 +83,7 @@ export const DEFAULT_FILE_GROUPS: readonly FileGroup[] = Object.freeze([
       'postcss.config.*', 'tailwind.config.*', 'next.config.*', 'nuxt.config.*', 'svelte.config.*', 'astro.config.*',
       'turbo.json', 'nx.json', 'lerna.json', 'pnpm-workspace.yaml', '.yarnrc*', '.npmrc', '.nvmrc',
       '.node-version', '.tool-versions', '.python-version', '.ruby-version',
-      'jest.config.*', 'jest.*.config.*', 'jest.setup.*', 'vitest.config.*', 'vitest.workspace.*', 'vitest.setup.*',
+      'jest.config.*', 'jest.setup.*', 'vitest.config.*', 'vitest.workspace.*', 'vitest.setup.*',
       'playwright.config.*', 'cypress.config.*', 'karma.conf.*', '.mocharc*', '.nycrc*', 'setupTests.*',
       'pytest.ini', 'tox.ini', '.coveragerc', 'codecov.yml', '.flake8', 'mypy.ini', '.pylintrc', 'ruff.toml',
       '.rubocop.yml', '.golangci.yml', '.golangci.yaml', '.clang-format',
