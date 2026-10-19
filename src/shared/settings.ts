@@ -568,6 +568,7 @@ export function setSettingsStorage(storage: SettingsStorage | undefined): void {
   injectedStorage = storage;
   // Also resets what this module knows about storage (see `known`), so tests start clean.
   known = undefined;
+  revision++;
   followers = 0;
   outstanding = [];
 }
@@ -591,6 +592,7 @@ async function readOverrides(area: SettingsStorageArea): Promise<DeepPartial<Dis
  * keep it current; `outstanding` lets the echoes of this context's own writes be told from foreign changes.
  */
 let known: DeepPartial<DisplaySettings> | undefined;
+let revision = 0;
 let followers = 0;
 let outstanding: string[] = [];
 let slowWrites = 0;
@@ -598,6 +600,7 @@ let slowWrites = 0;
 const fingerprint = (o: DeepPartial<DisplaySettings>): string => JSON.stringify(sanitizeOverrides(o));
 
 function forgetKnown(): void {
+  revision++;
   known = undefined;
   outstanding = [];
 }
@@ -612,14 +615,16 @@ function observeStored(raw: unknown): void {
   }
   outstanding = [];
   known = next;
+  revision++;
 }
 
 export async function loadSettings(): Promise<DisplaySettings> {
+  const started = revision;
   const stored = await storage().area.get(SETTINGS_STORAGE_KEY);
   const overrides = sanitizeOverrides(stored[SETTINGS_STORAGE_KEY]);
-  // A read that raced with our own writes may be older than what `known` already holds.
-  if (outstanding.length === 0 && slowWrites === 0) known = overrides;
-  return resolve(overrides);
+  // Storage events and acknowledged local writes can both overtake this read.
+  if (started === revision && outstanding.length === 0 && slowWrites === 0) known = overrides;
+  return resolve(known ?? overrides);
 }
 
 let writeQueue: Promise<unknown> = Promise.resolve();
@@ -634,6 +639,7 @@ export function saveSettings(patch: DeepPartial<DisplaySettings>): Promise<Displ
   const { area } = storage();
 
   const write = (next: DeepPartial<DisplaySettings>): Promise<DisplaySettings> => {
+    revision++;
     known = next;
     outstanding.push(fingerprint(next));
     let saved: Promise<void>;
