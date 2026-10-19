@@ -8,7 +8,7 @@ import { BASENAME, relateFiles, rulesProblem, type RelatedRule } from '../shared
 import { defaultRules, loadRelatedRules, onRelatedRulesChange, saveRelatedRules, sameRules } from '../shared/related-files-storage';
 import { RELATED_STYLES, type RelatedStyle } from '../shared/settings';
 import { RELATED_STYLE_LABELS, type Update } from '../viewer/ui/DisplaySettingsForm';
-import { RowActions, textRows } from './ListRow';
+import { RowActions, usePreviewRows } from './ListRow';
 
 const SAVE_DELAY_MS = 400;
 
@@ -186,7 +186,7 @@ function RuleEditor({ draft, index, count, onChange, onMove, onDelete }: {
         aria-label={`Related files of ${name}`}
         placeholder="package-lock.json"
         spellCheck={false}
-        rows={textRows(draft.text, 1, 6)}
+        {...usePreviewRows(draft.text, 1, 6)}
         value={draft.text}
         onChange={(e) => onChange({ ...draft, text: e.target.value })}
       />
@@ -333,7 +333,8 @@ export function RelatedFilesSettingsForm({ style, update }: { style: RelatedStyl
       </p>
       {draft && (
         <>
-          <ol className="box-list related-rules">
+          <p className="muted rule-editor-hint">Click a pattern to edit, or use Tab. Valid changes save automatically.</p>
+          <ol className="box-list rule-editor-list related-rules">
             {draft.map((d, i) => (
               <RuleEditor
                 key={d.id}

@@ -68,7 +68,7 @@ body {
   margin: 4px 0 12px;
 }
 
-/* GitHub's Box list: one bordered container per list, its rows split by dividers (tokens, file groups, related-files rules). */
+/* Token lists keep GitHub’s Box treatment; rule editors use open rows below. */
 .box-list {
   list-style: none;
   margin: 0 0 12px;
@@ -577,5 +577,75 @@ body {
 
   .related-probe-result ul {
     margin-top: 0;
+  }
+}
+
+/* Keep native fields and their keyboard behavior, without framing every value. */
+.rule-editor-list {
+  border: 0;
+  border-radius: 0;
+}
+
+.rule-editor-hint {
+  font-size: 12px;
+}
+
+.rule-editor-list .group-label,
+.rule-editor-list .group-patterns {
+  border-color: transparent;
+  background: transparent;
+}
+
+.rule-editor-list .group-label:hover,
+.rule-editor-list .group-patterns:hover,
+.rule-editor-list .group-label:placeholder-shown,
+.rule-editor-list .group-patterns:placeholder-shown {
+  background: var(--pierre-bg-subtle);
+}
+
+.rule-editor-list .group-label:focus,
+.rule-editor-list .group-patterns:focus {
+  background: var(--pierre-bg);
+  outline: 2px solid var(--pierre-accent);
+  outline-offset: -1px;
+}
+
+.related-rules .group-label {
+  font-family: var(--pierre-mono);
+  font-size: 12px;
+}
+
+.rule-editor-list .group-patterns {
+  resize: none;
+}
+
+.rule-editor-list .group-patterns[data-more] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5em), transparent);
+}
+
+/* Long group patterns stay scrollable; resizing is available while editing. */
+.rule-editor-list .group-patterns:not(.related-patterns):hover,
+.rule-editor-list .group-patterns:not(.related-patterns):focus {
+  resize: vertical;
+}
+
+.options-actions,
+.group-probe {
+  flex-wrap: wrap;
+}
+
+.group-probe .field input[type='text'] {
+  max-width: 100%;
+}
+
+@media (max-width: 540px) {
+  .options {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .related-rule .related-patterns {
+    margin-left: 8px;
+    width: calc(100% - 8px);
   }
 }

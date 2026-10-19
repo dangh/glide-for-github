@@ -16,8 +16,9 @@ Newest first. Each release's GitHub notes are its section here (`scripts/release
 ### Changed
 
 - The options page has far fewer boxes. File groups and related-files rules are each one list with a line between
-  rows, as on GitHub's settings pages, and a rule takes one short row. Up, Down and Delete are small arrow and trash
-  icons that name what they act on. Only the chosen related-files style has a frame.
+  rows. Names and patterns edit directly as plain text, with a quiet background on hover and a clear focus outline,
+  instead of a box around every field. Up, Down and Delete are small arrow and trash icons that name what they act
+  on. Only the chosen related-files style has a frame.
 
 ### Fixes
 

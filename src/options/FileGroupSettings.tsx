@@ -7,7 +7,7 @@ import { ALL_GROUP, classify, compileGroups, groupsProblem, parseSiftImport, typ
 import { defaultGroups, loadFileGroups, onFileGroupsChange, saveFileGroups, sameGroups } from '../shared/file-groups-storage';
 import type { FileGroupSettings } from '../shared/settings';
 import type { Update } from '../viewer/ui/DisplaySettingsForm';
-import { RowActions, textRows } from './ListRow';
+import { RowActions, usePreviewRows } from './ListRow';
 
 const SAVE_DELAY_MS = 400;
 
@@ -51,7 +51,8 @@ function GroupEditor({ draft, index, count, onChange, onMove, onDelete }: {
         className="group-patterns"
         aria-label={`Patterns of ${name}`}
         spellCheck={false}
-        rows={textRows(draft.text, 2, 6)}
+        placeholder="One pattern per line"
+        {...usePreviewRows(draft.text, 2, 6)}
         value={draft.text}
         onChange={(e) => onChange({ ...draft, text: e.target.value })}
       />
@@ -268,7 +269,8 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
       </p>
       {draft && (
         <>
-          <ol className="box-list">
+          <p className="muted rule-editor-hint">Click a name or pattern to edit, or use Tab. Valid changes save automatically.</p>
+          <ol className="box-list rule-editor-list">
             {draft.map((d, i) => (
               <GroupEditor
                 key={d.id}
