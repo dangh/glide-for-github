@@ -105,7 +105,7 @@ describe('groups', () => {
   });
 });
 
-describe('default groups (identical to Sift)', () => {
+describe('default groups', () => {
   it('are Sift\'s six tabs, in order', () => {
     expect(DEFAULT_FILE_GROUPS.map((x) => x.label)).toEqual(['Source', 'Tests', 'Docs', 'Infra', 'Manifest', 'Artifacts']);
   });
@@ -124,6 +124,10 @@ describe('default groups (identical to Sift)', () => {
     ['package.json', ['Manifest']],
     ['yarn.lock', ['Manifest']],
     ['jest.config.js', ['Manifest']],
+    ['admin/services/add-ons/jest.e2e.config.js', ['Manifest']],
+    ['admin/services/add-ons/jest.integration.config.js', ['Manifest']],
+    ['tests/jest.integration.config.ts', ['Manifest']],
+    ['src/jest.integration.js', ['Source']],
     ['tsconfig.build.json', ['Manifest']],
     ['.github/workflows/ci.yml', ['Infra']],
     ['Dockerfile', ['Infra']],
