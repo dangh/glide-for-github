@@ -234,6 +234,11 @@ test.describe('file groups', () => {
       await expect(button).toHaveAttribute('aria-expanded', 'true');
       await expect(item('Tests')).toBeFocused();
       await expect(item('Tests')).toHaveAttribute('aria-checked', 'true');
+      const rowWidths = await menu.getByRole('menuitemradio').evaluateAll((rows) => rows.map((row) => {
+        const panel = row.parentElement!;
+        return panel.clientWidth - 16 - row.getBoundingClientRect().width;
+      }));
+      expect(rowWidths.every((gap) => Math.abs(gap) <= 1)).toBe(true);
       const items = (await menu.getByRole('menuitemradio').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
       expect(items).toEqual(['All 167', 'Source 59', 'Tests 80', 'Docs 5', 'Manifest 23']);
       await page.keyboard.press('ArrowDown');
@@ -261,6 +266,17 @@ test.describe('file groups', () => {
       await expect(button).toBeFocused();
       await expect(button).toHaveAccessibleName('File group: Source 59');
 
+      // Tab leaves the menu in toolbar order, rather than restarting at the first control.
+      await page.keyboard.press('Enter');
+      await expect(item('Source')).toBeFocused();
+      await page.keyboard.press('Tab');
+      await expect(menu).toHaveCount(0);
+      await expect(viewer.locator.getByTestId('review-button')).toBeFocused();
+      await button.focus();
+      await page.keyboard.press('Enter');
+      await page.keyboard.press('Shift+Tab');
+      await expect(button).toBeFocused();
+
       // A click picks too; a click outside closes.
       await viewer.locator.getByTestId('file-groups-button').click();
       await item('Docs').click();
@@ -271,14 +287,14 @@ test.describe('file groups', () => {
       await viewer.locator.getByTestId('viewed-counter').click();
       await expect(menu).toHaveCount(0);
 
-      // At 320 px the menu stays inside the window.
-      await page.setViewportSize({ width: 320, height: 900 });
+      // An already-open menu follows the button when the window narrows.
       await viewer.locator.getByTestId('file-groups-button').click();
-      const inside = await viewer.frame().evaluate(() => {
+      await page.setViewportSize({ width: 320, height: 900 });
+      const inside = () => viewer.frame().evaluate(() => {
         const r = document.querySelector('[role="menu"]')!.getBoundingClientRect();
         return r.left >= 0 && r.right <= document.documentElement.clientWidth;
       });
-      expect(inside).toBe(true);
+      await expect.poll(inside).toBe(true);
       await page.keyboard.press('Escape');
 
       // Wide again: the tabs come back with the same group open, and focus moves to it from the button.

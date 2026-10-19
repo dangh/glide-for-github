@@ -1915,6 +1915,7 @@ html[data-scroll-layout] .pierre-body[data-tree-position='left'] .pierre-diffs {
 }
 
 .file-groups-item {
+  width: 100%;
   align-items: center;
   gap: 8px;
 }

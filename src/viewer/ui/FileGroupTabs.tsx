@@ -113,12 +113,20 @@ function GroupMenu({ tabs, active, choose, hidden }: { tabs: GroupTab[]; active:
   useLayoutEffect(() => {
     const panel = menu.current;
     if (!open || !panel) return;
-    // The menu opens leftwards from the button; in a narrow window it moves right to stay 8 px inside the left edge.
-    const left = panel.getBoundingClientRect().left;
-    if (left < 8) panel.style.right = `${left - 8}px`;
+    // Keep an open menu inside the frame when a resize moves its button.
+    const place = () => {
+      panel.style.right = '0px';
+      const left = panel.getBoundingClientRect().left;
+      if (left < 8) panel.style.right = `${left - 8}px`;
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(document.documentElement);
+    observer.observe(panel);
     const items = [...panel.querySelectorAll<HTMLElement>('[role="menuitemradio"]')];
     const target = focusOnOpen.current === 'last' ? items.at(-1) : (items.find((i) => i.getAttribute('aria-checked') === 'true') ?? items[0]);
     target?.focus();
+    return () => observer.disconnect();
   }, [open]);
 
   useLayoutEffect(() => {
