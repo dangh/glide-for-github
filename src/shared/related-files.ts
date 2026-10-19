@@ -73,7 +73,7 @@ const basenameOf = (name: string) => {
   return dot > 0 ? name.slice(0, dot) : name;
 };
 /** `text` as a pattern that matches only itself. */
-const literal = (text: string) => text.replace(/[*?[\]\\]/g, '\\$&');
+const literal = (text: string) => text.replace(/[*?[\]\\#!]/g, '\\$&').replace(/\s/g, (c) => `[${c}]`);
 
 export interface Relations {
   /** Each main file's companions, in list order. */

@@ -70,6 +70,14 @@ describe('related files: rules', () => {
     expect(relate(['x*.txt', 'x*.md', 'xy.md'], rules)).toEqual({ 'x*.txt': ['x*.md'] });
   });
 
+  it('${basename} preserves leading # and whitespace in actual file names', () => {
+    const rules = [{ main: '*.txt', companions: ['${basename}.md'] }];
+    expect(relate(['#note.txt', '#note.md', ' note.txt', ' note.md'], rules)).toEqual({
+      '#note.txt': ['#note.md'], ' note.txt': [' note.md'],
+    });
+    expect(relate(['note .txt', 'note '], [{ main: '*.txt', companions: ['${basename}'] }])).toEqual({ 'note .txt': ['note '] });
+  });
+
   it('an earlier rule claims a file first, and a file is in one relation only', () => {
     const rules = [
       { main: 'a.json', companions: ['shared.lock'] },
