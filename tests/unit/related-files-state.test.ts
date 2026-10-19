@@ -48,6 +48,42 @@ describe('the layout of each style', () => {
     expect(relatedLayout(rules, plain, 'box').items).toBe(plain);
   });
 
+  /** The gap CodeView puts above each item of `items` (`undefined`: the list's own gap). */
+  const gaps = (layout: ReturnType<typeof relatedLayout>, items = layout.items) =>
+    items.slice(1).map((id, i) => [id, layout.gapBefore?.(id, items[i]!)]);
+
+  it('nested and box: no gap inside a box, so its parts touch; the list gap around it', () => {
+    expect(gaps(relatedLayout(rules, shown, 'nested'))).toEqual([
+      ['package.json', undefined],
+      ['package-lock.json', 0],
+      ['yarn.lock', 0],
+      ['web/package.json', undefined],
+    ]);
+    const group = groupItemId('package.json');
+    expect(gaps(relatedLayout(rules, shown, 'box'))).toEqual([
+      [group, undefined],
+      ['package.json', 0],
+      ['package-lock.json', 0],
+      ['yarn.lock', 0],
+      ['web/package.json', undefined],
+    ]);
+  });
+
+  it('rail and off keep the list gap everywhere', () => {
+    expect(relatedLayout(rules, shown, 'rail').gapBefore).toBeUndefined();
+    expect(relatedLayout(rules, shown, 'off').gapBefore).toBeUndefined();
+    expect(relatedLayout(rules, ['a.ts', 'b.ts'], 'nested').gapBefore).toBeUndefined();
+  });
+
+  it('a part keeps the list gap when CodeView still holds another list (its box is not the item above)', () => {
+    const layout = relatedLayout(rules, shown, 'nested');
+    expect(gaps(layout, ['package-lock.json', 'package.json', 'src/a.ts', 'yarn.lock'])).toEqual([
+      ['package.json', undefined],
+      ['src/a.ts', undefined],
+      ['yarn.lock', undefined],
+    ]);
+  });
+
   it('is computed once per rules and file list, and again when either changes', () => {
     const relations = relationsOf(rules, shown);
     expect(relationsOf(rules, shown)).toBe(relations);
@@ -55,6 +91,9 @@ describe('the layout of each style', () => {
     expect(relationsOf(rules, [...shown])).not.toBe(relations);
     const layout = relatedLayout(rules, shown, 'nested');
     expect(relatedLayout(rules, shown, 'nested')).toBe(layout);
+    // CodeView relays out every item when `gapBefore` changes: it changes with the layout only.
+    expect(relatedLayout(rules, shown, 'nested').gapBefore).toBe(layout.gapBefore);
+    expect(relatedLayout(rules, shown, 'box').gapBefore).not.toBe(layout.gapBefore);
   });
 });
 

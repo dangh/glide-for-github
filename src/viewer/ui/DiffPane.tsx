@@ -3,7 +3,8 @@
  * one by one with `updateItem`, see state/items.ts). A group switch hands the CodeView the new group's items with
  * `setItems`: items it already has keep their layout, and loaded diffs stay loaded. Related files
  * (state/relatedFiles.ts) order the items, companions after their main file, and add 'box' and 'rail' group items;
- * a change of style or rules goes through `setItems` the same way.
+ * a change of style or rules goes through `setItems` the same way. Their `gapBefore` takes the gap out of a box
+ * (`layout.gapBefore`, added to @pierre/diffs by patches/), and a new one relays out the list.
  */
 import type { DiffLineAnnotation, FileDiffLoadedFiles, FileDiffMetadata, LineAnnotation, SelectedLineRange } from '@pierre/diffs';
 import { CodeView, type CodeViewHandle } from '@pierre/diffs/react';
@@ -119,11 +120,12 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
 
   const loadDiffFiles = useMemo(() => (pr ? createFileLoader(rpc, pr) : undefined), [rpc, pr]);
 
-  /** The gap between items, for viewer.css: related files draw their box or rail across it. */
+  /** The gap between items, for viewer.css: a 'rail' runs across it. */
   const gapStyle = useMemo(() => ({ '--pierre-gap': `${diffSettings.layoutGap}px` }) as CSSProperties, [diffSettings.layoutGap]);
 
+  const related = useRelated();
   const buildOptions = useMemo(createDiffOptionsBuilder, []);
-  const options = buildOptions(diffSettings, colorMode, loadDiffFiles, INTERACTIONS, lineHeight);
+  const options = buildOptions(diffSettings, colorMode, loadDiffFiles, INTERACTIONS, lineHeight, related.gapBefore);
 
   // Seeded once per PR; later changes go through `sync` → updateItem.
   const initialItems = useMemo<PierreItem[]>(() => (pr ? sync.seed(usePr.getState(), currentRelated().items) : []), [pr, sync]);
@@ -176,7 +178,7 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
 
   // A group switch (or a change of related files): its files load next, and the list keeps its place when the item at
   // its top is still listed, else starts at the top.
-  const { items } = useRelated();
+  const { items } = related;
   useEffect(() => {
     session.loader?.prefer(items);
     const handle = handleRef.current;

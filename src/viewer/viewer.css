@@ -1123,10 +1123,9 @@ html[data-scroll-layout] .pierre-body[data-tree-position='left'] .pierre-diffs {
 }
 
 /*
- * Related files (state/relatedFiles.ts; `data-related` on each header). Every file stays its own CodeView item, and
- * CodeView puts the same gap (`--pierre-gap`, layout.gap) between all items, so a file that belongs in the box above
- * (a 'nested' companion, a 'box' file) draws that box's sides across the gap above it (`::before`), and its clip
- * reaches up into the gap. Only paint changes: the items keep the sizes CodeView computes.
+ * Related files (state/relatedFiles.ts; `data-related` on each header). Every file stays its own CodeView item. In a
+ * 'nested' or 'box' group's box the items touch (the layout's `gapBefore` takes the list gap out), so each part draws
+ * its share of the box: the first part its top, the last its bottom, and every part but the last a line under itself.
  */
 .fh-tag {
   flex: none;
@@ -1166,63 +1165,29 @@ html[data-scroll-layout] .pierre-body[data-tree-position='left'] .pierre-diffs {
   font-weight: 600;
 }
 
-/* GitHub's file boxes: the box above stays open at its bottom, and the attached file closes it if it is the last. */
-[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='main'], [data-related='box-group'])) {
-  border-radius: 6px 6px 0 0;
-}
-
+/* GitHub's file boxes: one box drawn by its parts, square where they meet, each closing above the next with a line. */
+[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='main'], [data-related='box-group'])),
 [data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='main'], [data-related='box-group']))::after {
-  border-bottom: 0;
   border-radius: 6px 6px 0 0;
 }
 
-[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='companion'], [data-related='box-member'])) {
-  overflow: visible;
-  border-radius: 0;
-  clip-path: inset(calc(-1 * var(--pierre-gap, 16px)) 0 0 0);
-}
-
+[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='companion'], [data-related='box-member'])),
 [data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='companion'], [data-related='box-member']))::after {
-  border-bottom: 0;
   border-radius: 0;
 }
 
-[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='companion'], [data-related='box-member']))::before {
-  content: '';
-  position: absolute;
-  inset: calc(-1 * var(--pierre-gap, 16px)) 0 auto;
-  height: var(--pierre-gap, 16px);
-  background: var(--pierre-bg);
-  border-inline: 1px solid var(--pierre-border);
-  pointer-events: none;
-  z-index: 6;
+/* The part above already drew the line between them. */
+[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='companion'], [data-related='box-member']))::after {
+  border-top: 0;
 }
 
-[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='companion'], [data-related='box-member'])[data-last]) {
-  clip-path: inset(calc(-1 * var(--pierre-gap, 16px)) 0 0 0 round 0 0 6px 6px);
-}
-
+[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='companion'], [data-related='box-member'])[data-last]),
 [data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh:is([data-related='companion'], [data-related='box-member'])[data-last])::after {
-  border-bottom: 1px solid var(--pierre-border);
   border-radius: 0 0 6px 6px;
 }
 
 [data-file-header='github'] .fh:is([data-related='companion'], [data-related='box-member']) {
   border-radius: 0;
-}
-
-/* Under a header with nothing below it, the gap is that header's: it reads as one taller header. */
-[data-file-header='github'] .pierre-diffs diffs-container:has(> [slot='header-custom'] .fh[data-under-header])::before {
-  background: var(--pierre-bg-subtle);
-}
-
-[data-file-header='github'] .fh:is([data-related='main'][data-collapsed], [data-related='box-group']) {
-  border-bottom-color: transparent;
-}
-
-/* A collapsed attached file is its header alone: no line under it but the box's own. */
-[data-file-header='github'] .fh:is([data-related='companion'], [data-related='box-member'])[data-collapsed] {
-  border-bottom-color: transparent;
 }
 
 /*

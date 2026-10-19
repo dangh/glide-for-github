@@ -49,6 +49,22 @@ export interface RelatedLayout {
   roles: ReadonlyMap<string, Role>;
   /** Companions that start collapsed ('nested'). */
   folded: ReadonlySet<string>;
+  /** CodeView's `layout.gapBefore`: none inside a 'nested' or 'box' group's box; unset when no box has parts. */
+  gapBefore?: GapBefore;
+}
+
+/** The gap above item `id` when `previousId` is the item above it; `undefined` keeps the list's gap. */
+export type GapBefore = (id: string, previousId: string) => number | undefined;
+
+/**
+ * 'nested' and 'box' draw a group as one box: a part right below the box's previous part touches it. Asked about any
+ * other neighbor (CodeView can lay out the old list with the new layout for a frame), it keeps the list's gap.
+ */
+function touching(roles: ReadonlyMap<string, Role>): GapBefore {
+  return (id, previousId) => {
+    const role = roles.get(id);
+    return (role?.kind === 'companion' || role?.kind === 'member') && role.above === previousId ? 0 : undefined;
+  };
 }
 
 const relationsMemo = new WeakMap<readonly string[], { rules: readonly RelatedRule[]; relations: Relations }>();
@@ -98,7 +114,7 @@ function buildLayout(relations: Relations, style: RelatedStyle, shown: readonly 
     }
     items.push(path);
   }
-  return { style, relations, items, roles, folded };
+  return { style, relations, items, roles, folded, ...(style === 'rail' ? {} : { gapBefore: touching(roles) }) };
 }
 
 let layoutMemo: { relations: Relations; style: RelatedStyle; shown: readonly string[]; layout: RelatedLayout } | undefined;
