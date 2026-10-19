@@ -180,11 +180,11 @@ async function resolveRoundTrip(page: Page, viewer: Viewer, thread: () => Locato
   page.on('request', onRequest);
   const dialog = viewer.locator.getByRole('dialog');
   try {
-    await thread().getByRole('button', { name: 'Resolve conversation' }).click();
+    await clickInList(thread().getByRole('button', { name: 'Resolve conversation' }));
     await expect(thread().locator('.label-resolved')).toBeVisible();
     await expect.poll(async () => threadWith(await githubThreads(page), text)!.isResolved, { timeout: 30_000 }).toBe(true);
-    await thread().locator('.thread-fold').click();
-    await thread().getByRole('button', { name: 'Unresolve conversation' }).click();
+    await clickInList(thread().locator('.thread-fold'));
+    await clickInList(thread().getByRole('button', { name: 'Unresolve conversation' }));
     await expect(thread().locator('.label-resolved')).toHaveCount(0);
     await expect.poll(async () => threadWith(await githubThreads(page), text)!.isResolved, { timeout: 30_000 }).toBe(false);
     await expect(thread().locator('.thread-error')).toHaveCount(0);
@@ -204,11 +204,46 @@ const numberCell = (viewer: Viewer, line: number, side: 'additions' | 'deletions
   fileItem(viewer).locator(`code[data-${side}] [data-column-number="${line}"]`);
 const composer = (viewer: Viewer, key: string) => viewer.locator.locator(`.composer[data-draft-key="${key}"]`);
 
+/**
+ * Centers a control in the diff list and waits until it is topmost at its center, as it is for a mouse user once
+ * scrolling stops. Every scroll, and every CodeView scroll fix after a re-render, turns the list's pointer events off
+ * for 120 ms (CodeView `pointerEventsOnScroll`). Playwright's actions hit-test right after their own scroll, and their
+ * retries keep scrolling (`block: 'start'` parks the control under the sticky file header), so they never land.
+ */
+async function settleInList(target: Locator) {
+  await target.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await expect
+    .poll(
+      () =>
+        target.evaluate((el) => {
+          const r = el.getBoundingClientRect();
+          const [x, y] = [r.left + r.width / 2, r.top + r.height / 2];
+          let hit = document.elementFromPoint(x, y);
+          while (hit?.shadowRoot) {
+            const inner = hit.shadowRoot.elementFromPoint(x, y);
+            if (!inner || inner === hit) break;
+            hit = inner;
+          }
+          return hit !== null && el.contains(hit);
+        }),
+      { message: 'the control is topmost at its center once scrolling settles', timeout: 5_000 },
+    )
+    .toBe(true);
+}
+
+/** Clicks a control in the diff list. Retried: a late re-render can turn pointer events off again before the click. */
+async function clickInList(target: Locator) {
+  await expect(async () => {
+    await settleInList(target);
+    await target.click({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
+}
+
 /** Hover the line number, click Pierre's gutter "+" (single line). Retried: a scroll that settles re-renders the window. */
 async function plusOn(viewer: Viewer, line: number) {
-  await numberCell(viewer, line).scrollIntoViewIfNeeded();
   const plus = fileItem(viewer).locator('[data-utility-button]');
   await expect(async () => {
+    await settleInList(numberCell(viewer, line));
     await numberCell(viewer, line).hover({ timeout: 2_000 });
     await plus.click({ timeout: 2_000 });
   }).toPass({ timeout: 30_000 });
@@ -216,7 +251,7 @@ async function plusOn(viewer: Viewer, line: number) {
 
 /** Drag over line numbers (Pierre line selection): opens a range composer. */
 async function dragNumbers(page: Page, viewer: Viewer, from: number, to: number) {
-  await numberCell(viewer, from).scrollIntoViewIfNeeded();
+  await settleInList(numberCell(viewer, from));
   const a = (await numberCell(viewer, from).boundingBox())!;
   const b = (await numberCell(viewer, to).boundingBox())!;
   await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
@@ -344,7 +379,7 @@ test.describe('threads and the inline composer', () => {
     await viewer.allFetched();
 
     // Nothing was posted; close the composer (Cancel discards the draft).
-    await composer(viewer, key).getByRole('button', { name: 'Cancel' }).click();
+    await clickInList(composer(viewer, key).getByRole('button', { name: 'Cancel' }));
     await expect(composer(viewer, key)).toHaveCount(0);
   });
 
@@ -377,7 +412,7 @@ test.describe('threads and the inline composer', () => {
         const c = composer(viewer, `${FILE}:additions:-11`);
         await expect(c.locator('textarea')).toBeFocused();
         await page.keyboard.type(single);
-        await c.getByRole('button', { name: 'Add single comment' }).click();
+        await clickInList(c.getByRole('button', { name: 'Add single comment' }));
         await expect(c).toHaveCount(0);
         await expect(fileItem(viewer).locator('.thread', { hasText: single })).toBeVisible();
         await confirmedInViewer(viewer, single);
@@ -405,7 +440,7 @@ test.describe('threads and the inline composer', () => {
         await dragNumbers(page, viewer, 15, 17);
         const c = composer(viewer, `${FILE}:additions:15-17`);
         await expect(c).toBeVisible();
-        await c.getByRole('button', { name: 'Insert suggestion' }).click();
+        await clickInList(c.getByRole('button', { name: 'Insert suggestion' }));
         const lines = await viewer.frame().evaluate((path) => {
           const d = window.__pierre!.store.getState().diffs.get(path)!;
           const h = d.hunks[0]!;
@@ -415,7 +450,7 @@ test.describe('threads and the inline composer', () => {
         await c.locator('textarea').press('Control+Home');
         await page.keyboard.type(`${range}\n`);
         await expect(c.locator('.composer-target')).toHaveText('Comment on lines R15 to R17');
-        await c.getByRole('button', { name: 'Add single comment' }).click();
+        await clickInList(c.getByRole('button', { name: 'Add single comment' }));
         await expect(c).toHaveCount(0);
         // The line selection is released, so the next gutter "+" targets its own line.
         expect(await viewer.frame().evaluate(() => window.__pierre!.session.codeView!.getSelectedLines())).toBeNull();
@@ -442,19 +477,19 @@ test.describe('threads and the inline composer', () => {
 
       await test.step('reply, then edit the reply', async () => {
         console.log('[e2e] step: reply, then edit the reply');
-        await thread().getByRole('button', { name: 'Reply…' }).click();
+        await clickInList(thread().getByRole('button', { name: 'Reply…' }));
         await expect(thread().locator('textarea')).toBeFocused();
         await page.keyboard.type(reply);
-        await thread().getByRole('button', { name: 'Reply', exact: true }).click();
+        await clickInList(thread().getByRole('button', { name: 'Reply', exact: true }));
         await confirmedInViewer(viewer, reply);
         expect(threadWith(await githubThreads(page), single)!.comments.map((c) => c.body)).toEqual([single, reply]);
 
         const comment = thread().locator('.comment', { hasText: reply });
-        await comment.getByRole('button', { name: 'Edit' }).click();
+        await clickInList(comment.getByRole('button', { name: 'Edit' }));
         const box = comment.locator('textarea');
         await expect(box).toHaveValue(reply);
         await box.fill(edited);
-        await comment.getByRole('button', { name: 'Update comment' }).click();
+        await clickInList(comment.getByRole('button', { name: 'Update comment' }));
         await expect(thread().locator('.comment', { hasText: edited })).toBeVisible();
         await expect.poll(async () => threadWith(await githubThreads(page), single)!.comments.map((c) => c.body), { timeout: 30_000 }).toEqual([single, edited]);
       });
@@ -462,14 +497,14 @@ test.describe('threads and the inline composer', () => {
       await test.step('add and remove 👍', async () => {
         console.log('[e2e] step: add and remove 👍');
         const first = thread().locator('.comment').first();
-        await first.getByRole('button', { name: 'Add reaction' }).click();
-        await first.locator('.reaction-menu [data-reaction="THUMBS_UP"]').click();
+        await clickInList(first.getByRole('button', { name: 'Add reaction' }));
+        await clickInList(first.locator('.reaction-menu [data-reaction="THUMBS_UP"]'));
         await expect(first.locator('.reactions > [data-reaction="THUMBS_UP"]')).toHaveText('👍 1');
         const thumbs = async () =>
           threadWith(await githubThreads(page), single)!.comments[0]!.reactionGroups?.find((g) => g.reaction.content === 'THUMBS_UP');
         await expect.poll(async () => (await thumbs())?.totalCount, { timeout: 30_000 }).toBe(1);
         expect((await thumbs())!.reaction.viewerHasReacted).toBe(true);
-        await first.locator('.reactions > [data-reaction="THUMBS_UP"]').click();
+        await clickInList(first.locator('.reactions > [data-reaction="THUMBS_UP"]'));
         await expect(first.locator('.reactions > [data-reaction="THUMBS_UP"]')).toHaveCount(0);
         await expect.poll(async () => (await thumbs())?.totalCount ?? 0, { timeout: 30_000 }).toBe(0);
       });
@@ -491,8 +526,8 @@ test.describe('threads and the inline composer', () => {
       await test.step('delete own reply', async () => {
         console.log('[e2e] step: delete own reply');
         const comment = thread().locator('.comment', { hasText: edited });
-        await comment.getByRole('button', { name: 'Delete' }).click();
-        await comment.getByRole('button', { name: 'Delete' }).click(); // confirm
+        await clickInList(comment.getByRole('button', { name: 'Delete' }));
+        await clickInList(comment.getByRole('button', { name: 'Delete' })); // confirm
         await expect(thread().locator('.comment', { hasText: edited })).toHaveCount(0);
         await expect.poll(async () => threadWith(await githubThreads(page), single)!.comments.map((c) => c.body), { timeout: 30_000 }).toEqual([single]);
       });
@@ -503,7 +538,7 @@ test.describe('threads and the inline composer', () => {
         const c = composer(viewer, `${FILE}:additions:-18`);
         await expect(c.locator('textarea')).toBeFocused();
         await page.keyboard.type(reviewBody);
-        await c.getByRole('button', { name: 'Start a review' }).click();
+        await clickInList(c.getByRole('button', { name: 'Start a review' }));
         await expect(c).toHaveCount(0);
         await expect.poll(() => viewer.frame().evaluate(() => window.__pierre!.store.getState().pendingReview?.count ?? 0)).toBe(1);
         const pendingOnGithub = await githubPendingReview(page);
@@ -516,7 +551,7 @@ test.describe('threads and the inline composer', () => {
         const c2 = composer(viewer, `${FILE}:additions:-16`);
         await expect(c2.getByRole('button', { name: 'Add review comment' })).toBeVisible();
         await expect(c2.getByRole('button', { name: 'Start a review' })).toHaveCount(0);
-        await c2.getByRole('button', { name: 'Cancel' }).click();
+        await clickInList(c2.getByRole('button', { name: 'Cancel' }));
 
         // What GitHub does with REST POST /pulls/{n}/comments while the viewer has a pending review.
         const probe = await viewer.frame().evaluate(async (body) => {
@@ -560,7 +595,7 @@ test.describe('resolve via the API with a classic token', () => {
       const c = composer(viewer, `${FILE}:additions:-13`);
       await expect(c.locator('textarea')).toBeFocused();
       await page.keyboard.type(text);
-      await c.getByRole('button', { name: 'Add single comment' }).click();
+      await clickInList(c.getByRole('button', { name: 'Add single comment' }));
       await confirmedInViewer(viewer, text);
       const id = await fileItem(viewer).locator('.thread', { hasText: text }).getAttribute('data-thread-id');
       const paths = await resolveRoundTrip(page, viewer, () => fileItem(viewer).locator(`.thread[data-thread-id="${id}"]`), text);
@@ -702,13 +737,13 @@ test.describe('review submission (Task 10)', () => {
         let c = composer(viewer, `${FILE}:additions:-11`);
         await expect(c.locator('textarea')).toBeFocused();
         await page.keyboard.type(first);
-        await c.getByRole('button', { name: 'Start a review' }).click();
+        await clickInList(c.getByRole('button', { name: 'Start a review' }));
         await expect(c).toHaveCount(0);
         await plusOn(viewer, 13);
         c = composer(viewer, `${FILE}:additions:-13`);
         await expect(c.locator('textarea')).toBeFocused();
         await page.keyboard.type(second);
-        await c.getByRole('button', { name: 'Add review comment' }).click();
+        await clickInList(c.getByRole('button', { name: 'Add review comment' }));
         await expect(c).toHaveCount(0);
         await expect(reviewButton(viewer)).toHaveText('Review (2 pending)');
       });
@@ -738,7 +773,7 @@ test.describe('review submission (Task 10)', () => {
         const c = composer(viewer, `${FILE}:additions:-15`);
         await expect(c.locator('textarea')).toBeFocused();
         await page.keyboard.type(dropped);
-        await c.getByRole('button', { name: 'Start a review' }).click();
+        await clickInList(c.getByRole('button', { name: 'Start a review' }));
         await expect(reviewButton(viewer)).toHaveText('Review (1 pending)');
         expect((await githubPendingReview(page))?.threads).toEqual([expect.objectContaining({ bodies: [dropped] })]);
         await reviewButton(viewer).click();
@@ -958,7 +993,7 @@ test.describe('apply suggestion (Task 10)', () => {
       await test.step('Commit suggestion (single) → one commit with the suggested line; the thread is resolved on GitHub', async () => {
         const a = suggestions[0]!;
         await expect(thread(a.body).getByRole('button', { name: 'Commit suggestion' })).toBeVisible();
-        await thread(a.body).getByRole('button', { name: 'Commit suggestion' }).click();
+        await clickInList(thread(a.body).getByRole('button', { name: 'Commit suggestion' }));
         const dialog = viewer.locator.getByRole('dialog');
         await expect(dialog.locator('input[name="commit-message"]')).toHaveValue('Apply suggestions from code review');
         await dialog.getByRole('button', { name: 'Commit changes' }).click();
@@ -979,7 +1014,7 @@ test.describe('apply suggestion (Task 10)', () => {
         viewer = await openSandbox(page);
         const [, b, c] = suggestions;
         await threadsShown([b!.body, c!.body]);
-        for (const s of [b!, c!]) await thread(s.body).getByRole('button', { name: 'Add suggestion to batch' }).click();
+        for (const s of [b!, c!]) await clickInList(thread(s.body).getByRole('button', { name: 'Add suggestion to batch' }));
         const bar = viewer.locator.locator('.batch-bar');
         await expect(bar).toContainText('2 suggestions in batch');
         await bar.getByRole('button', { name: 'Commit suggestions' }).click();
