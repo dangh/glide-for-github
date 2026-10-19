@@ -1,74 +1,63 @@
 /** Built-in before/after sample for the options page's live preview: two hunks, one modified line, additions, deletions. */
 import { parseDiffFromFile, type FileDiffMetadata } from '@pierre/diffs';
 
-export const SAMPLE_FILE_NAME = 'src/pricing.ts';
+export const SAMPLE_FILE_NAME = 'examples/birdwatching.ts';
 
-const BEFORE = `import { fetchRates } from './rates';
-
-export interface Fare {
-  base: number;
-  taxes: number;
-  currency: string;
+const BEFORE = `export interface Sighting {
+  species: string;
+  count: number;
+  place: string;
 }
 
-const DEFAULT_CURRENCY = 'USD';
-
-export function total(fare: Fare): number {
-  return fare.base + fare.taxes;
+export function describe(sighting: Sighting): string {
+  return \`\${sighting.species}: \${sighting.count} spotted\`;
 }
 
-export function format(fare: Fare): string {
-  const amount = total(fare).toFixed(2);
-  return \`\${fare.currency} \${amount}\`;
+export function speciesSeen(sightings: readonly Sighting[]): string[] {
+  return [...new Set(sightings.map((sighting) => sighting.species))];
 }
 
-export function isFree(fare: Fare): boolean {
-  return total(fare) === 0;
+export function busiestSpot(sightings: readonly Sighting[]): string | undefined {
+  const counts = new Map<string, number>();
+  for (const sighting of sightings) {
+    counts.set(sighting.place, (counts.get(sighting.place) ?? 0) + sighting.count);
+  }
+  return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0];
 }
 
-export async function convert(fare: Fare, to: string): Promise<Fare> {
-  const rates = await fetchRates(fare.currency);
-  const rate = rates[to];
-  return { base: fare.base * rate, taxes: fare.taxes * rate, currency: to };
-}
-
-export function cheapest(fares: Fare[]): Fare | undefined {
-  return fares.sort((a, b) => total(a) - total(b))[0];
+export function notebook(sightings: readonly Sighting[], place: string): string {
+  const nearby = sightings.filter((sighting) => sighting.place === place);
+  return nearby.map(describe).join('\\n');
 }
 `;
 
-const AFTER = `import { fetchRates } from './rates';
-
-export interface Fare {
-  base: number;
-  taxes: number;
-  fees: number;
-  currency: string;
+const AFTER = `export interface Sighting {
+  species: string;
+  count: number;
+  place: string;
+  notes?: string;
 }
 
-const DEFAULT_CURRENCY = 'USD';
-
-export function total(fare: Fare): number {
-  return fare.base + fare.taxes + fare.fees;
+export function describe(sighting: Sighting): string {
+  const summary = \`\${sighting.species}: \${sighting.count} spotted\`;
+  return sighting.notes ? \`\${summary} (\${sighting.notes})\` : summary;
 }
 
-export function format(fare: Fare): string {
-  const amount = total(fare).toFixed(2);
-  return \`\${fare.currency} \${amount}\`;
+export function speciesSeen(sightings: readonly Sighting[]): string[] {
+  return [...new Set(sightings.map((sighting) => sighting.species))];
 }
 
-export function isFree(fare: Fare): boolean {
-  return total(fare) === 0;
+export function busiestSpot(sightings: readonly Sighting[]): string | undefined {
+  const counts = new Map<string, number>();
+  for (const sighting of sightings) {
+    counts.set(sighting.place, (counts.get(sighting.place) ?? 0) + sighting.count);
+  }
+  return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0];
 }
 
-export async function convert(fare: Fare, to: string): Promise<Fare> {
-  const rates = await fetchRates(fare.currency);
-  const rate = rates[to] ?? 1;
-  return { base: fare.base * rate, taxes: fare.taxes * rate, fees: fare.fees * rate, currency: to };
-}
-
-export function cheapest(fares: readonly Fare[]): Fare | undefined {
-  return [...fares].sort((a, b) => total(a) - total(b))[0];
+export function notebook(sightings: readonly Sighting[], place: string): string {
+  const nearby = sightings.filter((sighting) => sighting.place.toLowerCase() === place.toLowerCase());
+  return nearby.map(describe).join('\\n') || 'No birds spotted here yet.';
 }
 `;
 
