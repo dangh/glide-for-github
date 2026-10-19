@@ -1,7 +1,8 @@
 /**
  * The file group tabs (All, Source, Tests, …) in the toolbar, left of the viewed counter as Sift places them on
  * GitHub's toolbar: a segmented control of tabs with their file counts. A tab picks which files the tree and the diff
- * list show; arrow keys, Home and End move between tabs and open them (switching is instant, so focus follows).
+ * list show; arrow keys, Home and End move between tabs and open them (switching is instant, so focus follows). An
+ * open tree search stays open across a click on a tab or a pick from the menu.
  *
  * When the tabs don't fit, a menu button takes their place (Sift's narrow toolbar swaps them for a dropdown): it shows
  * the open group and its count and opens a menu of every group. The fit is measured, not a breakpoint, because the
@@ -13,6 +14,7 @@ import { memo, useCallback, useLayoutEffect, useRef, useState, type KeyboardEven
 import { ALL_GROUP } from '../../shared/file-groups';
 import { groupTabs, useActiveGroup, useFileGroups, type GroupTab } from '../state/fileGroups';
 import { useSettings } from '../state/settings';
+import { session } from '../state/session';
 import { usePr } from '../state/store';
 import { useDismiss } from './dismiss';
 import { CheckIcon, TriangleDownIcon } from './icons';
@@ -99,6 +101,14 @@ function GroupMenu({ tabs, active, choose, hidden }: { tabs: GroupTab[]; active:
   const close = useCallback(() => setOpen(false), []);
   useDismiss(open, root, close);
   const current = tabs.find((t) => t.label === active) ?? tabs[0]!;
+  /** Puts back the tree search that a press on the button closed, once the menu closes (after a pick, if any). */
+  const restoreSearch = useRef<(() => void) | undefined>(undefined);
+
+  useLayoutEffect(() => {
+    if (open) return;
+    restoreSearch.current?.();
+    restoreSearch.current = undefined;
+  }, [open]);
 
   useLayoutEffect(() => {
     const panel = menu.current;
@@ -165,6 +175,9 @@ function GroupMenu({ tabs, active, choose, hidden }: { tabs: GroupTab[]; active:
         aria-controls={open ? 'file-groups-menu' : undefined}
         aria-label={`File group: ${nameOf(current.label)} ${current.count}`}
         data-testid="file-groups-button"
+        onPointerDown={() => {
+          if (!open) restoreSearch.current = session.keepTreeSearch?.();
+        }}
         onClick={() => (open ? setOpen(false) : openWith('selected'))}
         onKeyDown={onButtonKey}
       >
@@ -211,6 +224,7 @@ export const FileGroupTabs = memo(function FileGroupTabs() {
   const { view, active } = useActiveGroup();
   const slot = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLDivElement>(null);
+  const restoreSearch = useRef<(() => void) | undefined>(undefined);
   const shown = enabled && loaded && view.labels.length > 0 && order.length > 0;
   const compact = useCompact(slot, list, shown);
 
@@ -261,7 +275,12 @@ export const FileGroupTabs = memo(function FileGroupTabs() {
               data-group={label}
               aria-selected={selected}
               tabIndex={selected ? 0 : -1}
-              onClick={() => choose(label)}
+              onPointerDown={() => (restoreSearch.current = session.keepTreeSearch?.())}
+              onClick={() => {
+                choose(label);
+                restoreSearch.current?.();
+                restoreSearch.current = undefined;
+              }}
             >
               {nameOf(label)}
               <span className="file-group-count">{count}</span>

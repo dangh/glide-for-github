@@ -375,12 +375,22 @@ test.describe('file groups', () => {
     // The tree filters on its next render: poll until the rows are the matches.
     await expect.poll(async () => (await viewer.treeFiles()).sort()).toEqual([...docs].sort());
 
-    // In another group the same search finds only that group's files (clicking a tab closes the search, as clicking
-    // anywhere else in Glide does).
+    // Clicking another tab keeps the search open with its text, and it finds only that group's files.
     await tab(viewer, 'Manifest').click();
     const manifest = (await listState(viewer)).inList;
-    await search.fill('md');
+    await expect(search).toHaveValue('md');
     await expect.poll(async () => (await viewer.treeFiles()).sort()).toEqual(manifest.filter((p) => /md/i.test(p)).sort());
+
+    // So does a pick from the narrow toolbar's menu.
+    await page.setViewportSize({ width: 700, height: 900 });
+    try {
+      await viewer.locator.getByTestId('file-groups-button').click();
+      await viewer.locator.getByRole('menuitemradio', { name: /^Docs \d+$/ }).click();
+      await expect(search).toHaveValue('md');
+      await expect.poll(async () => (await viewer.treeFiles()).sort()).toEqual([...docs].sort());
+    } finally {
+      await page.setViewportSize({ width: 1400, height: 900 });
+    }
   });
 
   test('a collapsed file stays collapsed across group switches', async ({ page }) => {

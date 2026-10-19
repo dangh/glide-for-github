@@ -4,7 +4,8 @@
  *
  * Tree options are construction-time in @pierre/trees, so a Display-menu change remounts the tree (cheap).
  * Decoration changes (viewed, comments, renames) re-render the mounted rows via `model.render({})`.
- * A file group switch swaps the tree's paths in place (`resetPaths`), keeping the search and each folder's expansion.
+ * A file group switch swaps the tree's paths in place (`resetPaths`), keeping the search and each folder's expansion;
+ * a click on a group tab, which blurs and so closes the search, reopens it (`session.keepTreeSearch`).
  */
 import type { FileTreeDirectoryHandle, GitStatusEntry } from '@pierre/trees';
 import { FileTree, useFileTree } from '@pierre/trees/react';
@@ -96,8 +97,16 @@ function Tree({ paths, gitStatus, settings, colorScheme }: { paths: readonly str
         syncing.current = false;
       }
     };
+    session.keepTreeSearch = () => {
+      const query = modelRef.current?.isSearchOpen() ? modelRef.current.getSearchValue() : null;
+      return () => {
+        const m = modelRef.current;
+        if (query !== null && m && !m.isSearchOpen()) m.setSearch(query);
+      };
+    };
     return () => {
       session.revealInTree = undefined;
+      session.keepTreeSearch = undefined;
     };
   }, []);
 
