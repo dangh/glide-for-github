@@ -10,6 +10,7 @@
   "scripts": {
     "postinstall": "patch-package",
     "build": "node build.mjs",
+    "build:scroll-harness": "node scripts/inpage-spike/build.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "e2e": "npm run build && DISPLAY=${DISPLAY:-:0} WAYLAND_DISPLAY= playwright test",

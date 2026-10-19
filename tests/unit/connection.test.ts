@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BridgeError, type BridgeMethods, type RpcClient } from '../../src/shared/rpc';
-import { createConnection, parsePrParam } from '../../src/viewer/connection';
+import { createConnection } from '../../src/viewer/connection';
 
 type Listener = (event: MessageEvent) => void;
 
@@ -55,24 +55,6 @@ function fakeClients(answer: (n: number, method: string) => Promise<unknown> | '
 }
 
 describe('viewer connection', () => {
-  it('passes the scroll channel of a page-scrolling handshake on, and closes one nobody asked for', async () => {
-    const w = fakeWindow();
-    const { createClient } = fakeClients(async () => null);
-    const received: unknown[] = [];
-    const conn = createConnection(w.win, { createClient, onScrollPort: (p) => received.push(p) });
-    const scrollPort = { close() {} };
-    w.post({ type: 'pierre:port' }, { scrollPort });
-    w.post({ type: 'pierre:port' });
-    expect(received).toEqual([scrollPort]);
-    conn.dispose();
-
-    const unused = { closed: false, close() { this.closed = true; } };
-    const plain = createConnection(w.win, { createClient });
-    w.post({ type: 'pierre:port' }, { scrollPort: unused });
-    expect(unused.closed).toBe(true);
-    plain.dispose();
-  });
-
   it('accepts pierre:port only from github.com and the parent window, and reports the color mode', async () => {
     const w = fakeWindow();
     const { clients, createClient } = fakeClients(async (n) => `client ${n}`);
@@ -88,19 +70,6 @@ describe('viewer connection', () => {
     conn.dispose();
     expect(w.listeners.size).toBe(0);
     expect(clients[0]!.closed).toBe(true);
-  });
-
-  it("passes on the breakpoints GitHub's viewport reaches, only from github.com and the parent window", () => {
-    const w = fakeWindow();
-    const reports: string[][] = [];
-    createConnection(w.win, { onViewport: (reached) => reports.push(reached) });
-    w.post({ type: 'pierre:viewport', reached: ['md', 'lg'] });
-    w.post({ type: 'pierre:viewport', reached: ['lg', 'xl', 7] });
-    w.post({ type: 'pierre:viewport', reached: [] });
-    w.post({ type: 'pierre:viewport', reached: 'md' });
-    w.post({ type: 'pierre:viewport', reached: ['md'] }, { origin: 'https://evil.example' });
-    w.post({ type: 'pierre:viewport', reached: ['md'] }, { source: {} });
-    expect(reports).toEqual([['md', 'lg'], ['lg'], []]);
   });
 
   it('calls wait for the first port', async () => {
@@ -183,16 +152,4 @@ describe('viewer connection', () => {
     expect(args[1]).toEqual([body, 'key-1']);
   });
 
-  it('parses the viewer ?pr= parameter', () => {
-    expect(parsePrParam('?pr=' + encodeURIComponent('dangh/pierre-sandbox#1'))).toEqual({
-      owner: 'dangh',
-      repo: 'pierre-sandbox',
-      number: 1,
-      page: 'changes',
-    });
-    expect(parsePrParam('?pr=a%2Fb%2337778')?.number).toBe(37778);
-    expect(parsePrParam('')).toBeNull();
-    expect(parsePrParam('?pr=a/b#0')).toBeNull();
-    expect(parsePrParam('?pr=' + encodeURIComponent('a/b/c#1'))).toBeNull();
-  });
 });

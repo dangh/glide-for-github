@@ -3,7 +3,7 @@
  */
 import type { CodeViewHandle } from '@pierre/diffs/react';
 import type { Rpc } from '../github/private';
-import type { PageScrollView } from '../pageScroll';
+import type { ScrollPosition } from '../pageScroll';
 import type { AnnotationMeta } from './items';
 import type { Loader } from './loader';
 import { WriteError } from '../github/errors';
@@ -27,8 +27,8 @@ export interface Session {
    * on a file group tab blurs the search, which closes it).
    */
   keepTreeSearch?(): () => void;
-  /** Attaches the list's anchors; frame scrolling also coordinates explicit scroll requests with its parent. */
-  pageScroll?: Pick<PageScrollView, 'attach'> & { expectListScroll?(): void };
+  /** Attaches the list's anchors for restoration after reload. */
+  pageScroll?: ScrollPosition;
 }
 
 export const session: Session = {};

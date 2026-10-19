@@ -15,20 +15,20 @@
   "content_scripts": [
     {
       "matches": ["https://github.com/*"],
-      "js": ["content.js"],
+      "js": ["inpage.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
     },
     {
       "matches": ["https://github.com/*"],
-      "js": ["bridge.js"],
+      "js": ["elements.js", "bridge.js"],
       "world": "MAIN",
       "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["viewer.html", "viewer.js", "chunks/*", "*.css"],
+      "resources": ["chunks/*", "*.css", "worker-host.html"],
       "matches": ["https://github.com/*"]
     }
   ],

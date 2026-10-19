@@ -184,7 +184,6 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
     const anchors = listAnchors(handle, sync);
     const anchor = anchors.anchor();
     instance.setItems(sync.mount(items));
-    session.pageScroll?.expectListScroll?.();
     if (anchor && items.includes(anchor.path)) anchors.scrollToAnchor(anchor);
     else handle.scrollTo({ type: 'position', position: 0 });
     onViewport();
@@ -204,7 +203,6 @@ export const DiffPane = memo(function DiffPane({ rpc, annotations }: DiffPanePro
           lastCurrent.current = path;
           quietUntil.current = performance.now() + SCROLL_QUIET_MS;
           treeSync.cancel();
-          session.pageScroll?.expectListScroll?.();
           // A folded companion unfolds when selected in the tree.
           const s = usePr.getState();
           if (s.folded.has(path) && isCollapsed(s, path)) s.setCollapsed(path, false);

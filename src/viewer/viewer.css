@@ -77,13 +77,7 @@ button {
   flex: 1;
 }
 
-/*
- * Merged bar (page-scrolling experiment): the iframe spans the viewport (src/content/page-scroll.ts), so GitHub's page
- * gutters (Primer's container: 16 px, 24 px from 768 px, 32 px from 1012 px) move inside it. `data-viewport` lists the
- * breakpoints GitHub's viewport reaches (src/shared/viewport.ts). Without it the iframe reaches 1 px past GitHub's
- * content edges instead (FRAME_OVERHANG, src/content/page-scroll.ts): Chrome can drop the frame's outermost device
- * pixel column at a fractional device pixel ratio, so nothing is drawn there.
- */
+/* The merged toolbar follows GitHub's viewport gutters (Primer md/lg breakpoints). */
 :root {
   --gutter: 1px;
 }
@@ -870,10 +864,7 @@ html[data-scroll-layout] .pierre-body[data-tree-hidden] .pierre-diffs {
   overscroll-behavior: contain;
 }
 
-/*
- * Page scrolling (experiment, src/viewer/pageScroll.ts): GitHub's page shows the scrollbar, the list scrolls only
- * while the page has the viewer stuck (inline overflow-y), and a gesture starting at the list's edge chains to the page.
- */
+/* The document owns scrolling; the diff list has no independent scrollbar. */
 html[data-scroll-layout] .pierre-diffs {
   overflow-y: hidden;
   overscroll-behavior: auto;

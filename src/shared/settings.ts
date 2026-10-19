@@ -69,8 +69,7 @@
  *                             so it is at most 300 chars and never contains ; { } < >.
  *   layout.treePosition       'left' | 'right', default 'left'
  *   layout.showTree           boolean, true: the file tree pane (the toolbar's file tree button, like GitHub's)
- *   experiments.pageScroll    boolean, false: GitHub's page scrolls the diffs (src/shared/page-scroll.ts), not the viewer
- *   experiments.mergedBar     boolean, false: GitHub's sticky PR header folds into Glide's toolbar (only with pageScroll)
+ *   experiments.mergedBar     boolean, false: GitHub's sticky PR header folds into Glide's toolbar
  *   github.replaceFilesTab    boolean, false: GitHub's Files changed tab is hidden and its page opens Glide instead
  *   fileGroups.*              enabled (true), defaultGroup ('' = All; else a group label), hideEmpty (true): the file
  *                             group tabs (./file-groups.ts). The groups themselves are stored apart (./file-groups-storage.ts).
@@ -377,7 +376,7 @@ export const DEFAULT_SETTINGS: DisplaySettings = deepFreeze({
   fonts: { codeFontFamily: '', uiFontFamily: '', codeFontSize: 'default', codeFontFeatures: '' },
   layout: { treePosition: 'left', showTree: true },
   review: { hideWhitespace: false },
-  experiments: { pageScroll: false, mergedBar: false },
+  experiments: { mergedBar: false },
   github: { replaceFilesTab: false },
   fileGroups: { enabled: true, defaultGroup: ALL_GROUP, hideEmpty: true },
   relatedFiles: { style: 'nested' },
@@ -457,7 +456,7 @@ const LAYOUT_SCHEMA: Schema<LayoutSettings> = { treePosition: oneOf(C.layout.tre
 
 const REVIEW_SCHEMA: Schema<ReviewSettings> = { hideWhitespace: isBool };
 
-const EXPERIMENTS_SCHEMA: Schema<ExperimentSettings> = { pageScroll: isBool, mergedBar: isBool };
+const EXPERIMENTS_SCHEMA: Schema<ExperimentSettings> = { mergedBar: isBool };
 
 const GITHUB_SCHEMA: Schema<GithubSettings> = { replaceFilesTab: isBool };
 
@@ -500,6 +499,10 @@ function sanitizeOverrides(raw: unknown): DeepPartial<DisplaySettings> {
   for (const name of SETTINGS_SECTIONS) {
     const picked = pick(SCHEMAS[name] as Schema<object>, Object.hasOwn(src, name) ? src[name] : undefined);
     if (Object.keys(picked).length > 0) (out as Record<string, unknown>)[name] = picked;
+  }
+  const legacy = src.experiments;
+  if (isRecord(legacy) && Object.hasOwn(legacy, 'pageScroll') && legacy.pageScroll !== true && out.experiments?.mergedBar === true) {
+    out.experiments.mergedBar = false;
   }
   return out;
 }

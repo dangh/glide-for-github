@@ -4,7 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BridgeError } from '../../src/shared/rpc';
-import { PORT_TIMEOUT_MESSAGE, PORT_TIMEOUT_MS, watchPort } from '../../src/viewer/connection';
+import { PORT_TIMEOUT_MESSAGE } from '../../src/viewer/connection';
 import { fetchHeadOid, type FileSummary, type PrData, type Rpc } from '../../src/viewer/github/private';
 import { openComposer, targetFromRange } from '../../src/viewer/state/compose';
 import { draftsKeyName, initDraftPersistence } from '../../src/viewer/state/drafts';
@@ -662,32 +662,6 @@ describe('Composer flushes on pagehide', () => {
     expect(usePr.getState().drafts.get(key)?.body).toBe('');
     window.dispatchEvent(new Event('pagehide'));
     expect(usePr.getState().drafts.get(key)?.body).toBe('half typed');
-  });
-});
-
-describe('port timeout', () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
-
-  it('reports "Reload the page to use Glide" when no port arrives within 5 s', async () => {
-    const onTimeout = vi.fn();
-    watchPort(new Promise(() => undefined), onTimeout);
-    expect(PORT_TIMEOUT_MS).toBe(5000);
-    await vi.advanceTimersByTimeAsync(4999);
-    expect(onTimeout).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(1);
-    expect(onTimeout).toHaveBeenCalledWith(PORT_TIMEOUT_MESSAGE);
-    expect(PORT_TIMEOUT_MESSAGE).toMatch(/^Reload the page to use Glide/);
-  });
-
-  it('stays quiet when the port arrives in time', async () => {
-    const onTimeout = vi.fn();
-    let resolve!: (v: string | undefined) => void;
-    watchPort(new Promise<string | undefined>((r) => (resolve = r)), onTimeout);
-    await vi.advanceTimersByTimeAsync(1000);
-    resolve('light');
-    await vi.advanceTimersByTimeAsync(10_000);
-    expect(onTimeout).not.toHaveBeenCalled();
   });
 });
 

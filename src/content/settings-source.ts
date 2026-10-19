@@ -13,7 +13,7 @@ export interface ContentSettings {
   replaceFilesTab: boolean;
 }
 
-export const DEFAULT_CONTENT_SETTINGS: ContentSettings = { layout: 'frame', replaceFilesTab: false };
+export const DEFAULT_CONTENT_SETTINGS: ContentSettings = { layout: 'page', replaceFilesTab: false };
 
 /** The content script's settings in a stored settings item; anything missing or invalid is the default. */
 export function contentSettingsOf(item: unknown): ContentSettings {

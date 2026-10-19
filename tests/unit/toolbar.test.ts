@@ -178,7 +178,7 @@ describe('Toolbar', () => {
     const labels = [...menu.querySelectorAll('.field > span:last-of-type, .field > span:first-child')].map((l) => l.textContent);
     expect(labels).toEqual(expect.arrayContaining(['Layout', 'Long lines', 'Hide whitespace changes']));
     await unmount();
-    usePageScroll.setState({ layout: 'frame', stuck: false });
+    usePageScroll.setState({ layout: 'page', stuck: false });
   });
 
   it("stuck with the merged bar, shows GitHub's sticky PR header: state, plain title and number above the commit range and branches", async () => {
@@ -229,7 +229,7 @@ describe('Toolbar', () => {
     expect(header()).toBeNull();
     expect(toolbar.querySelector('[data-testid="range-picker"]')).not.toBeNull();
     await unmount();
-    usePageScroll.setState({ layout: 'frame', stuck: false });
+    usePageScroll.setState({ layout: 'page', stuck: false });
   });
 
   it("stuck with the merged bar, a stacked PR shows GitHub's stack button before the commit range; its menu opens each PR in Glide", async () => {
@@ -290,6 +290,6 @@ describe('Toolbar', () => {
     expect(button()).toBeNull();
     expect(toolbar.querySelector('.stack-divider')).toBeNull();
     await unmount();
-    usePageScroll.setState({ layout: 'frame', stuck: false });
+    usePageScroll.setState({ layout: 'page', stuck: false });
   });
 });

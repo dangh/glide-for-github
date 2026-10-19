@@ -54,6 +54,9 @@ describe('build output', () => {
     expect(manifest.web_accessible_resources?.flatMap(entry => entry.resources)).toContain('worker-host.html');
     expect(manifest.web_accessible_resources?.flatMap(entry => entry.resources)).not.toContain('pierre-worker.js');
     for (const file of ['content.js', 'viewer.html', 'viewer.js']) expect(existsSync(join(dist, file)), file).toBe(false);
+    const inpage = readFileSync(join(dist, 'inpage.js'), 'utf8');
+    expect(inpage).not.toContain('viewer.html?pr=');
+    expect(inpage).not.toContain('function createPageScroll(');
   });
 
   it('preserves the body flex rule when adapting document selectors to the shadow root', () => {
@@ -74,7 +77,7 @@ describe('build output', () => {
   });
 
   it("takes the product name and description from BRAND (one place to rename)", () => {
-    expect(manifest.name).toBe(`${BRAND.name} (IN-PAGE SPIKE)`);
+    expect(manifest.name).toBe(BRAND.name);
     expect(manifest.description).toBe(BRAND.description);
     expect(BRAND.description.length).toBeLessThanOrEqual(132); // Chrome Web Store limit for the manifest description
     expect(BRAND.name).toBe('Glide for GitHub');
