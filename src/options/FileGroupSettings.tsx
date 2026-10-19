@@ -208,8 +208,8 @@ export function FileGroupSettingsForm({ settings, update }: { settings: FileGrou
           <span>
             <span className="options-check-label">Show file groups</span>
             <span className="options-check-description">
-              Tabs above the tree and the diffs that show one kind of file at a time, each with its file count. All shows
-              every file.
+              Tabs in the toolbar that show one kind of file at a time in the tree and the diffs, each with its file
+              count. All shows every file.
             </span>
           </span>
         </label>
