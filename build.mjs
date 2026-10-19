@@ -14,6 +14,15 @@ async function loadBrand() {
   return (await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`)).BRAND;
 }
 const BRAND = await loadBrand();
+
+/**
+ * patches/@pierre+diffs+*.patch (per-item gaps, applied by `postinstall`) must be in node_modules: built without it,
+ * a related file's box shows CodeView's 16 px gap where it should join its main file, and nothing else fails.
+ */
+const codeView = await readFile(r('node_modules/@pierre/diffs/dist/components/CodeView.js'), 'utf8');
+if (!codeView.includes('gapBefore')) {
+  throw new Error('@pierre/diffs is not patched (patches/@pierre+diffs+*.patch): run `npm install`, then build again.');
+}
 const jsonString = (value) => JSON.stringify(value).slice(1, -1);
 const htmlText = (value) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
