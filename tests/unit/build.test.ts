@@ -51,11 +51,13 @@ describe('build output', () => {
   it('builds the in-page entry and excludes the old iframe viewer', () => {
     expect(manifest.content_scripts?.[0]?.js).toEqual(['inpage.js']);
     expect(existsSync(join(dist, 'inpage.css'))).toBe(true);
+    expect(manifest.web_accessible_resources?.flatMap(entry => entry.resources)).toContain('worker-host.html');
+    expect(manifest.web_accessible_resources?.flatMap(entry => entry.resources)).not.toContain('pierre-worker.js');
     for (const file of ['content.js', 'viewer.html', 'viewer.js']) expect(existsSync(join(dist, file)), file).toBe(false);
   });
 
   it('emits every stylesheet and script that the HTML pages reference', () => {
-    for (const page of ['options.html']) {
+    for (const page of ['options.html', 'worker-host.html']) {
       const html = readFileSync(join(dist, page), 'utf8');
       const refs = [...html.matchAll(/(?:href|src)=["']([^"']+)["']/g)].map((m) => m[1]!);
       expect(refs.length, page).toBeGreaterThan(0);

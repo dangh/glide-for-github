@@ -13,11 +13,14 @@ export interface Lifecycle {
   stop(): void;
 }
 
+type MountedViewer = Pick<ViewerHost, 'layout' | 'refresh' | 'unmount'>;
+type MountViewer = (doc: Document, ref: NonNullable<ReturnType<typeof parsePrUrl>>, layout: ViewerHost['layout']) => MountedViewer;
+
 type NavigationTarget = { addEventListener(type: string, listener: () => void): void; removeEventListener(type: string, listener: () => void): void };
 
-export function createLifecycle(win: Window & typeof globalThis = window, settings: SettingsSource = fixedSettings()): Lifecycle {
+export function createLifecycle(win: Window & typeof globalThis = window, settings: SettingsSource = fixedSettings(), mount: MountViewer = mountViewer): Lifecycle {
   const doc = win.document;
-  let mounted: { key: string; host: ViewerHost } | null = null;
+  let mounted: { key: string; host: MountedViewer } | null = null;
   let observer: MutationObserver | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let cleanups: Array<() => void> = [];
@@ -63,7 +66,7 @@ export function createLifecycle(win: Window & typeof globalThis = window, settin
     const { layout } = stored;
 
     if (mounted && (mounted.host.layout !== layout || !mounted.host.refresh())) unmountViewer();
-    mounted ??= { key, host: mountViewer(doc, ref, layout) };
+    mounted ??= { key, host: mount(doc, ref, layout) };
     setTabActive(doc, true);
   }
 

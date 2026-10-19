@@ -1,57 +1,63 @@
 # In-page scroll spike, 2026-10-19
 
-Recommendation: proceed with the one-document scrolling design as a candidate. Do not replace the production iframe yet. The scroll adapter works; extension-context workers, authenticated review flows, navigation, and macOS trackpad behavior remain adoption gates.
+The packaged extension now renders Glide in GitHub's top document and performs highlighting in native workers. It uses the existing content lifecycle to keep the tab present when GitHub replaces its layout. Keep this on `spike/in-page` until macOS trackpad behavior, review writes, and production performance have been verified.
 
-Everything on `spike/in-page` is throwaway. Nothing from this spike was merged or pushed to main.
+## Current architecture
 
-## Verified behavior
+The viewer mounts in an open shadow root owned by GitHub's top document. Its diff list has no vertical scroller; the document scrolls, while the toolbar and file headers use native sticky positioning. The adapter patches Pierre's viewport reads, scroll anchoring, and programmatic jumps. It disables scroll rebasing, so browser document-height limits remain relevant to extremely tall lists.
 
-The T3 collaborative browser ran a synthetic 500-file list, with 160 TypeScript lines before and after per file, inside an open shadow root on the live GitHub page at https://github.com/dangh/glide-for-github/pull/1/files. This browser was signed out. The probe was injected through browser automation, not loaded as an extension. That proves rendering and layout feasibility, not extension loading or authenticated API behavior.
+A hidden `worker-host.html` iframe runs in the extension origin and creates the native Pierre workers. MessagePorts carry the existing worker protocol between the content script and those workers. This frame contains no viewer, toolbar, diff DOM, or scrolling relay. It exposes no token-storage or GitHub API methods.
 
-At document scroll positions 1,000, 200,000, 800,000, and the bottom at 1,633,740.5 pixels, the list itself stayed at `scrollTop: 0`. Only one file was mounted at each sampled position; the bottom sample mounted file 499. The toolbar stayed at 0 pixels and the native sticky file header at 56 pixels. A programmatic jump to file 250 reached its exact logical top, 817,008 pixels. Main-thread highlighting produced styled tokens on every sampled file. Raw samples are in [evidence.json](evidence.json).
+GitHub's origin cannot construct a worker from a `chrome-extension://` script directly. The earlier spike attempted that and fell back to the main thread. The worker host removes that origin mismatch. Worker startup errors now produce a visible failure, and PR data loading cannot clear that failure and hide a fallback.
 
-The inherited Pierre header style uses `top: 0`. The adapter adds the toolbar inset with `unsafeCSS`, preserving Pierre's prototype-backed options. Both the toolbar and file headers use browser CSS stickiness. The code does not relay wheel deltas between scrollers. Window scroll events update the virtualized range; programmatic jumps and Pierre's layout anchoring can still call `window.scrollBy`.
+Pierre's custom-element registration also needs the page's registry: Chrome's isolated content-script registry is null. The small `elements.js` MAIN-world entry registers the two hosts; viewer logic and extension state remain isolated. Theme, focus, and menu handling use the viewer's shadow root. Token entry stays on an extension page because an open shadow root is readable by page scripts.
 
-External rules setting textarea fonts to 90 pixels and toolbar heights to 999 pixels did not cross the shadow boundary: the probe kept its 14-pixel input and 56-pixel toolbar. Focus landed on the host in `document.activeElement`, and on the textarea in `shadowRoot.activeElement`. The shared viewer changes therefore scope focus, menu, modal, and theme handling to the viewer root. The probe did not change GitHub's root font or color-mode attribute.
+## Packaged-extension proof
 
-## Highlighting constraints
+The repository e2e tests load the actual unpacked extension in Chrome for Testing 155 with a disposable copy of a signed-in profile. They navigate a public PR through its Glide tab and check:
 
-On the real GitHub page, a page-context blob worker failed with a `worker-src` CSP violation. This does **not** prove that an isolated extension content script cannot start a worker. [Chrome documents separate CSP rules for isolated content scripts](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts#content_security_policy).
+- The tab is visible, and is reinserted after removal to simulate GitHub replacing its strip.
+- A real PR file header renders in the top document's shadow root, with no `iframe[data-pierre-viewer]`.
+- The hidden extension host creates and initializes at least two native workers, completes highlighting requests, and reports zero worker errors. The recorded run had four spawned workers, four initialized workers, one completed render at the sampled point, and zero errors.
+- Removing the worker host causes a remount and a new pool that completes highlighting.
+- A forced native Worker constructor failure produces an alert and no file renderer, rather than silently switching to main-thread highlighting.
 
-The local harness successfully initialized two Pierre workers, highlighted visible content, and finished its runs with no worker failures or queued tasks. The extension prototype attempts a packaged `chrome-extension://` worker. A later repository e2e test exercised the actual unpacked extension and confirmed this direct worker path is blocked; see the packaging follow-up below. Do not count its main-thread fallback as worker success. If direct creation fails, an extension-origin iframe hosting the worker pool and forwarding its protocol over ports is a candidate; it was not implemented or tested here.
+Both browser scenarios pass. TypeScript, the build integrity checks, and all 877 unit tests pass. This is a focused browser check, not a passing result for the full production e2e suite. The earlier main-branch suite has separate failures recorded in the conversation.
 
-## Timing is inconclusive for production
+The lifecycle is reused rather than replaced with a one-time tab insertion. It handles DOM/route notifications, active-tab styling, settings, and tab presses. A GitHub layout replacement preserves the mounted React root if its worker host survives, or remounts the viewer and its workers if that host was removed.
 
-The local harness alternated page scrolling and Pierre's original element scrolling five times each, 120 animation frames per run, with the same data and two workers. This comparison has **no separate iframe process**, no full GitHub application load, and no network loader or actual review composer. `frame` in the measurement output means an element scroller, not the current production iframe.
+## Earlier scroll and isolation probes
 
-Both paths had a median per-run p95 frame interval of approximately 16.8 ms. Per-run p95 intervals ranged from 16.7 to 50.0 ms for page scrolling and 16.7 to 50.1 ms for element scrolling. The first pair overlapped the unit-test run on this six-core host, so those samples have known CPU contention. No speedup or production performance equivalence is established.
+The T3 collaborative browser ran a synthetic 500-file list, with 160 TypeScript lines before and after per file, inside a shadow root on https://github.com/dangh/glide-for-github/pull/1/files. It was signed out, and the synthetic probe was injected through browser automation rather than loaded as an extension.
 
-The loop advances 120 pixels per frame through the first five files of the 500-file dataset; separate jump checks cover the distant files. Each run recorded render calls, mounted items, actual highlighted tokens, and initialized worker statistics, so a fast no-op or failed highlighter cannot pass unnoticed. The warm runs hit the display's roughly 60 Hz cadence. Main-thread render work was instrumented, but no full profiler or current-build comparison was run. The results are a smoke check, not a reason to choose one architecture for performance.
+At document scroll positions 1,000, 200,000, 800,000, and the bottom at 1,633,740.5 pixels, the list's own `scrollTop` stayed at zero. Only one file was mounted at each sampled position; the bottom sample mounted file 499. The toolbar stayed at zero pixels and the native sticky file header at 56 pixels. A jump to file 250 reached its exact logical top, 817,008 pixels. Styled tokens appeared on every sampled file. Raw samples are in [evidence.json](evidence.json).
+
+External rules setting textarea fonts to 90 pixels and toolbar heights to 999 pixels did not cross the shadow boundary: the probe retained its 14-pixel input and 56-pixel toolbar. Focus required `shadowRoot.activeElement`, rather than `document.activeElement`, which reports the shadow host. A browser check also verified that translated `:host(...)` attribute selectors apply responsive controls and header styles.
+
+## Timing remains inconclusive
+
+The synthetic local harness alternated document scrolling and Pierre's original element scrolling five times each, 120 animation frames per run, with the same data and two workers. This comparison had no separate iframe process, no full GitHub application load, and no network loader or actual review composer. `frame` in its measurement output means an element scroller, not the current production iframe.
+
+Both paths had a median per-run p95 frame interval of about 16.8 ms. Per-run p95 intervals ranged from 16.7 to 50.0 ms for document scrolling and 16.7 to 50.1 ms for element scrolling. The first pair overlapped unit tests on this six-core host and has known CPU contention. No production speedup or performance equivalence is established. These measurements also predate the port-based worker host and do not measure its overhead.
+
+The loop advanced 120 pixels per frame through the first five files; separate jump checks covered distant files. Each run recorded render calls, mounted items, actual highlighted tokens, and initialized worker statistics. The warm runs hit the display's roughly 60 Hz cadence. No full profiler or current-build comparison was run.
 
 ## Remaining adoption gates
 
-- Check explicit worker fallback reporting, post/reply/edit/delete review comments, viewed toggles, and suggestion actions in the unpacked extension on an authenticated GitHub PR. Initial rendering is now tested; direct worker construction is confirmed blocked. None of those authenticated actions were attempted by this spike.
-- Exercise real keyboard shortcuts, menus, modal focus traps, Turbo navigation, and GitHub React layout replacements. The standalone prototype requires a PR URL ending in `#glide` at initial load, uses a full reload on hash changes, and does not implement the normal tab lifecycle.
 - Test a physical macOS trackpad at the top, bottom, and former page/list seam. Linux programmatic scrolling cannot verify macOS rubber-band feel.
-- Restore a production strategy for extremely tall lists. The adapter disables Pierre's scroll rebasing; the tested list is about 1.63 million pixels tall. Browser document-height limits still apply to larger inputs.
-- Keep token entry in an extension page. An open shadow root is style isolation, not a secret DOM boundary. The prototype disables the in-page token prompt and directs missing-token actions to extension options. Stored tokens can still be used by isolated content-script code.
+- Verify authenticated review comments, replies, edits, deletion, viewed toggles, and suggestion actions. The focused tests above do not perform review writes.
+- Exercise full Turbo body replacement, repeated PR navigation, menu dismissal, and modal focus on the real site. Targeted tests cover tab repair and worker-host loss, not every navigation path.
+- Measure the full extension against the current iframe build on large real PRs, including comment typing and port transport overhead.
+- Restore a production strategy for inputs exceeding the browser's document-height limit. The synthetic list tested here was about 1.63 million pixels tall.
 
-Compared with a full-height iframe, an in-page viewer permits native page-relative sticky headers without a cross-frame position relay. A full-height iframe retains the extension document boundary, but still needs a viewport adapter and a strategy for sticky file headers. Neither route has earned a production performance claim from this spike.
+An in-page viewer permits page-relative native sticky headers. A full-height iframe retains the extension document boundary, but would need its own viewport adapter and a sticky-header strategy. This spike provides evidence for in-page feasibility; it does not establish a performance winner.
 
 ## Reproduce
 
-From this worktree, run `node scripts/inpage-spike/build.mjs`. It creates a separately named **IN-PAGE SPIKE** extension in this worktree's `dist/`, plus the synthetic browser probe. `npm run build` and `node build.mjs` also build the in-page experiment on this branch. The iframe viewer assets are removed from the output so this branch cannot silently produce the old viewer.
+Every build command on this branch, including `npm run build`, produces the **IN-PAGE SPIKE** extension in `dist/`. Old `content.js`, `viewer.js`, and `viewer.html` assets are removed so this branch cannot silently build the old iframe viewer. The original `node scripts/inpage-spike/build.mjs` command also works.
 
-For the synthetic harness, serve the worktree with `python3 -m http.server 8134` and open `http://localhost:8134/research/inpage-spike/index.html`. The harness starts in page mode with workers. To compare paths, evaluate the contents of `scripts/inpage-spike/measure.js`, then call `await __spikeMeasure()`. `__spikeStart({mode:'page',count:500,workers:true})` and `__spikeStart({mode:'frame',count:500,workers:true})` select individual paths.
+After pulling and building, reload the extension in `chrome://extensions`, then reload the GitHub page. Click Glide beside Files changed, or open a PR URL ending in `#glide`.
 
-To try the extension prototype, load this worktree's `dist/` as unpacked, then open a PR URL ending in `#glide`. This build is a feasibility artifact with the limitations above.
+To run the packaged-extension checks, set `PIERRE_SPIKE_PROFILE` to a signed-in Chrome profile directory and run `PIERRE_E2E_HEADLESS=1 npx playwright test tests/e2e/inpage-spike.spec.ts`. The tests copy that profile into a temporary directory and delete the copy afterward; they do not post comments or change viewed state.
 
-Validation: spike build succeeds, TypeScript passes, and all 877 unit tests pass. These tests do not cover the unverified extension and platform gates above.
-
-Packaging correction: the original spike required a separate build command, so the normal build still produced the iframe version. Every build entry now produces the in-page spike. Reload the extension and then reload the GitHub page to discard content scripts and DOM from the previous extension build.
-
-The packaged-extension smoke test now passes in Chrome for Testing 155 on an authenticated public PR, using a temporary copy of the existing test profile. It asserts a visible real file header, a shadow root owned by the top document, and zero `iframe[data-pierre-viewer]` elements. This exposed and fixed another bootstrap problem: Chrome isolated content scripts have a null custom-element registry. `elements.js` now registers Pierre's two custom elements in MAIN at document start, while the viewer stays in the isolated world. This tests initial rendering only, not review writes or navigation recovery.
-
-The same extension run confirmed that direct `chrome-extension://.../pierre-worker.js` construction throws SecurityError from the GitHub origin. The current prototype falls back to main-thread highlighting. Worker routing remains a production gate, now confirmed rather than hypothetical.
-
-To rerun the packaged-extension check, set `PIERRE_SPIKE_PROFILE` to a signed-in Chrome profile directory and run `PIERRE_E2E_HEADLESS=1 npx playwright test tests/e2e/inpage-spike.spec.ts`. The test copies the profile into a temporary directory and deletes the copy afterward; it does not post comments or change viewed state.
+For the synthetic harness, serve the worktree with `python3 -m http.server 8134` and open `http://localhost:8134/research/inpage-spike/index.html`. Evaluate `scripts/inpage-spike/measure.js`, then call `await __spikeMeasure()` to repeat the earlier synthetic comparison.

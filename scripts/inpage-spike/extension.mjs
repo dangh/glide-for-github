@@ -8,6 +8,8 @@ await build({ plugins: [{ name: 'isolated-custom-elements', setup(builder) {
   }));
 } }], entryPoints: ['src/inpage/main.tsx'], bundle: true, outfile: 'dist/inpage.js', format: 'iife', target: 'chrome120', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' } });
 await build({ stdin: { contents: "import './node_modules/@pierre/diffs/dist/components/web-components.js'; import './node_modules/@pierre/trees/dist/components/web-components.js';", resolveDir: process.cwd() }, bundle: true, outfile: 'dist/elements.js', format: 'iife', target: 'chrome120' });
+await build({ entryPoints: ['src/inpage/workerHost.ts'], bundle: true, outfile: 'dist/worker-host.js', format: 'iife', target: 'chrome120' });
+await writeFile('dist/worker-host.html', await readFile('src/inpage/worker-host.html'));
 const source = await readFile('src/viewer/viewer.css', 'utf8');
 const css = source.replaceAll(':root', ':host').replace(/\bhtml(?=[\s,\[.:{])/g, ':host').replace(/\bbody(?=[\s,{])/g, '#root')
   .replace(/:host((?:\[[^\]]+\]|:not\([^)]*\))+)/g, ':host($1)')
@@ -25,7 +27,7 @@ const manifest = JSON.parse(await readFile('dist/manifest.json', 'utf8'));
 manifest.name += ' (IN-PAGE SPIKE)';
 manifest.content_scripts[0].js = ['inpage.js'];
 manifest.content_scripts[1].js = ['elements.js', 'bridge.js'];
-manifest.web_accessible_resources[0].resources = ['chunks/*', '*.css', 'pierre-worker.js'];
+manifest.web_accessible_resources[0].resources = ['chunks/*', '*.css', 'worker-host.html'];
 await writeFile('dist/manifest.json', JSON.stringify(manifest, null, 2));
 await mkdir('research/inpage-spike', { recursive: true });
 await writeFile('research/inpage-spike/index.html', `<!doctype html><meta charset="utf-8"><title>Glide in-page spike harness</title>

@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-19",
+  "environment": "Chrome for Testing 155, Linux, actual unpacked extension, temporary signed-in profile copy",
+  "test": "tests/e2e/inpage-spike.spec.ts",
+  "nativeWorkersAtSample": {
+    "spawned": 4,
+    "initialized": 4,
+    "completedHighlightRenders": 1,
+    "errors": 0
+  },
+  "tabRestoredAfterRemoval": true,
+  "viewerInTopDocument": true,
+  "viewerIframeCount": 0,
+  "workerHostHidden": true,
+  "highlightingRecoveredAfterWorkerHostRemoval": true,
+  "forcedWorkerFailureShowsAlertWithoutFileRenderer": true,
+  "browserTestsPassed": 2,
+  "unitTestsPassed": 877,
+  "typecheckPassed": true
+}

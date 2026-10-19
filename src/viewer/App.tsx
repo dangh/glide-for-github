@@ -40,7 +40,7 @@ const workerRenderOptions = (diff: DisplaySettings['diff']) => {
 export const workerSpike: { factory?: (() => Worker) | 'main'; poolSize?: number } = {};
 
 /** Pierre's worker pool, or undefined (main-thread highlighting) when workers cannot be created. */
-function createWorkerPool(settings: DisplaySettings): WorkerPoolManager | undefined {
+function createWorkerPool(settings: DisplaySettings, reportFailure?: (message: string) => void): WorkerPoolManager | undefined {
   try {
     if (typeof Worker === 'undefined' || workerSpike.factory === 'main') return undefined;
     const url = chrome.runtime.getURL('pierre-worker.js');
@@ -48,12 +48,17 @@ function createWorkerPool(settings: DisplaySettings): WorkerPoolManager | undefi
       poolOptions: {
         workerFactory: workerSpike.factory ?? (() => new Worker(url, { type: 'module' })),
         poolSize: workerSpike.poolSize ?? Math.max(2, Math.min(4, (navigator.hardwareConcurrency || 4) - 1)),
-        // A failing pool falls back to main-thread highlighting on its own; keep the console quiet.
-        onWorkerError: (event) => event.preventDefault(),
+        // Surface in-page failures; the original frame keeps its existing fallback behavior.
+        onWorkerError: (event) => {
+          event.preventDefault();
+          reportFailure?.(event instanceof ErrorEvent ? event.message : 'Worker failed to start');
+        },
       },
       highlighterOptions: { ...workerRenderOptions(settings.diff), preferredHighlighter: 'shiki-js' },
     });
-  } catch {
+  } catch (error) {
+    // Pool creation happens during render; report setup failures after it completes.
+    queueMicrotask(() => reportFailure?.(error instanceof Error ? error.message : String(error)));
     return undefined;
   }
 }
@@ -77,8 +82,9 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
   const treePosition = useSettings((s) => s.settings.layout.treePosition);
   const showTree = useSettings((s) => s.settings.layout.showTree);
 
+  const [workerFailure, setWorkerFailure] = useState<string>();
   // The pool is created once settings are known (its initial render options come from them).
-  const pool = useMemo(() => (settingsLoaded ? createWorkerPool(useSettings.getState().settings) : undefined), [settingsLoaded]);
+  const pool = useMemo(() => (settingsLoaded ? createWorkerPool(useSettings.getState().settings, typeof workerSpike.factory === 'function' ? setWorkerFailure : undefined) : undefined), [settingsLoaded]);
   useEffect(() => {
     if (!pool) return;
     pool.setRenderOptions(workerRenderOptions(diffSettings)).catch(() => undefined);
@@ -115,6 +121,8 @@ export function App({ prRef, rpc }: { prRef: PrRef; rpc: Rpc }) {
     root.dataset.theme = themeType;
     root.style.colorScheme = themeType === 'system' ? 'light dark' : themeType;
   }, [themeType]);
+
+  if (workerFailure) return <FatalError message={`Glide highlighting failed: ${workerFailure}`} filesUrl={filesChangedUrl(prRef)} />;
 
   if (fatal) {
     // No port (extension updated): only a page reload helps, so no Try again.
