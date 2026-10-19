@@ -352,6 +352,33 @@ describe('review submission, viewed, apply suggestion (global store)', () => {
       expect(usePr.getState().viewed.has('a.ts')).toBe(true);
     });
 
+    it('sends rapid toggles in order, keeping the latest optimistic state', async () => {
+      setTokenStorage(fakeArea());
+      let finish!: () => void;
+      const calls = fakeRpc(async (method) => {
+        if (method === 'markViewed') await new Promise<void>((resolve) => { finish = resolve; });
+        return null;
+      });
+      const first = setFileViewed('a.ts', true);
+      await vi.waitFor(() => expect(calls).toHaveLength(1));
+      const second = setFileViewed('a.ts', false);
+      expect(usePr.getState().viewed.has('a.ts')).toBe(false);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(calls).toHaveLength(1);
+      finish();
+      await Promise.all([first, second]);
+      expect(calls.map((c) => c[0])).toEqual(['markViewed', 'unmarkViewed']);
+      expect(usePr.getState().viewed.has('a.ts')).toBe(false);
+    });
+
+    it('restores the last confirmed state when both rapid toggles fail', async () => {
+      setTokenStorage(fakeArea());
+      fakeRpc(async () => { throw new BridgeError({ status: 422, message: 'nope' }); });
+      const results = await Promise.allSettled([setFileViewed('a.ts', true), setFileViewed('a.ts', false)]);
+      expect(results.map((r) => r.status)).toEqual(['rejected', 'rejected']);
+      expect(usePr.getState().viewed.has('a.ts')).toBe(false);
+    });
+
     it('reverts when GitHub rejects it', async () => {
       graphql({ UnmarkViewed: () => json(502, { message: 'Bad gateway' }) });
       usePr.getState().setViewedLocal('a.ts', true);

@@ -492,9 +492,13 @@ export async function discardReview(): Promise<void> {
 
 // ---- viewed (Task 10, Ruling 13: token first, GitHub session second) --------------------------------
 
-/** Latest viewed toggle per path: an older toggle that fails must not revert a newer one. */
-const viewedOps = new Map<string, number>();
-let viewedSeq = 0;
+interface ViewedQueue {
+  tail: Promise<void>;
+  confirmed: boolean;
+}
+
+// Serialize each file's writes so GitHub cannot finish an older toggle after a newer one.
+const viewedQueues = new WeakMap<PrData, Map<string, ViewedQueue>>();
 
 /**
  * Marks a file viewed / not viewed: optimistic (the file collapses or expands at once), then GraphQL
@@ -505,11 +509,19 @@ let viewedSeq = 0;
 export async function setFileViewed(path: string, viewed: boolean): Promise<void> {
   const pr = currentPr();
   if (usePr.getState().viewed.has(path) === viewed) return;
-  const op = ++viewedSeq;
-  viewedOps.set(path, op);
+  let queues = viewedQueues.get(pr);
+  if (!queues) {
+    queues = new Map();
+    viewedQueues.set(pr, queues);
+  }
+  const previous = queues.get(path);
+  const queue = previous ?? { tail: Promise.resolve(), confirmed: usePr.getState().viewed.has(path) };
+  const before = queue.tail;
   usePr.getState().setViewedLocal(path, viewed);
   const { owner, repo, number } = pr.ref;
-  try {
+  const done = (async () => {
+    await before.catch(() => undefined);
+    if (usePr.getState().pr !== pr) return;
     await withSessionFallback(
       viewed ? 'mark files as viewed' : 'unmark files as viewed',
       async (api) => {
@@ -522,11 +534,17 @@ export async function setFileViewed(path: string, viewed: boolean): Promise<void
         await rpc.call(viewed ? 'markViewed' : 'unmarkViewed', owner, repo, number, path);
       },
     );
+    queue.confirmed = viewed;
+  })();
+  queue.tail = done;
+  queues.set(path, queue);
+  try {
+    await done;
   } catch (err) {
-    if (viewedOps.get(path) === op && usePr.getState().pr === pr) usePr.getState().setViewedLocal(path, !viewed);
+    if (queue.tail === done && usePr.getState().pr === pr) usePr.getState().setViewedLocal(path, queue.confirmed);
     throw err;
   } finally {
-    if (viewedOps.get(path) === op) viewedOps.delete(path);
+    if (queue.tail === done) queues.delete(path);
   }
 }
 
