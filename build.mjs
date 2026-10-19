@@ -15,13 +15,20 @@ async function loadBrand() {
 }
 const BRAND = await loadBrand();
 
-/**
- * patches/@pierre+diffs+*.patch (per-item gaps, applied by `postinstall`) must be in node_modules: built without it,
- * a related file's box shows CodeView's 16 px gap where it should join its main file, and nothing else fails.
- */
-const codeView = await readFile(r('node_modules/@pierre/diffs/dist/components/CodeView.js'), 'utf8');
-if (!codeView.includes('gapBefore')) {
-  throw new Error('@pierre/diffs is not patched (patches/@pierre+diffs+*.patch): run `npm install`, then build again.');
+// Fail before emitting a bundle if a dependency update or skipped postinstall lost the compatibility contract.
+const patchContracts = [
+  ['@pierre/diffs/dist/components/CodeView.js', ['gapBefore', 'windowViewport', 'refreshViewport =', 'resetScrollPage()']],
+  ['@pierre/diffs/dist/components/CodeView.d.ts', ['interface CodeViewWindowViewport', 'windowViewport?: CodeViewWindowViewport']],
+  ...['diffs', 'trees'].map(name => [
+    `@pierre/${name}/dist/components/web-components.js`,
+    ['typeof HTMLElement !== "undefined" && customElements != null && customElements.get'],
+  ]),
+];
+for (const [file, required] of patchContracts) {
+  const source = await readFile(r('node_modules', file), 'utf8');
+  for (const token of required) {
+    if (!source.includes(token)) throw new Error(`${file} is missing the patched contract ${token}. Run npm ci before building.`);
+  }
 }
 const jsonString = (value) => JSON.stringify(value).slice(1, -1);
 const htmlText = (value) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -46,6 +53,22 @@ await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
 
 await Promise.all([
+  build({
+    ...common,
+    entryPoints: { inpage: r('src/inpage/main.tsx') },
+    outdir: dist,
+    format: 'iife',
+    jsx: 'automatic',
+  }),
+  build({
+    ...common,
+    stdin: {
+      contents: "import './node_modules/@pierre/diffs/dist/components/web-components.js'; import './node_modules/@pierre/trees/dist/components/web-components.js';",
+      resolveDir: root,
+    },
+    outfile: resolve(dist, 'elements.js'),
+    format: 'iife',
+  }),
   // Extension pages: ESM with code splitting into dist/chunks/.
   build({
     ...common,
@@ -85,5 +108,8 @@ await Promise.all([
   writeFile(resolve(dist, 'THIRD_PARTY_NOTICES.txt'), renderNotices(root)),
 ]);
 
-const { buildInPage } = await import('./scripts/build-inpage.mjs');
-await buildInPage(common, root);
+const source = await readFile(r('src/viewer/viewer.css'), 'utf8');
+const css = source.replaceAll(':root', ':host').replace(/^html(?=[\s,\[.:{])/gm, ':host').replace(/^body(?=[\s,{])/gm, '#root')
+  .replace(/:host((?:\[[^\]]+\]|:not\([^)]*\))+)/g, ':host($1)')
+  .replace(/^(\[data-file-header=[^\]]+\])/gm, ':host($1)');
+await writeFile(resolve(dist, 'inpage.css'), css + '\n' + await readFile(r('src/inpage/layout.css'), 'utf8'));
