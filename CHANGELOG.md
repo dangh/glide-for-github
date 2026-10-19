@@ -2,6 +2,17 @@
 
 Newest first. Each release's GitHub notes are its section here (`scripts/release-notes.sh`).
 
+## Unreleased
+
+### New
+
+- **Related files.** A lock file shows with its manifest, and serverless parts with serverless.yml, so they read as one
+  change. By default each related file folds into one line at the bottom of its main file's box, with a "lock file" tag,
+  its counts and its comments; click it to open its diff. One Viewed covers the main file and its related files, and
+  marks each of them viewed on GitHub. In the tree, a related file sits right under its main file, indented. Pick
+  another look in the Display menu or on the options page (one box, a group rail, or off), and edit the rules there:
+  a main file pattern and its related files, in the same folder, with `${basename}` for the main file's name.
+
 ## 0.3.1 (2026-10-19)
 
 ### Fixes

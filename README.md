@@ -26,6 +26,8 @@ review features: comments, suggestions, resolving threads, viewed files and revi
 - Commit range picker (all commits, one commit, a range) and hide-whitespace.
 - File groups: tabs in the toolbar show one kind of file at a time in the tree and the diffs (see
   [File groups](#file-groups)).
+- Related files: a lock file folds under its manifest, and serverless parts under serverless.yml, with one Viewed for
+  both (see [Related files](#related-files)).
 - When someone pushes to the pull request, a "This pull request was updated" banner offers Reload. Glide checks every
   60 s while its tab is visible and never reloads by itself; Reload keeps your drafts and open comment boxes.
 - Reading needs no token. Posting comments, replies, reviews, edits and reactions needs one (next section). Applying
@@ -72,6 +74,33 @@ The groups, their patterns and the pattern engine come from [Sift for GitHub](ht
 which adds the same tabs to GitHub's own Files changed page. Already use Sift? The options page imports its tabs, the
 tab it opens pull requests on and its hide-empty switch. Unlike Sift, which opens on Source, Glide opens on All until
 you pick another group there.
+
+## Related files
+
+Some files are best read together: `package-lock.json` with `package.json`, `serverless-resources.yml` with
+`serverless.yml`. Glide shows such a related file with its main file, so skimming a pull request costs one stop, not
+two.
+
+- **Nested** (default). The related file folds into one line at the bottom of its main file's box: its name, a "lock
+  file" tag for lock files, its counts and its comment count. Click the line to open its diff, where comments,
+  suggestions and expanders work as in any file. One Viewed covers the main file and its related files; it marks each
+  of them viewed on GitHub, and shows checked only when all are viewed. The viewed counter still counts files.
+- **One box.** The files share one box under a "package.json + 1 related" header with their summed counts, each file
+  with its own small header and full diff.
+- **Group rail.** The files keep their own boxes under a "package.json · 2 files" line with a "Viewed all" checkbox, tied
+  by a rail.
+- **Off.** Every file on its own, in GitHub's order.
+
+Pick the look in the Display menu or on the options page, which shows a preview of each. In the file tree a related
+file sits right after its main file, indented and dimmed; clicking it opens it. With file groups, files are related
+only when both are in the open group; otherwise each shows on its own, as does a related file whose main file the pull
+request doesn't change.
+
+**Rules.** On the options page, each rule is a main file pattern and its related files, one per line, as file names in
+the same folder: `*` and `?` match characters, `${basename}` is the main file's name without its extension. Add,
+delete, reorder, reset to the defaults, and try paths to see what relates. The defaults cover npm, Yarn, pnpm and Bun,
+Deno, Cargo, Poetry, uv, PDM, Pipenv, pip-tools, pixi, Bundler, Go modules and workspaces, Composer, Pub, CocoaPods,
+SwiftPM, Nix flakes, Mix, Helm, Gradle, NuGet and Serverless.
 
 ## Install
 
@@ -121,8 +150,8 @@ extension icon, then **Options**).
 - Your token is stored in `chrome.storage.local`, on this device only, with the GitHub username it belongs to. It is
   sent only to `api.github.com`, only from the extension's own pages, never to the github.com page, and the options
   page never displays it.
-- Settings and file groups are stored in `chrome.storage.sync` (each file group is its own item), so Chrome can sync
-  them between your signed-in browsers. They contain no tokens and no pull request data.
+- Settings, file groups and related-files rules are stored in `chrome.storage.sync` (each file group is its own item),
+  so Chrome can sync them between your signed-in browsers. They contain no tokens and no pull request data.
 - The Sift import only parses the text you paste; Glide reads nothing from Sift. The full list of what Glide stores,
   including what it keeps in the tab's `sessionStorage`, is in the [privacy policy](store/PRIVACY.md).
 

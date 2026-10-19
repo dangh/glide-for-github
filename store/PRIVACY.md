@@ -15,8 +15,8 @@ github.com, which redirects to `raw.githubusercontent.com`, GitHub's file-conten
   belongs to (shown in the options page) and the owner it is for. The options page lists tokens by owner and
   never shows their values; you can remove them there at any time.
 - Your settings (layout, themes and so on) in `chrome.storage.sync`, which Chrome may sync between your signed-in
-  browsers. Your file groups (each group's name and patterns) are there too, one item per group. They contain no
-  tokens and no pull request data.
+  browsers. Your file groups (each group's name and patterns) are there too, one item per group, and your related-files
+  rules (file name patterns), in one item. They contain no tokens and no pull request data.
 - In the browser tab's `sessionStorage`, discarded when the tab closes: unsent comment drafts, a pending suggestion
   batch and a random key that stops a retried suggestion commit from being applied twice, the file group you picked on
   each pull request (so a reload reopens it), and, with "Scroll with the page" on, your place in the diff list (a file
