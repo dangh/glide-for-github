@@ -106,7 +106,7 @@ describe('fullFileDiff ("Load diff" fallback) size cap', () => {
 
   it('treats a missing side (404) as empty', async () => {
     const rpc: Rpc = {
-      call: ((method: string, url: string) =>
+      call: ((_method: string, url: string) =>
         url.includes('/base/')
           ? Promise.reject(new BridgeError({ status: 404, message: 'Not Found' }))
           : Promise.resolve('new\n')) as unknown as Rpc['call'],

@@ -7,7 +7,6 @@ import {
   chunkPaths,
   fetchDiffEntries,
   fetchDiffEntryLines,
-  fetchDiffs,
   fetchFullFile,
   fetchPrData,
   fetchStack,
@@ -116,36 +115,36 @@ describe('fetchPrData', () => {
   });
 });
 
-describe('fetchDiffs', () => {
-  it('returns lines for every requested path with one request per chunk (collapsed files stay empty)', async () => {
+describe('fetchDiffEntries', () => {
+  it('returns entries for every requested path with one request per chunk (collapsed files stay empty)', async () => {
     const rpc = fakeRpc();
-    const diffs = await fetchDiffs(rpc, ref, allPaths, W0);
-    expect([...diffs.keys()]).toEqual(allPaths);
-    expect(diffs.get('src/obsolete.ts')).toEqual([]);
-    expect(diffs.get('generated/big.generated.ts')).toEqual([]);
-    expect(diffs.get('assets/logo.png')).toEqual([]);
-    expect(diffs.get('src/util/math.ts')!.filter((l) => l.type === 'ADDITION')).toHaveLength(7);
+    const entries = await fetchDiffEntries(rpc, ref, allPaths, W0);
+    expect([...entries.keys()]).toEqual(allPaths);
+    expect(entries.get('src/obsolete.ts')!.lines).toEqual([]);
+    expect(entries.get('generated/big.generated.ts')!.lines).toEqual([]);
+    expect(entries.get('assets/logo.png')!.lines).toEqual([]);
+    expect(entries.get('src/util/math.ts')!.lines.filter((l) => l.type === 'ADDITION')).toHaveLength(7);
     expect(rpc.calls.map((c) => c.args[0])).toEqual([`${base}/page_data/diff_entries`]);
   });
 
   it('defaults range to the head oid, like the GitHub client', async () => {
     const rpc = fakeRpc();
-    await fetchDiffs(rpc, ref, ['src/util/math.ts'], W0);
+    await fetchDiffEntries(rpc, ref, ['src/util/math.ts'], W0);
     expect(decodePathsQuery(rawQueries(rpc, 'diff_entries')[0]!).params.get('range')).toBe(HEAD);
   });
 
   it('sends w=1 and range when asked', async () => {
     const rpc = fakeRpc();
-    const diffs = await fetchDiffs(rpc, ref, ['src/whitespace.ts'], { whitespace: true, headOid: HEAD, range: 'abc123' });
+    const entries = await fetchDiffEntries(rpc, ref, ['src/whitespace.ts'], { whitespace: true, headOid: HEAD, range: 'abc123' });
     const params = decodePathsQuery(rawQueries(rpc, 'diff_entries')[0]!).params;
     expect(params.get('w')).toBe('1');
     expect(params.get('range')).toBe('abc123');
-    expect(diffs.get('src/whitespace.ts')!.some((l) => l.type === 'ADDITION' || l.type === 'DELETION')).toBe(false);
+    expect(entries.get('src/whitespace.ts')!.lines.some((l) => l.type === 'ADDITION' || l.type === 'DELETION')).toBe(false);
   });
 
   it('encodes awkward paths', async () => {
     const rpc = fakeRpc();
-    const diffs = await fetchDiffs(rpc, ref, AWKWARD, W0);
+    const entries = await fetchDiffEntries(rpc, ref, AWKWARD, W0);
     const [raw] = rawQueries(rpc, 'diff_entries');
     // Per-path tokens of the `paths` value, exactly as they appear on the wire (`,` is sent as %2C).
     const tokens = (query: string) => new Map(
@@ -165,14 +164,14 @@ describe('fetchDiffs', () => {
     expect(ours.get('docs/with space.md')).toBe('docs%252Fwith%2520space.md');
     expect(fixture('diff-entries-w0.json').data.some((e: { path: string }) => e.path === 'docs/with space.md')).toBe(true);
     // results keyed by the exact original paths
-    expect([...diffs.keys()]).toEqual(AWKWARD);
-    for (const p of AWKWARD) expect(diffs.get(p)!.length).toBeGreaterThan(0);
+    expect([...entries.keys()]).toEqual(AWKWARD);
+    for (const p of AWKWARD) expect(entries.get(p)!.lines.length).toBeGreaterThan(0);
   });
 
   it('fills paths GitHub omits (no changes in that range) with empty lines', async () => {
     const rpc = fakeRpc((path) => (path.endsWith('/diff_entries') ? { data: [], link: null } : undefined));
-    const diffs = await fetchDiffs(rpc, ref, ['src/util/math.ts'], W0);
-    expect(diffs.get('src/util/math.ts')).toEqual([]);
+    const entries = await fetchDiffEntries(rpc, ref, ['src/util/math.ts'], W0);
+    expect(entries.get('src/util/math.ts')!.lines).toEqual([]);
   });
 
   it('chunks requests: <= 20 paths and <= 6,000 chars of encoded paths each, at most 6 in flight', async () => {
@@ -187,7 +186,7 @@ describe('fetchDiffs', () => {
       inFlight--;
       return { data: [], link: null };
     });
-    const diffs = await fetchDiffs(rpc, ref, paths, W0);
+    const entries = await fetchDiffEntries(rpc, ref, paths, W0);
     const raws = rawQueries(rpc, 'diff_entries');
     const requested: string[] = [];
     for (const raw of raws) {
@@ -201,7 +200,7 @@ describe('fetchDiffs', () => {
     expect(raws.length).toBeGreaterThan(paths.length / MAX_PATHS_PER_REQUEST);
     expect(maxInFlight).toBeLessThanOrEqual(MAX_IN_FLIGHT);
     expect(maxInFlight).toBeGreaterThan(1);
-    expect([...diffs.keys()]).toEqual(paths);
+    expect([...entries.keys()]).toEqual(paths);
   });
 
   it('chunkPaths keeps order and puts an over-long single path alone', () => {
@@ -219,8 +218,8 @@ describe('fetchDiffs', () => {
       }
       return undefined;
     });
-    const diffs = await fetchDiffs(rpc, ref, ['src/util/math.ts'], W0);
-    expect(diffs.get('src/util/math.ts')!.length).toBeGreaterThan(0);
+    const entries = await fetchDiffEntries(rpc, ref, ['src/util/math.ts'], W0);
+    expect(entries.get('src/util/math.ts')!.lines.length).toBeGreaterThan(0);
     expect(rawQueries(rpc, 'diff_entries')).toHaveLength(2);
   });
 
@@ -231,7 +230,7 @@ describe('fetchDiffs', () => {
       if (decodePathsQuery((query as { raw: string }).raw).paths.includes('f25.ts')) throw { status: 500, message: 'boom' };
       return { data: [], link: null };
     });
-    await expect(fetchDiffs(rpc, ref, paths, W0)).rejects.toMatchObject({ status: 500 });
+    await expect(fetchDiffEntries(rpc, ref, paths, W0)).rejects.toMatchObject({ status: 500 });
     const failing = rawQueries(rpc, 'diff_entries').filter((r) => decodePathsQuery(r).paths.includes('f25.ts'));
     expect(failing).toHaveLength(2);
   });

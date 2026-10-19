@@ -314,18 +314,6 @@ export function threadsByPath(threads: ThreadModel[]): Map<string, ThreadModel[]
   return map;
 }
 
-const threadsByIdCache = new WeakMap<ThreadModel[], Map<string, ThreadModel>>();
-
-/** A thread by id; the index is cached per `threads` array. */
-export function threadById(threads: ThreadModel[], id: string): ThreadModel | undefined {
-  let map = threadsByIdCache.get(threads);
-  if (!map) {
-    map = new Map(threads.map((t) => [t.id, t]));
-    threadsByIdCache.set(threads, map);
-  }
-  return map.get(id);
-}
-
 /**
  * A thread's stable key: its first comment's database id. Unlike `id`, it does not change when a provisional
  * thread (`local:<dbId>`) is replaced by the server's copy, so annotation slots, reply drafts (`draftKey.reply(key)`)

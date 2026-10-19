@@ -620,15 +620,6 @@ export async function loadEntryLines(rpc: Rpc, ref: PrRef, entry: DiffEntry, opt
 }
 
 /**
- * Diff lines per path; see `fetchDiffEntries` for batching, retry and completeness rules. Collapsed
- * and too-large files map to `[]` here: use `fetchDiffEntries` to see their flags.
- */
-export async function fetchDiffs(rpc: Rpc, ref: PrRef, paths: string[], opts: DiffOptions): Promise<Map<string, GithubDiffLine[]>> {
-  const entries = await fetchDiffEntries(rpc, ref, paths, opts);
-  return new Map([...entries].map(([p, e]) => [p, e.lines]));
-}
-
-/**
  * `GET page_data/diff_entry_lines` (R§1.3): the whole diff of one file, with `contextRanges` injected as
  * INJECTED_CONTEXT rows. With no ranges this is the "Load diff" request for too-large and collapsed files.
  */

@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS, saveSettings, SETTINGS_STORAGE_KEY, setSettingsStorag
 import { PORT_TIMEOUT_MESSAGE } from '../../src/viewer/connection';
 import { usePr } from '../../src/viewer/state/store';
 import { initSettings, reconcileSettings, useSettings } from '../../src/viewer/state/settings';
-import { createDiffOptionsBuilder, ITEM_METRICS, itemMetricsFor } from '../../src/viewer/state/view';
+import { createDiffOptionsBuilder, itemMetricsFor } from '../../src/viewer/state/view';
 
 /** In-memory sync area that, like chrome.storage, echoes every write back to subscribers (async). */
 function echoingStorage(): SettingsStorage & { writes: number } {
@@ -83,7 +83,7 @@ describe('viewer settings identity', () => {
     const build = createDiffOptionsBuilder();
     const diffOptions = () => build(useSettings.getState().settings.diff, undefined);
     const initial = diffOptions();
-    expect(initial.itemMetrics).toBe(ITEM_METRICS);
+    expect(initial.itemMetrics).toBe(itemMetricsFor(20));
 
     let notifications = 0;
     const stop = useSettings.subscribe(() => notifications++);
@@ -120,14 +120,14 @@ describe('viewer settings identity', () => {
     const build = createDiffOptionsBuilder();
     const diff = DEFAULT_SETTINGS.diff;
     const base = build(diff, undefined);
-    expect(base.itemMetrics).toBe(ITEM_METRICS);
-    expect(ITEM_METRICS).toMatchObject({ lineHeight: 20, diffHeaderHeight: 42, hunkSeparatorHeight: 24 });
+    expect(base.itemMetrics).toBe(itemMetricsFor(20));
+    expect(itemMetricsFor(20)).toMatchObject({ lineHeight: 20, diffHeaderHeight: 42, hunkSeparatorHeight: 24 });
     const big = build(diff, undefined, undefined, undefined, 40);
     expect(big).not.toBe(base);
     expect(big.itemMetrics).toMatchObject({ lineHeight: 40, diffHeaderHeight: 42 });
     expect(build(diff, undefined, undefined, undefined, 40)).toBe(big);
     expect(itemMetricsFor(40)).toBe(big.itemMetrics);
-    expect(itemMetricsFor(20)).toBe(ITEM_METRICS);
+    expect(itemMetricsFor(20)).toBe(base.itemMetrics);
   });
 
   it("reserves each header style's height and GitHub's 24 px separator rows only for hunkSeparators 'default'", () => {
@@ -141,7 +141,7 @@ describe('viewer settings identity', () => {
     const build = createDiffOptionsBuilder();
     expect(build(DEFAULT_SETTINGS.diff, undefined).itemMetrics).toMatchObject({ paddingBottom: 0 });
     expect(build({ ...DEFAULT_SETTINGS.diff, overflow: 'scroll' }, undefined).itemMetrics).toMatchObject({ paddingBottom: 8 });
-    expect(build({ ...DEFAULT_SETTINGS.diff, overflow: 'wrap' }, undefined).itemMetrics).toBe(ITEM_METRICS);
+    expect(build({ ...DEFAULT_SETTINGS.diff, overflow: 'wrap' }, undefined).itemMetrics).toBe(itemMetricsFor(20));
   });
 
   it('reconcileSettings keeps section identity when values are equal', () => {
